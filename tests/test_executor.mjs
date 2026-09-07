@@ -7,7 +7,9 @@
 
 import assert from "node:assert/strict";
 import http from "node:http";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
 import { createMndeExecutor } from "../executor/index.mjs";
 import { startMndeSidecar } from "../executor/sidecar-harness.mjs";
@@ -120,6 +122,30 @@ async function main() {
       assert.equal(r.failClosed, true);
     } finally {
       await new Promise((done) => server.close(done));
+    }
+  });
+
+  await test("9. Hostile execution IDs cannot escape the receipt directory", async () => {
+    const root = mkdtempSync(join(tmpdir(), "mnde-executor-path-"));
+    const receiptsDir = join(root, "receipts");
+    const outsideVictim = join(root, "victim.json");
+    try {
+      const offline = createMndeExecutor({ sidecarUrl: "http://127.0.0.1:8799", receiptsDir, timeoutMs: 250 });
+      let ran = false;
+      const r = await offline.execute({
+        action: "read_status",
+        input: {},
+        executionId: "/../../victim",
+        run: async () => { ran = true; }
+      });
+      const rel = relative(resolve(receiptsDir), resolve(r.receiptPath));
+      assert.equal(ran, false);
+      assert.equal(r.decision, "REFUSE");
+      assert.ok(rel && !rel.startsWith("..") && !isAbsolute(rel), `receipt escaped: ${r.receiptPath}`);
+      assert.match(r.receiptPath, /failclosed-[0-9a-f]{64}\.json$/);
+      assert.equal(existsSync(outsideVictim), false, "hostile ID must not create or overwrite an outside JSON file");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 

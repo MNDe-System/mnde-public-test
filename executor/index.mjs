@@ -24,10 +24,12 @@
 //   ALLOW not backed by a verified request-bound receipt, executes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { isAbsolute, relative, resolve } from "node:path";
 
 import { reviewerRequest } from "../scripts/reviewer-request.mjs";
+import { sha256 } from "../src/crypto/provider.mjs";
+import { createContainmentGuard } from "../src/containment/index.mjs";
 import { verifyReceiptFile, verificationPassed } from "../tools/verify-receipt.mjs";
 import { verifyAnyReceiptFile } from "../tools/verify.mjs";
 import { isSignedReceiptEnvelope, SIGNED_RECEIPT_SCHEMA } from "../src/authority-signing/index.mjs";
@@ -56,6 +58,17 @@ function loadVerifyBundle(pathOrUndefined) {
   try {
     return JSON.parse(readFileSync(pathOrUndefined, "utf8"));
   } catch {
+    return undefined;
+  }
+}
+
+function loadContainmentManifest(pathOrUndefined) {
+  if (!pathOrUndefined) return undefined;
+  try {
+    return JSON.parse(readFileSync(pathOrUndefined, "utf8"));
+  } catch {
+    // Strict mode treats an unreadable or malformed manifest exactly like a
+    // missing one: every action is refused by the local containment guard.
     return undefined;
   }
 }
@@ -103,7 +116,7 @@ export function receiptForBinding(receipt) {
 }
 
 export function receiptBinding(receipt) {
-  if (!isPlainObject(receipt)) return { decision: null, requestIds: [], action: null, params: null, subjectId: null, policyHash: null, policyVersion: null };
+  if (!isPlainObject(receipt)) return { decision: null, requestIds: [], action: null, params: null, subjectId: null, policyHash: null, policyVersion: null, containment: null };
   // Defense in depth: bindings always come from the (verified) inner receipt, so
   // even a caller that hands us a raw custody envelope binds the inner receipt
   // rather than the binding-less outer wrapper.
@@ -156,7 +169,10 @@ export function receiptBinding(receipt) {
       ? (typeof er?.actor?.user_id === "string" ? er.actor.user_id : null)
       : (typeof cr?.principal?.id === "string" ? cr.principal.id : null),
     policyHash: dout.policy_hash ?? receipt.policy_hash ?? null,
-    policyVersion: dout.policy_version ?? receipt.policy_version ?? null
+    policyVersion: dout.policy_version ?? receipt.policy_version ?? null,
+    containment: er
+      ? (isPlainObject(er.mnde_containment) ? er.mnde_containment : null)
+      : (isPlainObject(cr?.context?.mnde_containment) ? cr.context.mnde_containment : null)
   };
 }
 
@@ -203,11 +219,27 @@ export function createMndeExecutor(config = {}) {
   const verifyEnvironmentId = config.verifyEnvironmentId ?? process.env.MNDE_VERIFY_ENVIRONMENT_ID ?? undefined;
   const verifyExpectedExecutorId = config.verifyExpectedExecutorId ?? process.env.MNDE_VERIFY_EXPECTED_EXECUTOR_ID ?? undefined;
   const verifyRequireExecutor = config.verifyRequireExecutor === true || (typeof verifyExpectedExecutorId === "string" && verifyExpectedExecutorId.length > 0);
+  const containmentMode = config.containmentMode ?? process.env.MNDE_CONTAINMENT_MODE ?? "off";
+  const containmentManifest = config.containmentManifest
+    ?? loadContainmentManifest(config.containmentManifestPath ?? process.env.MNDE_CONTAINMENT_MANIFEST);
+  // The guard snapshots and validates the operator-owned manifest now. An agent
+  // cannot weaken it through action inputs or requestOverrides later.
+  const containmentGuard = createContainmentGuard({ mode: containmentMode, manifest: containmentManifest });
 
   mkdirSync(receiptsDir, { recursive: true });
+  const canonicalReceiptsDir = realpathSync(receiptsDir);
+
+  function receiptFileName(kind, executionId) {
+    const digest = sha256(String(executionId));
+    return `${kind}-${digest}.json`;
+  }
 
   function persist(name, value) {
-    const filePath = join(receiptsDir, name);
+    const filePath = resolve(canonicalReceiptsDir, name);
+    const rel = relative(canonicalReceiptsDir, filePath);
+    if (!rel || rel.startsWith("..") || isAbsolute(rel)) {
+      throw new Error("receipt path escapes the configured receipt directory");
+    }
     writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
     return filePath;
   }
@@ -233,7 +265,7 @@ export function createMndeExecutor(config = {}) {
   // The strict execution gate. Runs ONLY when the sidecar's HTTP decision was
   // ALLOW; returns { ok, reason } and never has a side effect. `ok:true` is the
   // sole condition under which the wrapped function may run.
-  function authorizeExecution({ receipt, action, input, executionId, verified }) {
+  function authorizeExecution({ receipt, action, input, executionId, verified, containmentEvidence }) {
     if (!isPlainObject(receipt)) return { ok: false, reason: "ERR_NO_RECEIPT" };
     if (verified !== true) return { ok: false, reason: "ERR_RECEIPT_UNVERIFIED" };
     // When an executor identity is required, raw legacy/PE receipts and
@@ -262,10 +294,17 @@ export function createMndeExecutor(config = {}) {
     // Expected-policy binding (only when the caller declares one).
     if (expectedPolicyHash && b.policyHash !== expectedPolicyHash) return { ok: false, reason: "ERR_POLICY_MISMATCH" };
     if (expectedPolicyVersion && b.policyVersion !== expectedPolicyVersion) return { ok: false, reason: "ERR_POLICY_MISMATCH" };
+    // In strict containment mode, the signed receipt must carry the exact
+    // operator-owned capability classification assessed before the request.
+    // This prevents a sidecar, request override, or confused adapter from
+    // silently dropping or substituting containment evidence.
+    if (containmentMode === "strict" && !jsonEqual(b.containment, containmentEvidence)) {
+      return { ok: false, reason: "ERR_CONTAINMENT_RECEIPT_MISMATCH" };
+    }
     return { ok: true, reason: null };
   }
 
-  function buildRequest({ action, input, executionId, requestOverrides }) {
+  function buildRequest({ action, input, executionId, requestOverrides, containmentEvidence }) {
     const base = reviewerRequest({
       requestId: executionId,
       tool: action,
@@ -273,12 +312,21 @@ export function createMndeExecutor(config = {}) {
       installationId,
       parameters: isPlainObject(input) ? input : {}
     });
-    return isPlainObject(requestOverrides) ? deepMerge(base, requestOverrides) : base;
+    const request = isPlainObject(requestOverrides) ? deepMerge(base, requestOverrides) : base;
+    if (containmentEvidence) {
+      // Reserved evidence is written after requestOverrides so untrusted caller
+      // data cannot replace the operator-owned capability classification.
+      request.execution_request = {
+        ...request.execution_request,
+        mnde_containment: containmentEvidence
+      };
+    }
+    return request;
   }
 
   // Ask MNDe. Fails closed: any transport/parse/shape problem returns { error }.
-  async function askMnde({ action, input, executionId, requestOverrides }) {
-    const request = buildRequest({ action, input, executionId, requestOverrides });
+  async function askMnde({ action, input, executionId, requestOverrides, containmentEvidence }) {
+    const request = buildRequest({ action, input, executionId, requestOverrides, containmentEvidence });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let response;
@@ -317,11 +365,31 @@ export function createMndeExecutor(config = {}) {
       throw new TypeError("mnde.execute({ run }) requires run to be a function");
     }
     const id = executionId ?? nextExecutionId(action);
-    const decision = await askMnde({ action, input, executionId: id, requestOverrides });
+    const containment = containmentGuard.assess(action);
+    if (!containment.ok) {
+      const receiptPath = persist(receiptFileName("failclosed", id), {
+        mnde_failclosed: true,
+        decision: "REFUSE",
+        action: action ?? null,
+        execution_id: id,
+        reason: containment.reason,
+        capability: containment.capability ?? null,
+        note: "Client-side strict containment refusal. The action was blocked before the sidecar was contacted and did not run.",
+        recorded_at: new Date().toISOString()
+      });
+      return buildResult({ decision: "REFUSE", executed: false, reason: containment.reason, receipt: null, receiptPath, verified: false, failClosed: true });
+    }
+    const decision = await askMnde({
+      action,
+      input,
+      executionId: id,
+      requestOverrides,
+      containmentEvidence: containment.evidence
+    });
 
     // FAIL CLOSED — the sidecar gave us nothing we can trust. run() is unreachable here.
     if (decision.error) {
-      const receiptPath = persist(`failclosed-${id}.json`, {
+      const receiptPath = persist(receiptFileName("failclosed", id), {
         mnde_failclosed: true,
         decision: "REFUSE",
         action: action ?? null,
@@ -338,7 +406,7 @@ export function createMndeExecutor(config = {}) {
     let receiptPath = null;
     let verified = null;
     if (decision.receipt) {
-      receiptPath = persist(`receipt-${id}.json`, decision.receipt);
+      receiptPath = persist(receiptFileName("receipt", id), decision.receipt);
       verified = await offlineVerify(receiptPath);
     }
 
@@ -352,12 +420,19 @@ export function createMndeExecutor(config = {}) {
     // offline-verified receipt whose OWN signed decision is ALLOW and which is
     // bound to this exact request (and expected policy, when declared). Fail closed
     // on any gap. This is the execution-firewall claim.
-    const authz = authorizeExecution({ receipt: decision.receipt, action, input, executionId: id, verified });
+    const authz = authorizeExecution({
+      receipt: decision.receipt,
+      action,
+      input,
+      executionId: id,
+      verified,
+      containmentEvidence: containment.evidence
+    });
     if (!authz.ok) {
       // Always persist a DISTINCT refusal record — even when the sidecar's ALLOW
       // receipt was also stored — so an audit can tell the executor refused it
       // rather than mistaking the stored ALLOW for an execution.
-      const failPath = persist(`failclosed-${id}.json`, {
+      const failPath = persist(receiptFileName("failclosed", id), {
         mnde_failclosed: true,
         decision: "REFUSE",
         action: action ?? null,
@@ -425,7 +500,9 @@ export function createMndeExecutor(config = {}) {
       verifyTrustedRootFingerprint,
       verifyEnvironmentId,
       verifyExpectedExecutorId,
-      verifyRequireExecutor
+      verifyRequireExecutor,
+      containmentMode,
+      containmentManifestDigest: containmentGuard.manifestDigest ?? null
     }
   };
 }

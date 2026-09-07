@@ -119,9 +119,11 @@ function resolveCheckpointKey(bundle, keyId, signedAt, now) {
 // signature authenticates against a `checkpoint`-role key in a bundle that is
 // itself pinned to `trustedRootFingerprint`.
 //
-// `previousCheckpoint` (optional) enforces the chain link. `now` defaults to
+// `previousCheckpoint` (optional) enforces the authenticated chain link. When
+// the parent committed a different authority bundle (for example during key
+// rotation), supply that bundle as `previousAuthorityBundle`. `now` defaults to
 // wall-clock; pass it in tests for determinism.
-export async function verifyAuthorityCheckpoint({ checkpoint, authorityBundle, trustedRootFingerprint, previousCheckpoint = null, now } = {}) {
+export async function verifyAuthorityCheckpoint({ checkpoint, authorityBundle, trustedRootFingerprint, previousCheckpoint = null, previousAuthorityBundle = null, now } = {}) {
   const at = now ?? new Date().toISOString();
   if (!isObject(checkpoint)) return { ok: false, reason: "MALFORMED" };
   if (checkpoint.schema !== CHECKPOINT_SCHEMA) return { ok: false, reason: "UNSUPPORTED_SCHEMA" };
@@ -162,6 +164,20 @@ export async function verifyAuthorityCheckpoint({ checkpoint, authorityBundle, t
     if (checkpoint.previous_checkpoint_digest !== checkpointDigest(previousCheckpoint)) return { ok: false, reason: "PREVIOUS_CHECKPOINT_MISMATCH" };
     if (previousCheckpoint.authority_id !== checkpoint.authority_id) return { ok: false, reason: "AUTHORITY_MISMATCH", detail: "previous checkpoint authority differs" };
     if (previousCheckpoint.sequence !== checkpoint.sequence - 1) return { ok: false, reason: "EPOCH_INVALID", detail: "sequence must increase by one" };
+    if (!isInt(previousCheckpoint.authority_epoch) || previousCheckpoint.authority_epoch > checkpoint.authority_epoch) {
+      return { ok: false, reason: "EPOCH_INVALID", detail: "authority epoch must not decrease" };
+    }
+
+    // A matching digest is only a link to bytes, not proof that those bytes were
+    // ever authorized. Authenticate the parent independently under the same
+    // pinned root before accepting it as chain history.
+    const parentCheck = await verifyAuthorityCheckpoint({
+      checkpoint: previousCheckpoint,
+      authorityBundle: previousAuthorityBundle ?? authorityBundle,
+      trustedRootFingerprint,
+      now: at
+    });
+    if (!parentCheck.ok) return { ok: false, reason: "PREVIOUS_CHECKPOINT_INVALID", detail: parentCheck.reason };
   }
 
   // 4) Authenticate the signature against a valid, in-role checkpoint key.

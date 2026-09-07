@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 
 import { bootstrapReceiptKeys } from "../scripts/bootstrap_dev_receipt_keys.mjs";
 import { startMndeSidecar } from "../executor/sidecar-harness.mjs";
-import { normalizeReceipt } from "../sidecar/production_api.mjs";
+import { normalizeReceipt, readRecentReceipts } from "../sidecar/production_api.mjs";
 import { buildSidecarRefusalReceipt } from "../sidecar/refusal_receipt.mjs";
 import { buildAuthorityBundle, generateAuthorityKeyPair } from "../src/custody/index.mjs";
 import { signPolicyBundle } from "../src/policy-bundles/index.mjs";
@@ -169,6 +169,44 @@ async function main() {
     assert.equal(normalizeReceipt({ timestamp: "garbage", verifiable_signature: { signed_at: "also garbage" } }).timestamp, null);
     assert.equal(normalizeReceipt({ verifiable_signature: { signed_at: { evil: true } } }).timestamp, null);
     assert.equal(normalizeReceipt({ verifiable_signature: "not-an-object" }).timestamp, null);
+  });
+
+  await test("recent receipt reads handle chunk boundaries and stop at the requested window", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mnde-recent-receipts-"));
+    const receiptPath = join(dir, "receipts.jsonl");
+    const warnings = [];
+    try {
+      const old = { receipt_id: "old", decision_output: { decision: "ALLOW" } };
+      const large = { receipt_id: "large", note: "é".repeat(40_000), decision_output: { decision: "REFUSE" } };
+      const newest = { receipt_id: "newest", decision_output: { decision: "ALLOW" } };
+      writeFileSync(receiptPath, `${JSON.stringify(old)}\nnot-json\n${JSON.stringify(large)}\n${JSON.stringify(newest)}\n`, "utf8");
+
+      const recent = readRecentReceipts(receiptPath, 2, (warning) => warnings.push(warning));
+      assert.deepEqual(recent.map((receipt) => receipt.receipt_id), ["newest", "large"]);
+      assert.deepEqual(warnings, [], "older malformed history must not be loaded once the recent limit is satisfied");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  await test("recent receipt reads skip malformed tail records while filling the window", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mnde-recent-malformed-"));
+    const receiptPath = join(dir, "receipts.jsonl");
+    const warnings = [];
+    try {
+      writeFileSync(receiptPath, [
+        JSON.stringify({ receipt_id: "older", decision_output: { decision: "REFUSE" } }),
+        "not-json",
+        JSON.stringify({ receipt_id: "newest", decision_output: { decision: "ALLOW" } }),
+        ""
+      ].join("\n"), "utf8");
+      const recent = readRecentReceipts(receiptPath, 2, (warning) => warnings.push(warning));
+      assert.deepEqual(recent.map((receipt) => receipt.receipt_id), ["newest", "older"]);
+      assert.equal(warnings.length, 1);
+      assert.equal(typeof warnings[0].byte_offset, "number");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   await test("custody envelopes normalize from their signed inner receipt", () => {

@@ -109,7 +109,14 @@ export function toPolicyEngineRequest(body, now) {
     tool: { tool_name: typeof toolCall?.tool === "string" ? toolCall.tool : "unknown" },
     parameters: toolCall && typeof toolCall.parameters === "object" && toolCall.parameters !== null ? toolCall.parameters : {},
     environment: { region: typeof er?.submitted_region === "string" ? er.submitted_region : "unknown" },
-    context: {}
+    // Containment evidence is supplied by the enforcing executor, included in
+    // the canonical request, and checked again by that executor against the
+    // signed receipt. A direct caller can submit arbitrary metadata here, but it
+    // gains no execution authority because strict executors require an exact
+    // match to their operator-owned manifest snapshot.
+    context: er?.mnde_containment && typeof er.mnde_containment === "object" && !Array.isArray(er.mnde_containment)
+      ? { mnde_containment: er.mnde_containment }
+      : {}
   };
 }
 

@@ -130,8 +130,14 @@ export async function evaluateWitnessThreshold({ checkpointDigest, attestations,
   if (!isObject(policy) || policy.schema !== WITNESS_POLICY_SCHEMA || !isInt(policy.required)) {
     return { ok: false, reason: "MALFORMED_POLICY" };
   }
+  if (!Array.isArray(policy.eligible_witnesses)
+      || policy.eligible_witnesses.some((id) => typeof id !== "string" || id.length === 0)
+      || new Set(policy.eligible_witnesses).size !== policy.eligible_witnesses.length
+      || policy.required > policy.eligible_witnesses.length) {
+    return { ok: false, reason: "MALFORMED_POLICY", field: "eligible_witnesses" };
+  }
   if (!isDigest(checkpointDigest)) return { ok: false, reason: "MALFORMED", field: "checkpoint_digest" };
-  const eligible = Array.isArray(policy.eligible_witnesses) ? new Set(policy.eligible_witnesses) : null;
+  const eligible = new Set(policy.eligible_witnesses);
   const counted = new Set();
   const rejected = [];
   for (const attestation of Array.isArray(attestations) ? attestations : []) {
@@ -140,7 +146,7 @@ export async function evaluateWitnessThreshold({ checkpointDigest, attestations,
       rejected.push({ witness_id: isObject(attestation) ? attestation.witness_id : null, reason: v.reason });
       continue;
     }
-    if (eligible && !eligible.has(v.witness_id)) {
+    if (!eligible.has(v.witness_id)) {
       rejected.push({ witness_id: v.witness_id, reason: "WITNESS_NOT_ELIGIBLE" });
       continue;
     }

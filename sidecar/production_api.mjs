@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { canonicalizeJson } from "../shared/json.ts";
 import { sha256 } from "../src/crypto/provider.mjs";
@@ -6,6 +6,7 @@ import { sha256 } from "../src/crypto/provider.mjs";
 const RECEIPT_LIMIT_DEFAULT = 100;
 const RECEIPT_LIMIT_MIN = 1;
 const RECEIPT_LIMIT_MAX = 500;
+const RECEIPT_TAIL_CHUNK_BYTES = 64 * 1024;
 const RECEIPT_SIGNATURE_STATES = new Set(["VALID", "INVALID", "UNKNOWN", "NOT_REPORTED"]);
 const REPLAY_STATES = new Set(["VALID", "DRIFT", "UNKNOWN", "NOT_REPORTED"]);
 const FORBIDDEN_AUDIT_PATTERNS = [
@@ -90,21 +91,55 @@ export function normalizeReceipt(raw) {
 export function readRecentReceipts(receiptPath, limit = RECEIPT_LIMIT_DEFAULT, onMalformed = () => {}) {
   const boundedLimit = clampReceiptLimit(limit);
   if (!existsSync(receiptPath)) return [];
-  const source = readFileSync(receiptPath, "utf8").trim();
-  if (!source) return [];
-
   const parsed = [];
-  const lines = source.split(/\r?\n/);
-  for (let index = lines.length - 1; index >= 0 && parsed.length < boundedLimit; index -= 1) {
-    const line = lines[index].trim();
-    if (!line) continue;
-    try {
-      const raw = JSON.parse(line);
-      if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("receipt line is not an object");
-      parsed.push(normalizeReceipt(raw));
-    } catch (error) {
-      onMalformed({ line: index + 1, reason: error instanceof Error ? error.message : "malformed receipt" });
+  const fd = openSync(receiptPath, "r");
+  try {
+    let position = fstatSync(fd).size;
+    let leadingFragment = Buffer.alloc(0);
+
+    const parseLine = (bytes, byteOffset) => {
+      const line = bytes.toString("utf8").replace(/\r$/, "").trim();
+      if (!line || parsed.length >= boundedLimit) return;
+      try {
+        const raw = JSON.parse(line);
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("receipt line is not an object");
+        parsed.push(normalizeReceipt(raw));
+      } catch (error) {
+        onMalformed({ byte_offset: byteOffset, reason: error instanceof Error ? error.message : "malformed receipt" });
+      }
+    };
+
+    // Walk backward in fixed-size chunks. Stop as soon as enough valid recent
+    // receipts have been found, so memory and I/O are independent of old log
+    // history in the normal case.
+    while (position > 0 && parsed.length < boundedLimit) {
+      const start = Math.max(0, position - RECEIPT_TAIL_CHUNK_BYTES);
+      const chunk = Buffer.allocUnsafe(position - start);
+      readSync(fd, chunk, 0, chunk.length, start);
+      const combined = leadingFragment.length > 0 ? Buffer.concat([chunk, leadingFragment]) : chunk;
+      const firstNewline = combined.indexOf(0x0a);
+
+      if (firstNewline < 0 && start > 0) {
+        leadingFragment = combined;
+        position = start;
+        continue;
+      }
+
+      // The first newline terminates the carried partial record, but is also the
+      // delimiter that starts the first complete record in this chunk.
+      const completeStart = start === 0 ? 0 : firstNewline;
+      let end = combined.length;
+      for (let index = combined.length - 1; index >= completeStart && parsed.length < boundedLimit; index -= 1) {
+        if (combined[index] !== 0x0a) continue;
+        parseLine(combined.subarray(index + 1, end), start + index + 1);
+        end = index;
+      }
+      if (parsed.length < boundedLimit && start === 0) parseLine(combined.subarray(0, end), 0);
+      leadingFragment = start === 0 ? Buffer.alloc(0) : combined.subarray(0, firstNewline);
+      position = start;
     }
+  } finally {
+    closeSync(fd);
   }
   return parsed;
 }

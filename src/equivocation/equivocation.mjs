@@ -103,7 +103,13 @@ export async function analyzeCheckpointConflict({
   if (!vy.ok) return { ok: false, reason: "CANDIDATE_Y_INVALID", detail: vy.reason };
 
   const tx = await evaluateWitnessThreshold({ checkpointDigest: vx.checkpoint_digest, attestations: candidateX.attestations, witnessBundle, policy, now });
+  if (!tx.ok && tx.reason !== "THRESHOLD_NOT_MET") {
+    return { ok: false, reason: "CANDIDATE_X_THRESHOLD_INVALID", detail: tx.reason };
+  }
   const ty = await evaluateWitnessThreshold({ checkpointDigest: vy.checkpoint_digest, attestations: candidateY.attestations, witnessBundle, policy, now });
+  if (!ty.ok && ty.reason !== "THRESHOLD_NOT_MET") {
+    return { ok: false, reason: "CANDIDATE_Y_THRESHOLD_INVALID", detail: ty.reason };
+  }
 
   const conflict = classifyCheckpointConflict(candidateX.checkpoint, candidateY.checkpoint);
 

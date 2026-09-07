@@ -64,8 +64,17 @@ Optional `expectedPolicyHash` / `expectedPolicyVersion` (or `MNDE_EXECUTOR_EXPEC
 | `verifyTrustedRootFingerprint` | unset | out-of-band root pin for custody verification |
 | `verifyEnvironmentId` | unset | expected executor credential environment |
 | `verifyExpectedExecutorId` | unset | require this executor id (also rejects authority-only custody receipts) |
+| `containmentMode` | `off` | set to `strict` to require the independent containment gate (`MNDE_CONTAINMENT_MODE`) |
+| `containmentManifest` | unset | operator-owned manifest object used by strict mode |
+| `containmentManifestPath` | unset | manifest file path (`MNDE_CONTAINMENT_MANIFEST`) |
 
 Returns `{ execute, wrapTool, verifyReceipt, config }`.
+
+In strict containment mode, missing or malformed manifests, unknown tools, and
+escape-enabling capabilities are refused before the sidecar is contacted. The
+signed receipt must also bind the exact action, capabilities, and manifest
+digest assessed by the executor. See
+[`docs/containment-profile.md`](../docs/containment-profile.md).
 
 ### `mnde.execute({ action, input, run, executionId?, requestOverrides? })`
 

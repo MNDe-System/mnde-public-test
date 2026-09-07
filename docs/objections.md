@@ -46,14 +46,15 @@ is the fastest way to lose a security buyer on question one.
 
 ## Objection 2 — "Can the operator just forge these receipts?"
 
-**The honest state today: a receipt cannot be silently altered, but a privileged
-insider who holds both the ledger store and the ledger signing key can still
-rewrite history undetectably.** The receipt itself is tamper-evident — mutating any
-signed field breaks the Ed25519 signature, and verification is offline against a
-root-anchored trust bundle. What is *not* yet closed is the **insider** case: the
-log is currently **operator-signed only**, described in
-`docs/security-note-ledger-route-authorization.md` as `operator-signed-inclusion`
-and explicitly **"not a witnessed log."**
+**The honest state today: individual receipts are tamper-evident, and witnessed
+authority-checkpoint primitives are on `main`, but the live execution ledger is
+still operator-signed unless a deployment actually operates an independent
+witness flow.** Mutating any signed receipt field breaks the Ed25519 signature,
+and verification is offline against a root-anchored trust bundle. The repository
+can create and verify authority checkpoints, independent witness attestations,
+threshold policies, forks, and equivocation proofs. Production startup does not
+yet require those attestations, and the existing ledger checkpoint route remains
+`operator-signed-inclusion` by default.
 
 **What already holds against forgery:**
 
@@ -63,24 +64,33 @@ and explicitly **"not a witnessed log."**
   root fingerprint, not the operator's environment or logs.
 - Ledger entries are **signed (v2)** and **Merkle-anchored** with offline
   inclusion proofs; excision-and-rebuild of a single entry is detectable.
+- Authority checkpoints and witness attestations have separate key roles and
+  trust sources. A verifier can detect conflicting signed authority histories
+  when an independent witness retained and presents its attestation.
 
-**What is not yet closed (the fix is Phase 3 of the sellable plan):**
+**What is not yet closed:**
 
-- The checkpoint chain is **operator-signed only**. A party controlling both the
-  store and the ledger signing key can rewrite history and re-sign it. Detection
-  requires an **independent witness co-signing checkpoints** — a witness role in
-  the bundle plus offline verification of the co-signature. That does not exist on
-  main yet.
+- Shipping witness primitives does not create an independent witness. A party
+  controlling the store, ledger key, and every configured witness key can still
+  present a rewritten history. The pilot must place the witness key and retained
+  attestations with a genuinely independent counterparty.
+- Witnessing detects conflicting histories after evidence is compared; it does
+  not prevent an insider from producing them, provide consensus, or guarantee a
+  trustworthy timestamp.
+- The current production startup path does not fail closed on a missing witness
+  threshold. Requiring that policy is deployment work, not a property of the
+  default product path.
 
-**One-line answer:** *"An individual receipt can't be silently altered — it's
-Ed25519-signed and verified offline against a pinned root. The gap we're closing
-is the insider who controls the signing key: today the log is operator-signed, so
-the honest claim is 'tamper-evident against outsiders, not yet against a
-privileged insider.' An independent checkpoint witness closes that, and it's the
-next security lift."*
+**One-line answer:** *"An individual receipt cannot be silently altered: it is
+Ed25519-signed and verified offline against a pinned root. MNDe also ships
+witnessed authority-checkpoint verification, but it only makes conflicting
+histories externally detectable when a genuinely independent witness operates a
+key and retains the attestation; the default live ledger is not automatically
+witnessed."*
 
-Do **not** claim "tamper-proof against insiders" until the witness co-sign is on
-main and verifiable in the counterparty verifier.
+Do **not** claim "tamper-proof against insiders." Even with an independent
+witness, the accurate claim is externally detectable conflicting authority
+history, conditional on retained witness evidence.
 
 ---
 

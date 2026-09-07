@@ -35,7 +35,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, rmSync, 
 import { join, dirname, relative, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { scanForPrivateKeyMaterial } from "./lib/private-key-scan.mjs";
+import { scanForPackageSecrets, applyAllowlist } from "./lib/package-secret-scan.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const OUT_DIR = join(repoRoot, "dist");
@@ -193,7 +193,7 @@ function build() {
   process.stdout.write(`build-package: ${tsCount} .ts compiled, ${jsCount} .mjs/.js rewritten+copied, ${otherCount} other files copied -> ${relative(repoRoot, OUT_DIR)}/\n`);
 
   writeReleaseBuildInfo();
-  assertNoPrivateKeyMaterial();
+  assertNoSecretMaterial();
 }
 
 // Capture immutable release metadata (source commit, build id, build time) at
@@ -253,15 +253,33 @@ function writeReleaseBuildInfo() {
   process.stdout.write(`build-package: embedded release identity ${buildId} (commit ${commitShort ?? "unknown"})\n`);
 }
 
-// Authoritative, content-based backstop: fail the build outright if any
-// private-key material made it into dist/, regardless of filename, extension,
-// directory depth, or whether it's embedded inside JSON/text/config/fixtures.
-// See build/lib/private-key-scan.mjs for exactly what markers this detects
-// (and, just as importantly, what it does not).
-function assertNoPrivateKeyMaterial() {
-  const offenders = scanForPrivateKeyMaterial(OUT_DIR);
-  if (offenders.length > 0) {
-    for (const f of offenders) process.stderr.write(`FATAL: private key material in build output: ${f}\n`);
+// Fast, content-based backstop: fail the build outright if any recognized
+// secret material made it into dist/, regardless of filename, extension,
+// directory depth, or whether it's embedded inside JSON/text/config. See
+// build/lib/package-secret-scan.mjs for exactly what this detects (PEM/DER/JWK/
+// PuTTY private keys, selected provider tokens, and conservatively detected
+// credential assignments) and, just as importantly, what it does not.
+//
+// This is a fast pre-pack backstop; tests/test_pack_no_private_keys.mjs runs the
+// SAME scanner over the literal extracted npm tarball as the authoritative
+// package-boundary check. The allowlist lives under build/ (never shipped), is
+// exact + hash-bound, and can never suppress a private-key-class finding.
+//
+// Diagnostics report only detector id, normalized path, and line/fingerprint —
+// never the secret itself.
+const SECRET_SCAN_ALLOWLIST = fileURLToPath(new URL("secret-scan-allowlist.json", import.meta.url));
+
+function assertNoSecretMaterial() {
+  const findings = applyAllowlist(scanForPackageSecrets(OUT_DIR), {
+    rootDir: OUT_DIR,
+    allowlistPath: SECRET_SCAN_ALLOWLIST
+  });
+  if (findings.length > 0) {
+    for (const f of findings) {
+      process.stderr.write(
+        `FATAL: suspected secret material in build output: [${f.detectorId}] ${f.relativePath}:${f.line} (${f.fingerprint})\n`
+      );
+    }
     process.exit(1);
   }
 }

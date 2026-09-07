@@ -1,0 +1,10 @@
+{
+  "schema_version": "mnde.containment-manifest.v1",
+  "tools": {
+    "inspect_logs": ["observability.read"],
+    "local_compute": ["compute.local", "memory.session"],
+    "read_status": ["observability.read"],
+    "workspace_read": ["filesystem.read.private"],
+    "workspace_write": ["filesystem.write.private"]
+  }
+}

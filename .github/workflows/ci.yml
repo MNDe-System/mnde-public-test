@@ -9,9 +9,13 @@ permissions:
 
 jobs:
   guardrails:
-    name: Guardrails
-    runs-on: windows-latest
+    name: Guardrails (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout
@@ -52,9 +56,13 @@ jobs:
   # default suite) so it can pack, install into a clean project, boot, and
   # uninstall without inflating every other suite's cost. Requires no secrets.
   release-contract:
-    name: Release contract
-    runs-on: windows-latest
+    name: Release contract (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout
@@ -76,6 +84,15 @@ jobs:
 
       - name: Release build + checksums
         run: npm run release
+
+      - name: Upload Linux pilot artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mnde-pilot-${{ github.sha }}-linux
+          path: release/*
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Release truth (pack, install, run outside repo, fail-closed, uninstall)
         run: npm run release:verify

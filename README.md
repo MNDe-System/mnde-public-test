@@ -45,6 +45,82 @@ Three integration paths share the same decision and receipt flow:
 
 The tests assert that no code path executes (or, in the proxy, forwards) a `REFUSE`d call. The MCP tests check this across process boundaries using a marker file written only when the underlying tool actually runs.
 
+### Strict containment profile
+
+For sandboxed AI agents, the executor can add an independent strict-containment
+gate. It requires an operator-owned tool capability manifest, refuses unknown
+tools, and blocks network egress, shared cross-agent channels, credentials,
+persistence, host/control-plane access, sandbox or monitoring changes, external
+publication, and model-weight access. A normal policy `ALLOW` cannot override
+this gate, and the exact capability assessment is bound into the signed receipt
+before execution.
+
+See [`docs/containment-profile.md`](docs/containment-profile.md) for the threat
+model, manifest, refusal codes, deployment requirements, and limitations.
+
+## Repository Map
+
+MNDe has two implementations of the decision logic that a fresh clone will
+notice: a **reference engine** in TypeScript, used for deterministic replay,
+receipt verification, and conformance evidence; and the **live runtime** in
+`.mjs`, which the sidecar actually loads. Both use primitives and contracts from
+`shared/`.
+
+### Core — decision and verification
+
+| Path | Role |
+|------|------|
+| `mnde-local-sidecar.mjs` | Service entrypoint launched by `npm run sidecar` |
+| `src/` | Live sidecar runtime: policy evaluation, execution gating and ledgers, identity, custody, authority signing, event import, and policy lifecycle |
+| `sidecar/` | Live HTTP admission, deterministic workers, replay, and receipt persistence |
+| `shared/` | Canonical hashing and JSON, contracts, signing helpers, and decision primitives shared across the repository |
+| `preflight/` | Reference stage — strict, fail-closed input-envelope parsing |
+| `orbit/` | Reference stage — validates the signed intent envelope against the pinned Orbit v2.0 schema |
+| `arm/` | Reference stage — release control for cost, GPU, hours, and approval constraints |
+| `ram0na/` | Reference stage — runtime refusal checks such as kill-switch and request-state drift |
+| `audit/` | Reference-engine orchestration adapter used by deterministic tests and conformance checks |
+| `verifier/` | Standalone browser-based offline receipt verifier |
+| `conformance/` | Frozen compatibility vectors and expected verification results; evidence, not a live runtime path |
+
+### Integration paths
+
+| Path | Role |
+|------|------|
+| `executor/` | Wrap-a-function guard (`@mnde/executor`) |
+| `mcp/` | MCP server, proxy, and guarded-tool examples |
+| `shell/` | Deny-by-default shell-policy example |
+
+### Tooling and committed assets
+
+| Path | Role |
+|------|------|
+| `bin/`, `scripts/`, `tools/`, `build/` | CLIs, demos, verification utilities, and packaging scripts |
+| `tests/` | Runtime, integration, security, release, and compatibility tests |
+| `docs/` | Design notes, security models, specifications, and integration guidance |
+| `examples/`, `sample-policies/`, `templates/` | Request, integration, and policy fixtures |
+| `authority/` | Committed **demo** authority for documentation and example receipts; not a production trust root |
+| `desktop/`, `installer/` | Packaging surfaces; installers are not committed (see [Install](#install)) |
+| `policy-editor/` | Local browser UI for drafting and inspecting policy documents |
+| `brand/` | Wordmark and brand assets |
+| `.github/` | Repository automation and contribution metadata |
+
+### Generated and local-only
+
+Build and review outputs — `dist/`, `reviewer-kit/artifacts/`, and
+`hostile-verifier-proof-bundle/` — are ignored by git and can be regenerated.
+
+Local trust and runtime state — `.mnde-test/`, `shared/receipt_keys/`,
+`mnde-receipts/`, `auth-audit/`, `auth-nonce-cache.d/`, and
+`grant-nonce-store.d/` — is also ignored and is not authored by hand. Do not
+treat it as disposable in a working deployment: deleting it can replace the
+local trust identity, remove receipt or audit history, or reset replay
+protection.
+
+### Optional
+
+`cosmetic/` is a self-contained easter egg with no connection to the authority
+or decision paths. Deleting it does not change decision behavior.
+
 ## Quick Start
 
 1. Start MNDe:
@@ -316,7 +392,7 @@ See [docs/feedback-workflow.md](docs/feedback-workflow.md).
 ## Limitations
 
 - The bundled decision policy is small and illustrative: a denylist of patterns plus cost and runtime-drift checks, and a deny-by-default list for the shell example. It is not a complete policy for any specific deployment. See [docs/production-readiness.md](docs/production-readiness.md).
-- The manual-approval threshold and the shell `APPROVAL_REQUIRED` decision are gated on a request field (`hold_state`) supplied by the caller. There is no authenticated approver binding yet.
+- The legacy manual-approval threshold and shell `APPROVAL_REQUIRED` path still rely on caller-supplied request state. The policy-engine path separately supports Ed25519-signed, action-scoped approvals when the operator explicitly configures out-of-band approval trust anchors. Approval enforcement is not enabled when those anchors are absent, and MNDe does not yet provide an approver directory or approval-service UI.
 - The `orbit_intent.signatures` field is shape-validated but not cryptographically verified.
 - Verification in this repository chains to a locally generated test authority. A published authority bundle for use outside this repository does not exist yet.
 - Enforcement is cooperative: MNDe evaluates an action only when the caller routes it through MNDe (executor, MCP server, or proxy). It is not OS-level and does not stop a process that bypasses it.
@@ -325,11 +401,11 @@ See [docs/execution-receipt-spec-v1.md](docs/execution-receipt-spec-v1.md), sect
 
 ## Roadmap
 
-These exist as architecture or concepts in the repository but are not claimed as complete:
+These remain outside the current pilot boundary or need operational product work:
 
 - Argument-level shell policy and operator-defined allowlists.
 - Production MNDe Policy Engine behavior defined in [docs/mnde-policy-engine-production-spec-v1.md](docs/mnde-policy-engine-production-spec-v1.md).
-- Authenticated approval (signed approval tokens) for `APPROVAL_REQUIRED`.
+- Approval issuer enrollment, approver lifecycle management, and a human approval-service UI. The policy-engine's signed approval-token verification exists and is tested, but is opt-in through operator-supplied trust anchors.
 - A published authority bundle with documented key rotation.
 - Centralized policy and audit management.
 - Identity-aware authorization for multi-user deployments.
@@ -339,7 +415,7 @@ These exist as architecture or concepts in the repository but are not claimed as
   no longer accepts the legacy unscoped bearer-style grant. Known limitations (weaker principal
   source, no tenant-authentication system, exact-only scope matching, no grant-revocation list)
   are documented in that spec's "Known limitations" section.
-- **P1**: A safe key-revocation lifecycle command for `shared/authority-manifest.mjs` authorities — `findAuthorityReceiptKey` now checks `revoked_at`, but nothing writes it; revoking a key today means hand-editing and re-signing the manifest. Needs chronology validation, a re-signed manifest, an audit record, and refusal of unsafe edits (e.g. revoking a key with no successor).
+- **P1 (pilot implementation done)**: `mnde-authority rotate` and `mnde-authority revoke` reissue and verify a root-signed production authority bundle, refuse unknown or already-revoked keys, and support file-backed or external root signing. This is bundle lifecycle tooling, not a hosted revocation service: publication/distribution, operator audit records, successor policy, and recovery ceremony remain deployment responsibilities. Revocation intentionally makes receipts signed by the compromised key fail verification, including historical receipts.
 
 ## More Docs
 

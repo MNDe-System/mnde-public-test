@@ -206,6 +206,20 @@ async function main() {
       assert.equal(r.ok, false);
     }
   });
+  await test("invalidly signed parent checkpoint is rejected", async () => {
+    const badParent = clone(genesis);
+    badParent.signature.value = flipHex(badParent.signature.value);
+    const r = await verifyAuthorityCheckpoint({ checkpoint: cp1, previousCheckpoint: badParent, ...V });
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, "PREVIOUS_CHECKPOINT_INVALID");
+    assert.equal(r.detail, "SIGNATURE_INVALID");
+  });
+  await test("authority epoch cannot roll back across a checkpoint link", async () => {
+    const rollback = await mkCheckpoint({ sequence: 1, authorityEpoch: 1, previousCheckpointDigest: checkpointDigest(genesis) });
+    const r = await verifyAuthorityCheckpoint({ checkpoint: rollback, previousCheckpoint: genesis, ...V });
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, "EPOCH_INVALID");
+  });
 
   // ─────────────────────────────────────────── §41 witness happy path
   group = "witness-happy: ";
@@ -347,6 +361,21 @@ async function main() {
     const r = await thr([attA, other], policy(2, ["witness-a", "witness-b"]));
     assert.equal(r.count, 1);
   });
+  await test("missing witness eligibility fails closed as a malformed policy", async () => {
+    const r = await thr([attA], { schema: WITNESS_POLICY_SCHEMA, required: 1 });
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, "MALFORMED_POLICY");
+  });
+  await test("witness eligibility must contain unique non-empty IDs and a possible threshold", async () => {
+    for (const eligible_witnesses of ["witness-a", [""], ["witness-a", "witness-a"]]) {
+      const r = await thr([attA], { schema: WITNESS_POLICY_SCHEMA, required: 1, eligible_witnesses });
+      assert.equal(r.ok, false);
+      assert.equal(r.reason, "MALFORMED_POLICY");
+    }
+    const impossible = await thr([attA], policy(2, ["witness-a"]));
+    assert.equal(impossible.ok, false);
+    assert.equal(impossible.reason, "MALFORMED_POLICY");
+  });
 
   // ─────────────────────────────────────────── §44 authority equivocation
   group = "authority-equivocation: ";
@@ -444,6 +473,20 @@ async function main() {
     assert.equal(r.conflict, "AUTHORITY_EQUIVOCATION");
     assert.deepEqual(r.witness_equivocators, ["witness-b"]);
     assert.equal(r.resolved, false); // never silently selects X or Y
+  });
+  await test("malformed threshold policy returns an analysis error instead of success or throw", async () => {
+    const r = await analyzeCheckpointConflict({
+      candidateX: { checkpoint: cpX, attestations: [wAx] },
+      candidateY: { checkpoint: cpY, attestations: [wBy] },
+      authorityBundle: bundle,
+      trustedRootFingerprint: fp,
+      witnessBundle: wbundle,
+      policy: { schema: WITNESS_POLICY_SCHEMA, required: 1 },
+      now: NOW
+    });
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, "CANDIDATE_X_THRESHOLD_INVALID");
+    assert.equal(r.detail, "MALFORMED_POLICY");
   });
 
   // ─────────────────────────────────────────── §47 serialization

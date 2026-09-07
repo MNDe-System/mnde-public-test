@@ -19,6 +19,8 @@ This file records security-related statements that appear in the repository and 
 | Enterprise identity is supported. | Docs describe future/off-by-default identity features; current auth is bearer-based. | `src/sidecar-auth/index.mjs`, `sidecar/auth_authority.mjs`, `src/identity/` | `test:auth`, `test:identity-assertion`, `test:executor-lifecycle` | `docs/operational-dashboard.md`, `docs/identity-assertion-v1.md` | No, if stated as complete enterprise identity. | Enterprise identity features are future/off by default; current support is local/pilot caller auth and identity assertion verification slices. |
 | Government readiness or procurement readiness. | No implementation or documentation package proves this. | Not applicable. | Not applicable. | `ACCESSIBILITY.md`, `COMPLIANCE_SUMMARY.md` document gaps. | No. | Do not claim government readiness. |
 | AI safety. | Deterministic policy enforcement and receipt logging exist for routed actions. | `src/policy-engine/`, `src/execution-gate/`, `executor/index.mjs` | `test:policy-engine`, `test:execution-gate`, `test:executor` | `docs/production-readiness.md`, `docs/execution-firewall-overview.md` | No, if stated broadly. | MNDe provides deterministic pre-execution policy decisions and evidence for routed actions; it is not a general AI safety system. |
+| Strict agent containment. | Strict executor mode independently refuses unregistered tools and escape-class capabilities, snapshots the operator manifest, and requires matching evidence in the verified signed receipt. | `src/containment/index.mjs`, `executor/index.mjs`, `src/policy-engine/sidecar-adapter.mjs` | `test:containment` | `docs/containment-profile.md` | Partially. It covers routed actions only and does not provide OS/network isolation. | Strict mode refuses escape-class capabilities for actions routed through an enforcing MNDe integration and bound to a valid operator manifest; OS/network containment remains required. |
+| npm package/pack does not ship recognized secrets. | The prepack build and the extracted npm tarball are content-scanned for supported private-key and secret formats, each with its own matching rule (see below); the build fails closed on a finding and the pack-boundary test asserts an empty result over the real tarball bytes. Detection is deliberately conservative and non-exhaustive. | `build/lib/package-secret-scan.mjs`, `build/build-package.mjs`, `build/secret-scan-allowlist.json` | `test:package-secret-scan-hostile`, `test:pack-security`, `test:private-key-scan-hostile` | `SECURITY_CLAIMS.md` (Package-Boundary Secret Scanning) | Partially. Covers supported formats only, by the specific rule per detector; it is not exhaustive secret detection. | The npm build and extracted pack artifact are scanned for supported PEM/DER/JWK/PuTTY private-key formats, selected recognizable provider tokens, and conservatively detected credential assignments, each by its own rule (textual markers, structured/embedded JSON, complete-file DER, populated PuTTY bodies, and recognized secret-bearing assignments); detection is not exhaustive. |
 
 ## Unsupported Wording to Avoid
 
@@ -62,6 +64,61 @@ MNDe should not yet claim:
 - OS-wide enforcement.
 - Complete enterprise identity.
 - General AI safety.
+- Standalone or OS-wide AI containment.
 - Regulatory compliance.
 - Production hardening.
 - Government procurement readiness.
+- Complete or universal secret scanning of the package artifact.
+
+## Package-Boundary Secret Scanning
+
+The prepack build (`build/build-package.mjs`) and the pack-boundary test
+(`test:pack-security`, which extracts a real `npm pack` tarball and scans its
+`package/` content directory) run the same content-based scanner
+(`build/lib/package-secret-scan.mjs`) over the shipped files and fail closed on
+any finding. Each detector applies its own matching rule — the scan is not a
+single "anywhere/any-embedding" match:
+
+- **PEM private keys** (`PRIVATE KEY`, `RSA`/`EC`/`OPENSSH`/`ENCRYPTED PRIVATE
+  KEY`) are matched textually anywhere in file contents, regardless of filename,
+  extension, or nesting.
+- **Provider secret tokens** (a conservative, non-exhaustive registry: GitHub,
+  GitLab, npm, Slack, Stripe live secret/restricted keys, OpenAI) are matched
+  textually anywhere in file contents.
+- **JWKs** — private RSA/EC/OKP (`d`) and symmetric `oct` (populated `k`) — are
+  detected as structured JSON: the whole file parsed as JSON, JWKs nested inside
+  it, JSON strings whose decoded value is a JWK, and complete valid JSON-object
+  candidates embedded in surrounding text or JavaScript (bounded, brace-aware
+  extraction — not arbitrary JavaScript object-literal parsing).
+- **DER private keys** (PKCS#8, PKCS#1 RSA, SEC1 EC) are detected only when a
+  *complete file* parses as one via Node's crypto — not from embedded fragments.
+- **PuTTY** v2/v3 private-key containers are detected only when a recognizable
+  header is present *and* the declared `Private-Lines` body is actually present,
+  non-empty, and plausibly Base64 (a truncated header alone is not flagged).
+- **Contextual credential assignments** are detected only when a conservatively
+  strong (length/diversity/entropy) value is bound to an explicitly
+  secret-bearing field name (JSON/dotenv/YAML/simple assignment); this is not
+  unrestricted high-entropy scanning of arbitrary content.
+
+Findings never contain the matched secret — only detector id, normalized path,
+line, and a truncated SHA-256 fingerprint. An allowlist (`build/`, never shipped)
+can suppress only an exact path + detector + full-file-hash match with a written
+reason; it can never suppress a private-key-class finding, and a changed file
+reactivates the finding.
+
+**Documented limitations (this is not complete or universal secret detection):**
+
+- Detection is not exhaustive.
+- Provider token formats change over time; the registry is non-exhaustive.
+- Unknown or proprietary credential formats may not be recognized.
+- Encrypted or custom binary containers may evade recognition.
+- Secrets that are split, encoded, compressed, or obfuscated across values are
+  not guaranteed to be detected.
+- JWK embedding is detected only for the forms listed above (structured JSON,
+  JSON-encoded strings, and complete valid JSON-object candidates in text). It
+  does not parse arbitrary JavaScript object-literal syntax, and not every
+  possible embedding is covered.
+- Runtime logs, user-supplied request content, external systems, and any
+  artifact outside the npm package boundary are not covered.
+- This is not a substitute for repository, CI, host, or organization-level
+  secret scanning.

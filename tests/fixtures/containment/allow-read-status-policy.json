@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "policy_id": "policy_containment_test_001",
+  "version": "1.0.0",
+  "state": "ACTIVE",
+  "rules": [
+    {
+      "rule_id": "allow_read_status",
+      "effect": "ALLOW",
+      "match": {
+        "field": "tool.tool_name",
+        "op": "eq",
+        "value": "read_status"
+      }
+    }
+  ]
+}

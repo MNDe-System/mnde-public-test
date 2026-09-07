@@ -51,12 +51,42 @@ async function health(port) {
     return (await fetch(`http://127.0.0.1:${port}/healthz`, { signal: AbortSignal.timeout(1200) })).ok;
   } catch { return false; }
 }
-function stopTree(child) {
-  if (!child || child.exitCode !== null) return;
-  try {
-    if (process.platform === "win32") spawnSync("taskkill", ["/F", "/T", "/PID", String(child.pid)], { stdio: "ignore" });
-    else child.kill("SIGTERM");
-  } catch { /* gone */ }
+async function stopTree(child) {
+  if (!child) return;
+  if (child.exitCode === null) {
+    try {
+      if (process.platform === "win32") {
+        spawnSync("taskkill", ["/F", "/T", "/PID", String(child.pid)], { stdio: "ignore" });
+      } else {
+        // The packaged CLI launches the runtime as a child. On POSIX, killing
+        // only the CLI can leave that runtime holding the inherited stderr pipe,
+        // which keeps this test process alive after every assertion has passed.
+        // The test spawns CLIs in their own process group so teardown can signal
+        // the complete tree without touching unrelated runner processes.
+        process.kill(-child.pid, "SIGTERM");
+      }
+    } catch { /* already gone */ }
+  }
+
+  if (child.exitCode === null) {
+    await new Promise((resolveStop) => {
+      const timer = setTimeout(() => {
+        try {
+          if (process.platform !== "win32") process.kill(-child.pid, "SIGKILL");
+        } catch { /* already gone */ }
+        resolveStop();
+      }, 5000);
+      timer.unref();
+      child.once("close", () => {
+        clearTimeout(timer);
+        resolveStop();
+      });
+    });
+  }
+
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+  child.stdin?.destroy();
 }
 
 const results = [];
@@ -374,12 +404,13 @@ try {
     const proc = spawn(nodeCmd, [runtime], {
       cwd: pkgDir,
       env: { ...process.env, MNDE_PROFILE: "production", MNDE_HOME: prodHome, MNDE_BIND_PORT: "8851" },
-      stdio: ["ignore", "ignore", "pipe"]
+      stdio: ["ignore", "ignore", "pipe"],
+      detached: process.platform !== "win32"
     });
     let stderr = "";
     proc.stderr.on("data", (d) => { stderr += d.toString(); });
     const exitCode = await new Promise((res) => {
-      const timer = setTimeout(() => { stopTree(proc); res("timeout"); }, 10000);
+      const timer = setTimeout(async () => { await stopTree(proc); res("timeout"); }, 10000);
       proc.once("exit", (code) => { clearTimeout(timer); res(code); });
     });
     assert.notEqual(exitCode, 0, `production sidecar must not start without custody (exit=${exitCode})`);
@@ -394,7 +425,8 @@ try {
     child = spawn(nodeCmd, [sidecarCli, "start"], {
       cwd: projectDir,
       env: { ...cliEnv, MNDE_BIND_PORT: String(startPort) },
-      stdio: ["ignore", "ignore", "pipe"]
+      stdio: ["ignore", "ignore", "pipe"],
+      detached: process.platform !== "win32"
     });
     let up = false;
     for (let i = 0; i < 40 && !up; i += 1) {
@@ -409,7 +441,7 @@ try {
     assert.equal(identityResp.release.version, cliId.version, "sidecar vs CLI version must agree");
     assert.equal(identityResp.release.commit, cliId.commit, "sidecar vs CLI commit must agree");
     assert.equal(identityResp.release.product, "MNDe");
-    stopTree(child);
+    await stopTree(child);
     child = null;
   });
 
@@ -446,7 +478,7 @@ try {
   }
   console.log("PASS release truth (all REL-* checks)");
 } finally {
-  stopTree(child);
+  await stopTree(child);
   if (projectDir) rmSync(projectDir, { recursive: true, force: true });
   if (packDir) rmSync(packDir, { recursive: true, force: true });
 }
