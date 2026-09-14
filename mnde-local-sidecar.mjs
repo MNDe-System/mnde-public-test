@@ -67,6 +67,11 @@ import {
 import { execIdDirPath, reserveExecutionId } from "./sidecar/execution_id_store.mjs";
 import { replayReceiptDeterministically } from "./sidecar/replay_engine.mjs";
 import { assertStartupDirectoryPermissions } from "./sidecar/startup_checks.mjs";
+import {
+  createGracefulShutdown,
+  parseShutdownDeadlineMs,
+  waitForQuiescence
+} from "./sidecar/graceful_shutdown.mjs";
 import { getReleaseIdentity } from "./src/release/identity.mjs";
 
 const HOST = "127.0.0.1";
@@ -95,6 +100,15 @@ const WORKER_QUEUE_MAX_DEPTH = Number.parseInt(process.env.MNDE_WORKER_QUEUE_MAX
 const WORKER_TASK_TIMEOUT_MS = Number.parseInt(process.env.MNDE_WORKER_TASK_TIMEOUT_MS ?? String(Math.max(100, HTTP_LIMITS.request_timeout_ms - 100)), 10);
 const INLINE_REFUSAL_RECEIPTS = process.env.MNDE_INLINE_REFUSAL_RECEIPTS === "1";
 const TEST_HARNESS_ENABLED = process.env.MNDE_TEST_HARNESS === "1";
+// Single finite budget covering the ENTIRE graceful-shutdown sequence (quiesce
+// in-flight work → flush receipts → stop workers → clean up sockets). Explicitly
+// invalid values fail fast at startup; unset uses the documented default. See
+// sidecar/graceful_shutdown.mjs and the ERR_SHUTDOWN_CONFIG contract.
+const SHUTDOWN_DEADLINE_MS = parseShutdownDeadlineMs(process.env);
+// Draining latch. Flipped true the instant shutdown begins (before any await) so
+// readiness reports not-ready and new decision work is refused while the process
+// finishes already-admitted requests. Never flips back.
+let draining = false;
 // Opaque nonce a spawning harness passes in so /readyz answers can be tied to
 // THIS process. Without it a readiness poll cannot distinguish this sidecar
 // from an unrelated process already bound to the same port.
@@ -162,10 +176,11 @@ const watchdog = new RuntimeWatchdog({
 const eventLoopDelay = monitorEventLoopDelay({ resolution: 10 });
 eventLoopDelay.enable();
 let latestEventLoopLagMs = 0;
-setInterval(() => {
+const eventLoopLagTimer = setInterval(() => {
   latestEventLoopLagMs = Math.max(0, Math.round(eventLoopDelay.percentile(99) / 1_000_000));
   eventLoopDelay.reset();
-}, 500).unref();
+}, 500);
+eventLoopLagTimer.unref();
 let inflight = 0;
 let l0ActiveConnections = 0;
 const counters = {
@@ -254,12 +269,13 @@ new PerformanceObserver((list) => {
     runtimeStats.gc_pause_ms_max = Math.max(runtimeStats.gc_pause_ms_max, duration);
   }
 }).observe({ entryTypes: ["gc"] });
-setInterval(() => {
+const memoryStatsTimer = setInterval(() => {
   const memory = process.memoryUsage();
   runtimeStats.heap_used_bytes = memory.heapUsed;
   runtimeStats.heap_total_bytes = memory.heapTotal;
   runtimeStats.rss_bytes = memory.rss;
-}, 500).unref();
+}, 500);
+memoryStatsTimer.unref();
 
 function receiptPathForWorker(basePath) {
   if (!cluster.isWorker || !CLUSTER_MODE || CLUSTER_SHARED_RECEIPT_LOG) return basePath;
@@ -397,17 +413,39 @@ if (AUTH_MODE === "bearer") {
 }
 
 if (cluster.isPrimary && CLUSTER_MODE) {
-  for (let i = 0; i < CLUSTER_WORKERS; i += 1) cluster.fork();
+  // The primary blocks here forever (below), so the graceful-shutdown controller
+  // and the SIGINT/SIGTERM handlers defined later in this file are never reached
+  // in the primary — only in workers. The primary therefore needs its OWN
+  // termination handling: forward the signal to each worker (so each runs its own
+  // graceful drain) and, critically, STOP restarting workers once shutdown has
+  // begun, or a cleanly-draining worker would be respawned.
+  let clusterShuttingDown = false;
   cluster.on("exit", (worker, code) => {
+    if (clusterShuttingDown) {
+      if (Object.keys(cluster.workers ?? {}).length === 0) process.exit(0);
+      return;
+    }
     process.stderr.write(`MNDe sidecar worker ${worker.id} exited with code ${code}; restarting fail-closed worker\n`);
     cluster.fork();
   });
+  const shutdownPrimary = () => {
+    if (clusterShuttingDown) return;
+    clusterShuttingDown = true;
+    for (const worker of Object.values(cluster.workers ?? {})) {
+      try { worker.process.kill("SIGTERM"); } catch { /* already gone */ }
+    }
+    // Bound the primary's own wait so one stuck worker cannot wedge the group.
+    // Slightly beyond a worker's deadline so a worker can finish first.
+    const forceExit = setTimeout(() => process.exit(1), SHUTDOWN_DEADLINE_MS + 1_000);
+    forceExit.unref?.();
+  };
+  process.on("SIGINT", shutdownPrimary);
+  process.on("SIGTERM", shutdownPrimary);
+  for (let i = 0; i < CLUSTER_WORKERS; i += 1) cluster.fork();
+  await new Promise(() => {});
 } else {
   await receiptQueue.start();
   workerPool.start();
-}
-if (cluster.isPrimary && CLUSTER_MODE) {
-  await new Promise(() => {});
 }
 
 // Decision engine. v1 default is "policy-engine" (the canonical authority path);
@@ -1056,8 +1094,22 @@ async function handleDecide(req, res) {
       await fail(res, "ERR_CUSTODY_SIGNER_TIMEOUT", 200, { timings }, timings);
       return;
     }
+    if (TEST_HARNESS_ENABLED && req.headers["x-mnde-shutdown-test"] === "hang") {
+      // Never resolves: pins this request in-flight (inflight stays > 0) so a
+      // test can exercise the shutdown DEADLINE path. The process is expected to
+      // exit via the deadline, never via this handler returning.
+      await new Promise(() => {});
+      return;
+    }
     const { value: request, raw } = await readStrictObject(req, timings);
     timings.body_read_complete_ms = ms();
+    if (TEST_HARNESS_ENABLED && req.headers["x-mnde-shutdown-test"] === "slow") {
+      // Bounded delay AFTER the body is captured, so real application work
+      // (decision + receipt persistence) is still running when a test begins
+      // shutdown mid-request — including after the client has disconnected.
+      const slowMs = Number.parseInt(req.headers["x-mnde-shutdown-slow-ms"] ?? "300", 10);
+      await new Promise((resolve) => setTimeout(resolve, Number.isSafeInteger(slowMs) && slowMs > 0 ? slowMs : 300));
+    }
 
     // Durable execution ID dedup: reserve the execution ID globally before any
     // evaluation work. Uses O_EXCL file creation so the reservation survives
@@ -1300,10 +1352,15 @@ function readinessSnapshot() {
   const workerMetrics = workerPool.metrics();
   const watchdogState = watchdog.snapshot();
   return {
-    ok: !queueMetrics.fail_closed && !watchdogState.fatal,
+    // Draining reports NOT ready while still reachable: a load balancer or the
+    // spawning harness sees ok:false the instant shutdown begins and stops
+    // routing new work here, even though the process keeps serving already-
+    // admitted requests until they settle.
+    ok: !draining && !queueMetrics.fail_closed && !watchdogState.fatal,
     ...(HARNESS_INSTANCE_ID ? { harness_instance_id: HARNESS_INSTANCE_ID } : {}),
-    degraded: queueMetrics.fail_closed || watchdogState.degraded,
-    degraded_reason: queueMetrics.fail_closed_reason ?? watchdogState.degraded_reason,
+    draining,
+    degraded: draining || queueMetrics.fail_closed || watchdogState.degraded,
+    degraded_reason: draining ? "ERR_SIDECAR_DRAINING" : (queueMetrics.fail_closed_reason ?? watchdogState.degraded_reason),
     active_policy_version: policy.policy_version,
     policy_hash,
     worker_id: cluster.worker?.id ?? 0,
@@ -1467,6 +1524,16 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (req.method === "POST" && isDecisionRoute(pathname)) {
+    // Drain gate. Once shutdown has begun we admit NO new decision work — not
+    // even on a connection that was already open before draining started (the
+    // socket outlives server.close()). This is a liveness refusal, not a policy
+    // decision, so it carries no receipt and enqueues nothing into the queue we
+    // are about to flush; it still returns the standard REFUSE envelope with
+    // connection:close so the caller retries elsewhere.
+    if (draining) {
+      failWithoutReceipt(res, "ERR_SIDECAR_DRAINING", 503);
+      return;
+    }
     if (L0_LIMITS.enable && l0ActiveConnections > L0_LIMITS.max_connections) {
       l0ShedDecision(req, res);
       return;
@@ -1810,14 +1877,98 @@ function metricsText(queueMetrics, workerMetrics) {
   return out;
 }
 
-async function shutdown() {
-  watchdog.stop();
+// ── Graceful shutdown ────────────────────────────────────────────────────────
+// Ordered so no dependency is torn down while work still needs it:
+//   1. begin-drain (sync): latch `draining` (readiness → not-ready, new decisions
+//      refused) and stop accepting NEW connections. Existing connections — idle
+//      or mid-request — are left intact here; idle ones are torn down in the
+//      final socket-cleanup phase and never affect quiescence.
+//   2. await-quiescence: wait for `inflight` to reach 0. This tracks APPLICATION
+//      work, not sockets — a request whose client has disconnected is still
+//      counted until its worker reply and receipt persistence complete, so we
+//      never cut a decision off mid-flight.
+//   3. drain-receipts: flush queued receipts. The queue's shutdown() resolves
+//      even when it finished fail-closed, so success is confirmed via metrics,
+//      not by the promise resolving.
+//   4. stop-workers, then 5. cleanup-sockets, then 6. stop-runtime timers.
+// One deadline (SHUTDOWN_DEADLINE_MS) bounds the whole sequence; on expiry or a
+// persistence failure we force best-effort teardown and exit non-zero.
+function beginDrain() {
+  if (draining) return;
+  draining = true;
+  // Stop accepting NEW connections. Existing connections are deliberately left
+  // intact: a request arriving on one is refused at the application layer by the
+  // drain gate (ERR_SIDECAR_DRAINING), and idle keep-alives are torn down in the
+  // final socket-cleanup phase — NOT here — so they never affect quiescence
+  // (which waits on `inflight`, i.e. application work, not sockets). We do not
+  // await server.close()'s callback, so an idle keep-alive cannot block exit.
   server.close();
-  await receiptQueue.shutdown();
-  await workerPool.shutdown();
-  await socketRegistry.shutdown();
-  process.exit(0);
+  // Observable drain marker: informative in normal operation and a deterministic
+  // synchronization point for tests (once printed, the drain latch is set and new
+  // decision work is refused). Emitted after the latch so it never races it.
+  process.stdout.write("mnde.sidecar.shutdown draining\n");
+}
+
+function forcedShutdownCleanup() {
+  // Best-effort, synchronous, NO awaits — we are already over budget. Fire the
+  // async teardowns without waiting on them (swallowing any sync throw AND async
+  // rejection so the deadline path never raises an unhandled rejection) and stop
+  // the runtime timers so the process can exit promptly after exit() is called.
+  try { Promise.resolve(workerPool.shutdown()).catch(() => {}); } catch { /* fire-and-forget */ }
+  try { Promise.resolve(socketRegistry.shutdown()).catch(() => {}); } catch { /* fire-and-forget */ }
+  stopRuntimeTimers();
+}
+
+function stopRuntimeTimers() {
+  watchdog.stop();
+  clearInterval(eventLoopLagTimer);
+  clearInterval(memoryStatsTimer);
+  try { eventLoopDelay.disable(); } catch { /* already disabled */ }
+}
+
+const gracefulShutdown = createGracefulShutdown({
+  deadlineMs: SHUTDOWN_DEADLINE_MS,
+  onBegin: beginDrain,
+  onForcedCleanup: forcedShutdownCleanup,
+  phases: [
+    { name: "await-quiescence", run: (signal) => waitForQuiescence(() => inflight, signal) },
+    {
+      name: "drain-receipts",
+      run: async () => {
+        await receiptQueue.shutdown();
+        const metrics = receiptQueue.metrics();
+        // A resolved shutdown() does NOT mean persistence succeeded: the queue
+        // can finish fail-closed after a flush failure/timeout. Confirm here.
+        return metrics.fail_closed ? { ok: false, reason: metrics.fail_closed_reason } : { ok: true };
+      }
+    },
+    { name: "stop-workers", run: () => workerPool.shutdown() },
+    { name: "cleanup-sockets", run: () => socketRegistry.shutdown() },
+    { name: "stop-runtime", run: () => stopRuntimeTimers() }
+  ]
+});
+
+function shutdown() {
+  return gracefulShutdown.shutdown();
 }
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
+
+// Cross-platform test seam (never active in production): when the sidecar is
+// spawned by a test harness with a piped stdin, a `stop` line triggers the exact
+// same graceful shutdown that SIGINT/SIGTERM do — the same path Ctrl+C drives —
+// without depending on POSIX signal delivery (unreliable for a child on Windows).
+// Gated behind MNDE_TEST_HARNESS so it adds zero surface to real deployments,
+// where the launcher spawns this process with stdin ignored.
+if (TEST_HARNESS_ENABLED) {
+  try {
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => {
+      if (/(^|\n)\s*(stop|shutdown|quit|exit)\s*(\n|$)/i.test(String(chunk))) shutdown();
+    });
+    process.stdin.on("error", () => {});
+  } catch {
+    /* stdin may be unavailable */
+  }
+}

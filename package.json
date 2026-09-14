@@ -68,6 +68,8 @@
     "test:policy-trust": "node ./tests/test_policy_trust.mjs",
     "test:approvals": "node ./tests/test_authenticated_approvals.mjs",
     "test:sidecar-pe": "node ./tests/test_sidecar_pe_mode.mjs",
+    "test:sidecar-shutdown": "node ./tests/test_sidecar_shutdown.mjs",
+    "test:graceful-shutdown": "node ./tests/test_graceful_shutdown.mjs",
     "test:sidecar-startup-race": "node ./tests/test_sidecar_startup_race.mjs",
     "test:auth": "node ./tests/test_sidecar_auth.mjs",
     "test:proxy-auth": "node ./tests/test_proxy_auth.mjs",
