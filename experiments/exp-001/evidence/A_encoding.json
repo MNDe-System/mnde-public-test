@@ -1,0 +1,160 @@
+{
+  "conjunct": "A-encoding",
+  "total": 11,
+  "fail": 0,
+  "inconclusive": 0,
+  "notes": [
+    "A6: MNDe applies no Unicode normalization; NFC and NFD forms are distinct authorization identities. Safe against collision, but a downstream executor that normalizes refs before acting could re-introduce ambiguity (Stage 2 concern)."
+  ],
+  "results": [
+    {
+      "id": "A1",
+      "conjunct": "A-encoding",
+      "verdict": "PASS",
+      "expected": "identical identity",
+      "observed": {
+        "a": "{\"operation\":\"merge\",\"repository\":\"r\",\"target_ref\":\"main\"}",
+        "b": "{\"operation\":\"merge\",\"repository\":\"r\",\"target_ref\":\"main\"}",
+        "collision": true
+      },
+      "detail": {
+        "label": "key-order independence"
+      },
+      "at": "2026-09-16T02:35:43.638Z"
+    },
+    {
+      "id": "A2",
+      "conjunct": "A-encoding",
+      "verdict": "PASS",
+      "expected": "reject (duplicate_json_keys)",
+      "observed": "REJECTED:duplicate_json_keys",
+      "detail": {
+        "label": "duplicate key rejection"
+      },
+      "at": "2026-09-16T02:35:43.640Z"
+    },
+    {
+      "id": "A3",
+      "conjunct": "A-encoding",
+      "verdict": "PASS",
+      "expected": "distinct identities",
+      "observed": {
+        "a": "{\"pull_request\":17}",
+        "b": "{\"pull_request\":\"17\"}",
+        "collision": false
+      },
+      "detail": {
+        "label": "numeric-vs-string PR id"
+      },
+      "at": "2026-09-16T02:35:43.640Z"
+    },
+    {
+      "id": "A4",
+      "conjunct": "A-encoding",
+      "verdict": "PASS",
+      "expected": "distinct identities",
+      "observed": {
+        "a": "{\"target_ref\":\"main\"}",
+        "b": "{\"target_ref\":\"refs/heads/main\"}",
+        "collision": false
+      },
+      "detail": {
+        "label": "short vs full ref"
+      },
+      "at": "2026-09-16T02:35:43.640Z"
+    },
+    {
+      "id": "A5",
+      "conjunct": "A-encoding",
+      "verdict": "PASS",
+      "expected": "distinct identities",
+      "observed": {
+        "a": "{\"target_ref\":\"main\"}",
+        "b": "{\"target_ref\":\"Main\"}",
+        "collision": false
+      },
+      "detail": {
+        "label": "ref case sensitivity"
+      },
+      "at": "2026-09-16T02:35:43.640Z"
+    },
+    {
+      "id": "A6",
+      "conjunct": "A-encoding",
+      "verdict": "PASS",
+      "expected": "distinct identities",
+      "observed": {
+        "a": "{\"target_ref\":\"café\"}",
+        "b": "{\"target_ref\":\"café\"}",
+        "collision": false
+      },
+      "detail": {
+        "label": "unicode NFC vs NFD"
+      },
+      "at": "2026-09-16T02:35:43.640Z"
+    },
+    {
+      "id": "A7",
+      "conjunct": "A-encoding",
+      "verdict": "PASS",
+      "expected": "distinct identities",
+      "observed": {
+        "a": "{\"target_ref\":\"main\"}",
+        "b": "{\"target_ref\":\"main \"}",
+        "collision": false
+      },
+      "detail": {
+        "label": "value whitespace significance"
+      },
+      "at": "2026-09-16T02:35:43.640Z"
+    },
+    {
+      "id": "A8",
+      "conjunct": "A-encoding",
+      "verdict": "PASS",
+      "expected": "reject (invalid_json_number)",
+      "observed": "REJECTED:invalid_json_number",
+      "detail": {
+        "label": "float rejected"
+      },
+      "at": "2026-09-16T02:35:43.640Z"
+    },
+    {
+      "id": "A8b",
+      "conjunct": "A-encoding",
+      "verdict": "PASS",
+      "expected": "reject (invalid_json_number)",
+      "observed": "REJECTED:invalid_json_number",
+      "detail": {
+        "label": "exponent rejected"
+      },
+      "at": "2026-09-16T02:35:43.640Z"
+    },
+    {
+      "id": "A9",
+      "conjunct": "A-encoding",
+      "verdict": "PASS",
+      "expected": "reject (invalid_json_number)",
+      "observed": "REJECTED:invalid_json_number",
+      "detail": {
+        "label": "unsafe integer rejected"
+      },
+      "at": "2026-09-16T02:35:43.640Z"
+    },
+    {
+      "id": "A10",
+      "conjunct": "A-encoding",
+      "verdict": "PASS",
+      "expected": "identical identity",
+      "observed": {
+        "a": "{\"a\":1,\"b\":2}",
+        "b": "{\"a\":1,\"b\":2}",
+        "collision": true
+      },
+      "detail": {
+        "label": "inter-token whitespace"
+      },
+      "at": "2026-09-16T02:35:43.640Z"
+    }
+  ]
+}

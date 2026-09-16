@@ -1,0 +1,10 @@
+{
+  "mnde_failclosed": true,
+  "decision": "REFUSE",
+  "action": "github.merge",
+  "execution_id": "EXP-C001-1789526144356",
+  "reason": "ERR_SUBJECT_MISMATCH",
+  "supplied_receipt_path": "C:\\Users\\Shadow\\Downloads\\INsol\\mnde-public-test\\experiments\\exp-001\\receipts\\receipt-EXP-C001-1789526144356.json",
+  "note": "Client-side fail-closed record: MNDe returned ALLOW but the receipt did not satisfy the strict execution gate (missing, unverifiable, or not bound to this request/policy), so the action was refused locally.",
+  "recorded_at": "2026-09-16T02:35:44.546Z"
+}

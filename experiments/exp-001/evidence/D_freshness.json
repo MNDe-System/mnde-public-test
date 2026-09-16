@@ -1,0 +1,109 @@
+{
+  "conjunct": "D-freshness",
+  "total": 5,
+  "fail": 2,
+  "inconclusive": 0,
+  "results": [
+    {
+      "id": "D1",
+      "conjunct": "D-freshness",
+      "verdict": "PASS",
+      "expected": "first ALLOW, replay REFUSE (consumed)",
+      "observed": {
+        "first": {
+          "decision": "ALLOW",
+          "reason": "OK_ALLOW"
+        },
+        "replay": {
+          "decision": "REFUSE",
+          "reason": "ERR_EXECUTION_ID_DUPLICATE"
+        },
+        "storeFiles": [
+          "D1-1789526145211"
+        ]
+      },
+      "detail": {},
+      "at": "2026-09-16T02:35:45.273Z"
+    },
+    {
+      "id": "D2",
+      "conjunct": "D-freshness",
+      "verdict": "PASS",
+      "expected": "consumed id still REFUSED after restart",
+      "observed": {
+        "first": {
+          "decision": "ALLOW",
+          "reason": "OK_ALLOW"
+        },
+        "afterRestart": {
+          "decision": "REFUSE",
+          "reason": "ERR_EXECUTION_ID_DUPLICATE"
+        }
+      },
+      "detail": {},
+      "at": "2026-09-16T02:35:46.242Z"
+    },
+    {
+      "id": "D3",
+      "conjunct": "D-freshness",
+      "verdict": "FAIL",
+      "expected": "rolled-back consumed id must NOT re-authorize",
+      "observed": {
+        "consumed": {
+          "decision": "ALLOW",
+          "reason": "OK_ALLOW"
+        },
+        "afterRollback": {
+          "decision": "ALLOW",
+          "reason": "OK_ALLOW"
+        },
+        "storeBefore": [
+          "D3-1789526146242"
+        ],
+        "storeAfterRollback": []
+      },
+      "detail": {
+        "note": "Freshness state lives entirely in the local FS store; a rollback of that store reverts Consumed→Unused. No out-of-rollback-domain anchor exists."
+      },
+      "at": "2026-09-16T02:35:47.191Z"
+    },
+    {
+      "id": "D4",
+      "conjunct": "D-freshness",
+      "verdict": "FAIL",
+      "expected": "default posture must not allow replay across restart",
+      "observed": {
+        "first": {
+          "decision": "ALLOW",
+          "reason": "OK_ALLOW"
+        },
+        "afterRestart": {
+          "decision": "ALLOW",
+          "reason": "OK_ALLOW"
+        }
+      },
+      "detail": {
+        "note": "MNDE_EXEC_ID_CACHE unset by default → only in-process dedup, which resets on restart. Durable single-use is opt-in, not the default."
+      },
+      "at": "2026-09-16T02:35:48.118Z"
+    },
+    {
+      "id": "D5",
+      "conjunct": "D-freshness",
+      "verdict": "PASS",
+      "expected": "same-process replay refused even without durable store",
+      "observed": {
+        "first": {
+          "decision": "ALLOW",
+          "reason": "OK_ALLOW"
+        },
+        "replay": {
+          "decision": "REFUSE",
+          "reason": "ERR_EXECUTION_ID_REPLAYED"
+        }
+      },
+      "detail": {},
+      "at": "2026-09-16T02:35:48.621Z"
+    }
+  ]
+}

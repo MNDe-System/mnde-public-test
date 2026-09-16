@@ -1,0 +1,158 @@
+{
+  "conjunct": "C-binding",
+  "total": 9,
+  "fail": 0,
+  "inconclusive": 1,
+  "results": [
+    {
+      "id": "C001",
+      "conjunct": "C-binding",
+      "verdict": "PASS",
+      "expected": "ALLOW + executed once + verified",
+      "observed": {
+        "decision": "ALLOW",
+        "executed": true,
+        "verified": true,
+        "ran": 1,
+        "reason": "OK_ALLOW"
+      },
+      "detail": {},
+      "at": "2026-09-16T02:35:44.408Z"
+    },
+    {
+      "id": "T005",
+      "conjunct": "C-binding",
+      "verdict": "PASS",
+      "expected": "REFUSE, run() not called",
+      "observed": {
+        "decision": "REFUSE",
+        "executed": false,
+        "ran": 0,
+        "reason": "ERR_RECEIPT_ACTION_MISMATCH",
+        "failClosed": true
+      },
+      "detail": {
+        "label": "action substitution (merge→force_push)"
+      },
+      "at": "2026-09-16T02:35:44.448Z"
+    },
+    {
+      "id": "T001",
+      "conjunct": "C-binding",
+      "verdict": "PASS",
+      "expected": "REFUSE, run() not called",
+      "observed": {
+        "decision": "REFUSE",
+        "executed": false,
+        "ran": 0,
+        "reason": "ERR_RECEIPT_ACTION_MISMATCH",
+        "failClosed": true
+      },
+      "detail": {
+        "label": "target ref mutation (main→production)"
+      },
+      "at": "2026-09-16T02:35:44.466Z"
+    },
+    {
+      "id": "T002",
+      "conjunct": "C-binding",
+      "verdict": "PASS",
+      "expected": "REFUSE, run() not called",
+      "observed": {
+        "decision": "REFUSE",
+        "executed": false,
+        "ran": 0,
+        "reason": "ERR_RECEIPT_ACTION_MISMATCH",
+        "failClosed": true
+      },
+      "detail": {
+        "label": "source commit mutation (abc123→def456)"
+      },
+      "at": "2026-09-16T02:35:44.482Z"
+    },
+    {
+      "id": "T003",
+      "conjunct": "C-binding",
+      "verdict": "PASS",
+      "expected": "REFUSE, run() not called",
+      "observed": {
+        "decision": "REFUSE",
+        "executed": false,
+        "ran": 0,
+        "reason": "ERR_RECEIPT_ACTION_MISMATCH",
+        "failClosed": true
+      },
+      "detail": {
+        "label": "pull request mutation (17→18)"
+      },
+      "at": "2026-09-16T02:35:44.497Z"
+    },
+    {
+      "id": "T004",
+      "conjunct": "C-binding",
+      "verdict": "PASS",
+      "expected": "REFUSE, run() not called",
+      "observed": {
+        "decision": "REFUSE",
+        "executed": false,
+        "ran": 0,
+        "reason": "ERR_RECEIPT_ACTION_MISMATCH",
+        "failClosed": true
+      },
+      "detail": {
+        "label": "repository mutation"
+      },
+      "at": "2026-09-16T02:35:44.512Z"
+    },
+    {
+      "id": "Tid",
+      "conjunct": "C-binding",
+      "verdict": "PASS",
+      "expected": "REFUSE, run() not called",
+      "observed": {
+        "decision": "REFUSE",
+        "executed": false,
+        "ran": 0,
+        "reason": "ERR_RECEIPT_REQUEST_MISMATCH",
+        "failClosed": true
+      },
+      "detail": {
+        "label": "execution-id substitution (receipt reused for a new call)"
+      },
+      "at": "2026-09-16T02:35:44.529Z"
+    },
+    {
+      "id": "T007",
+      "conjunct": "C-binding",
+      "verdict": "PASS",
+      "expected": "REFUSE, run() not called",
+      "observed": {
+        "decision": "REFUSE",
+        "executed": false,
+        "ran": 0,
+        "reason": "ERR_SUBJECT_MISMATCH",
+        "failClosed": true
+      },
+      "detail": {
+        "label": "subject mismatch (expected B, receipt A)"
+      },
+      "at": "2026-09-16T02:35:44.546Z"
+    },
+    {
+      "id": "T009-exec",
+      "conjunct": "C-binding",
+      "verdict": "INCONCLUSIVE",
+      "expected": "characterize executor replay of identical request",
+      "observed": {
+        "decision": "ALLOW",
+        "executed": true,
+        "ran": 1
+      },
+      "detail": {
+        "label": "identical-request replay at executor gate",
+        "interpretation": "Executor re-authorizes an identical declared request when re-presented the same receipt+id; it is a per-call binding check, NOT a single-use ledger. Consumption must be enforced by the sidecar (conjunct D)."
+      },
+      "at": "2026-09-16T02:35:44.561Z"
+    }
+  ]
+}
