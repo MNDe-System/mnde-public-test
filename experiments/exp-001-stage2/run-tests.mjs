@@ -18,7 +18,8 @@ const TESTS = [
   "tests/test_evidence.mjs",
   "tests/test_adapter.mjs",
   "tests/test_verify_failclosed.mjs",
-  "tests/test_verify_positive.mjs"
+  "tests/test_verify_positive.mjs",
+  "tests/test_freshness.mjs"
 ];
 
 let failures = 0;

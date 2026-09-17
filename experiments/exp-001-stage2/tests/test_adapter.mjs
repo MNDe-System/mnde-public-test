@@ -4,9 +4,12 @@
 import { test, atest, done, assert } from "./_t.mjs";
 import { createAdapter, ATTEMPT } from "../src/adapter.mjs";
 import { testOnlyVerifiedDeclaration, makeAPlus } from "../src/declaration.mjs";
+import { createFileClaimBackend } from "../src/claim_store.mjs";
+import { tmpDir } from "./_tmp.mjs";
 import { makeRealVerifiedDeclaration } from "./_real_receipt.mjs";
 
-const CONFIG = { owner: "mnde-labs", repo: "exp-001", target_ref: "main" };
+const CONFIG = { owner: "mnde-labs", repo: "exp-001", target_ref: "main", namespace: "mnde:exp001s2:test" };
+const freshBackend = () => createFileClaimBackend({ dir: tmpDir("adapter-claims") });
 
 function recordingTransport(response) {
   const calls = [];
@@ -17,7 +20,7 @@ function recordingTransport(response) {
 
 await atest("exactly one merge call for an eligible (production-verified) attempt", async () => {
   const transport = recordingTransport({ status: 200, body: { merged: true }, headers: { "x-github-request-id": "abc" } });
-  const adapter = createAdapter({ config: CONFIG, transport });
+  const adapter = createAdapter({ config: CONFIG, transport, claimBackend: freshBackend() });
   const rec = await adapter.attemptMerge(await makeRealVerifiedDeclaration());
   assert.equal(transport.calls.length, 1, "transport called exactly once");
   assert.equal(adapter.dispatchCount, 1);
@@ -29,7 +32,7 @@ await atest("exactly one merge call for an eligible (production-verified) attemp
 await atest("a lost response is UNKNOWN and never auto-retries", async () => {
   let calls = 0;
   const transport = async () => { calls += 1; throw new Error("socket hang up"); };
-  const adapter = createAdapter({ config: CONFIG, transport });
+  const adapter = createAdapter({ config: CONFIG, transport, claimBackend: freshBackend() });
   const rec = await adapter.attemptMerge(await makeRealVerifiedDeclaration());
   assert.equal(rec.outcome, ATTEMPT.UNKNOWN);
   assert.equal(calls, 1, "must not retry after a lost response");
@@ -45,7 +48,7 @@ await atest("the test-only pause hook cannot change the dispatched request", asy
   const transport = recordingTransport({ status: 409, body: { message: "Head branch was modified" } });
   const modelled = { head: "a".repeat(40) };
   const adapter = createAdapter({
-    config: CONFIG, transport,
+    config: CONFIG, transport, claimBackend: freshBackend(),
     beforeDispatch: async () => { modelled.head = "c".repeat(40); } // move the world; request already frozen
   });
   const rec = await adapter.attemptMerge(await makeRealVerifiedDeclaration());
@@ -55,7 +58,7 @@ await atest("the test-only pause hook cannot change the dispatched request", asy
 
 await atest("an invalid (target-mismatched) declaration is refused BEFORE dispatch", async () => {
   const transport = recordingTransport({ status: 200, body: {} });
-  const adapter = createAdapter({ config: CONFIG, transport });
+  const adapter = createAdapter({ config: CONFIG, transport, claimBackend: freshBackend() });
   const wrongTarget = await makeRealVerifiedDeclaration({ parameters: {
     repository: { owner: "mnde-labs", repo: "exp-001" }, pull_request: 17,
     expected_source_sha: "a".repeat(40), target_ref: "release", expected_target_sha: "b".repeat(40), merge_method: "merge"
@@ -68,7 +71,7 @@ await atest("an invalid (target-mismatched) declaration is refused BEFORE dispat
 
 await atest("SECURITY: a test-only (unverified) declaration cannot dispatch through the adapter", async () => {
   const transport = recordingTransport({ status: 200, body: { merged: true } });
-  const adapter = createAdapter({ config: CONFIG, transport });
+  const adapter = createAdapter({ config: CONFIG, transport, claimBackend: freshBackend() });
   const testOnly = testOnlyVerifiedDeclaration(makeAPlus()); // branded, but NOT production-verified
   const rec = await adapter.attemptMerge(testOnly);
   assert.equal(rec.outcome, ATTEMPT.REFUSED_BEFORE_DISPATCH);
@@ -78,7 +81,7 @@ await atest("SECURITY: a test-only (unverified) declaration cannot dispatch thro
 
 await atest("SECURITY: a plain {verified:true} object cannot dispatch through the adapter", async () => {
   const transport = recordingTransport({ status: 200, body: {} });
-  const adapter = createAdapter({ config: CONFIG, transport });
+  const adapter = createAdapter({ config: CONFIG, transport, claimBackend: freshBackend() });
   const rec = await adapter.attemptMerge({ ok: true, verified: true, declaration: makeAPlus() });
   assert.equal(rec.outcome, ATTEMPT.REFUSED_BEFORE_DISPATCH);
   assert.equal(rec.error, "ERR_NOT_PRODUCTION_VERIFIED");

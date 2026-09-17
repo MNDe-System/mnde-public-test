@@ -40,13 +40,15 @@ const DEFAULT_PARAMS = () => ({
   merge_method: "merge"
 });
 
-function policyRequest({ subject = "EXP001S2-SUBJECT", executionId = "EXP001S2-EXEC-1", action = "github.pull_request.merge", parameters }) {
-  return {
+function policyRequest({ subject = "EXP001S2-SUBJECT", executionId = "EXP001S2-EXEC-1", action = "github.pull_request.merge", parameters, grant_id }) {
+  const req = {
     schema_version: "1.0", request_id: executionId, timestamp: SIGNED_AT,
     principal: { id: subject }, agent: { id: "agent-1" },
     tool: { tool_name: action }, parameters: parameters ?? DEFAULT_PARAMS(),
     environment: { region: "us-west-2" }, context: {}
   };
+  if (grant_id !== undefined && grant_id !== null) req.grant_id = grant_id; // signed grant/nonce identity
+  return req;
 }
 function allowPolicy(action) {
   return { schema_version: "1.0", policy_id: "pol-s2", version: "1", state: "ACTIVE",
@@ -120,7 +122,14 @@ export async function makeRealExecutorBoundReceipt(over = {}) {
   if (!signed.ok) throw new Error(`v2 signing failed: ${signed.reason_code}`);
   return {
     receipt: signed.receipt,
-    trustedConfig: { authorityBundle, trustedRootFingerprint: authorityBundle.root_key.fingerprint, environmentId: ENVIRONMENT_ID, expectedExecutorId: executorId, requireExecutor: true, now: SIGNED_AT }
+    trustedConfig: {
+      authorityBundle, trustedRootFingerprint: authorityBundle.root_key.fingerprint,
+      environmentId: ENVIRONMENT_ID,
+      // verifyExpectedExecutorId lets a test pin a DIFFERENT executor id than the
+      // one that signed, to exercise the wrong-executor refusal.
+      expectedExecutorId: over.verifyExpectedExecutorId ?? executorId,
+      requireExecutor: true, now: SIGNED_AT
+    }
   };
 }
 

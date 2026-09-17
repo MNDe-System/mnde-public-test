@@ -12,6 +12,7 @@
 
 import { buildMergeRequest } from "./build_request.mjs";
 import { isProductionVerified } from "./declaration.mjs";
+import { deriveClaimRecord, claimAuthority, DISPATCH } from "./freshness.mjs";
 
 export const ATTEMPT = Object.freeze({ RESPONDED: "RESPONDED", UNKNOWN: "UNKNOWN", REFUSED_BEFORE_DISPATCH: "REFUSED_BEFORE_DISPATCH" });
 
@@ -38,61 +39,73 @@ function sanitizeResponse(resp) {
 // beforeDispatch (TEST-ONLY): async () => void, awaited after the request is
 //   frozen and before dispatch, so a fixture can mutate the MODELLED external
 //   head. It receives nothing that can change the action or URL.
-export function createAdapter({ config, transport, beforeDispatch } = {}) {
+// config: { owner, repo, target_ref, namespace }  — namespace is TRUSTED config,
+//   used to scope durable claims; it is never taken from an agent field.
+// claimBackend: the durable, out-of-rollback-domain claim service (§ claim_store).
+//   REQUIRED for the protected path. Absent/unhealthy => refuse (F-001 fail-closed).
+export function createAdapter({ config, transport, beforeDispatch, claimBackend } = {}) {
   if (typeof transport !== "function") throw new Error("adapter requires an injected transport (offline: a recording stub)");
   if (config && "token" in config) throw new Error("ERR_TOKEN_IN_CONFIG: the adapter config must not carry a credential");
 
   let dispatched = 0;
+  const refused = (error, extra = {}) => Object.freeze({
+    outcome: ATTEMPT.REFUSED_BEFORE_DISPATCH, error, dispatched: false, request: null, at: new Date().toISOString(), ...extra
+  });
 
   async function attemptMerge(verifiedDeclaration) {
-    // AUTHORIZATION BOUNDARY: dispatch requires a declaration that passed the REAL
-    // receipt verifier (production brand). A JavaScript brand from the test-only
-    // fixture, or a plain {verified:true} object, is NOT sufficient and never
-    // reaches the transport.
-    if (!isProductionVerified(verifiedDeclaration)) {
-      return Object.freeze({
-        outcome: ATTEMPT.REFUSED_BEFORE_DISPATCH,
-        error: "ERR_NOT_PRODUCTION_VERIFIED",
-        dispatched: false, request: null, at: new Date().toISOString()
-      });
-    }
-    // Build + freeze the request BEFORE any await, so a post-verification mutation
-    // or the test hook cannot change what is dispatched.
+    // 1) AUTHORIZATION BOUNDARY: dispatch requires the exact-action production
+    //    brand (verified executor-bound v2). A wiring brand, the test-only
+    //    fixture, or a {verified:true} object never reaches the claim or transport.
+    if (!isProductionVerified(verifiedDeclaration)) return refused("ERR_NOT_PRODUCTION_VERIFIED");
+
+    // 2) Build + freeze the request from the signed A⁺ BEFORE any await.
     let request;
     try {
       request = buildMergeRequest(verifiedDeclaration, config);
     } catch (error) {
-      return Object.freeze({
-        outcome: ATTEMPT.REFUSED_BEFORE_DISPATCH,
-        error: error.code ?? String(error?.message ?? error),
-        dispatched: false, request: null, at: new Date().toISOString()
-      });
+      return refused(error.code ?? String(error?.message ?? error));
     }
+
+    // 3) FRESHNESS: atomically claim the authority in the durable, out-of-domain
+    //    backend BEFORE any transport. The adapter derives the claim itself from
+    //    the verified declaration + trusted namespace — it never trusts a
+    //    caller-supplied "claimed" flag.
+    const derived = deriveClaimRecord(verifiedDeclaration, { namespace: config?.namespace });
+    if (!derived.ok) return refused(derived.reason);
+    const claim = await claimAuthority(claimBackend, derived.record);
+
+    if (claim.decision === DISPATCH.NO_BACKEND) return refused("ERR_NO_CLAIM_BACKEND", { claim });
+    if (claim.decision === DISPATCH.BACKEND_UNAVAILABLE) return refused("ERR_CLAIM_BACKEND_UNAVAILABLE", { claim });
+    if (claim.decision === DISPATCH.SPENT) return refused("ERR_AUTHORITY_SPENT", { claim }); // prior is for inspection only
+    if (claim.decision === DISPATCH.UNKNOWN) {
+      // Claim outcome unknown → send NOTHING, no retry. Operator reconciliation.
+      return Object.freeze({ outcome: ATTEMPT.UNKNOWN, error: "ERR_CLAIM_UNKNOWN", dispatched: false, request: null, claim, at: new Date().toISOString() });
+    }
+    // claim.decision === CLAIMED → proceed to exactly one dispatch.
 
     if (typeof beforeDispatch === "function") {
       await beforeDispatch(); // test-only; cannot alter the frozen `request`
     }
 
-    // Exactly one dispatch. No retry on failure/timeout.
+    // 4) Exactly one dispatch. No retry on failure/timeout, and NO re-claim.
     dispatched += 1;
     const at = new Date().toISOString();
     let resp;
     try {
       resp = await transport({ method: request.method, path: request.path, body: request.body });
     } catch (error) {
-      // Missing reply / timeout: UNKNOWN. Do NOT auto-retry — a second merge could
-      // be a second effect. The observer decides what actually happened.
+      // Lost provider response: UNKNOWN. Do NOT auto-retry and do NOT re-claim —
+      // the authority is already spent. Observation + operator reconciliation.
       return Object.freeze({
-        outcome: ATTEMPT.UNKNOWN,
-        error: String(error?.message ?? error),
-        dispatched: true, dispatchCount: dispatched, request, at
+        outcome: ATTEMPT.UNKNOWN, error: String(error?.message ?? error),
+        dispatched: true, dispatchCount: dispatched, request, claim, at
       });
     }
     const s = sanitizeResponse(resp);
     return Object.freeze({
       outcome: ATTEMPT.RESPONDED,
       dispatched: true, dispatchCount: dispatched,
-      request,
+      request, claim,
       httpStatus: s.httpStatus,
       responseBodySanitized: s.body,
       providerRequestId: s.providerRequestId ?? null,

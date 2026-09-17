@@ -69,22 +69,25 @@ function extractAPlus(envelope) {
   cr = cr && typeof cr === "object" ? cr : {};
   const er = cr.execution_request && typeof cr.execution_request === "object" ? cr.execution_request : null;
 
-  let subject, executionId, action, params;
+  let subject, executionId, action, params, grantId;
   if (er) {
     const tc = Array.isArray(er.tool_calls) && er.tool_calls.length === 1 ? er.tool_calls[0] : null;
     subject = typeof er.actor?.user_id === "string" ? er.actor.user_id : null;
     executionId = er.request_id ?? er.release_request?.execution_id ?? null;
     action = typeof tc?.tool === "string" ? tc.tool : null;
     params = tc && typeof tc.parameters === "object" && tc.parameters !== null ? tc.parameters : {};
+    grantId = er.grant_id ?? er.release_request?.grant_id ?? null;
   } else {
     subject = typeof cr.principal?.id === "string" ? cr.principal.id : null;
     executionId = cr.request_id ?? null;
     action = typeof cr.tool?.tool_name === "string" ? cr.tool.tool_name : (typeof cr.tool === "string" ? cr.tool : null);
     params = cr.parameters && typeof cr.parameters === "object" ? cr.parameters : {};
+    grantId = cr.grant_id ?? null;
   }
   return {
     subject,
     executionId,
+    grant_id: grantId ?? null,        // grant/nonce identity where present (signed)
     action,
     repository: params.repository ?? null,
     pull_request: params.pull_request ?? null,
@@ -104,7 +107,7 @@ function extractAPlus(envelope) {
   };
 }
 
-function brandedDeclaration({ provenance, verifiedAt, signedCanonicalDigest, aPlus, trust, receiptRef, freshness = null, production = false }) {
+function brandedDeclaration({ provenance, verifiedAt, signedCanonicalDigest, aPlus, trust, receiptRef, receiptHash = null, freshness = null, production = false }) {
   const decl = deepFreeze({
     ok: true,
     provenance,
@@ -112,6 +115,7 @@ function brandedDeclaration({ provenance, verifiedAt, signedCanonicalDigest, aPl
     signedCanonicalDigest,
     declaration: aPlus,
     receiptRef,
+    receiptHash,
     trust,
     freshness
   });
@@ -178,6 +182,7 @@ export async function verifyDeclaration(envelope, trustedConfig = {}) {
     signedCanonicalDigest,
     aPlus,
     receiptRef: aPlus.receiptRef,
+    receiptHash: envelope.custody_attestation?.receipt_hash ?? null,   // signed inner-receipt hash
     trust: { source: result.trust_source ?? result.kind ?? null, key_id: result.custody?.key_id ?? null, executor_id: result.executor_id ?? null },
     // Consumption is NOT established by verification. Never treat this as single-use.
     freshness: { durably_consumed: false, basis: "NOT_ESTABLISHED_BY_VERIFICATION", note: "authenticity + executor binding only; durable single-use is F-001/F-002, unproven here" },
