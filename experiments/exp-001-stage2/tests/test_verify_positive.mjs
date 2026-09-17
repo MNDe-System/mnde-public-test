@@ -9,7 +9,7 @@
 import { test, atest, done, assert } from "./_t.mjs";
 import { verifyDeclaration, isProductionVerified } from "../src/declaration.mjs";
 import { buildMergeRequest } from "../src/build_request.mjs";
-import { createAdapter, ATTEMPT } from "../src/adapter.mjs";
+import { createOfflineAdapter as createAdapter, ATTEMPT } from "../../../tests/support/offline_freshness_adapter.mjs";
 import { makeRealExecutorBoundReceipt, makeRealSignedReceipt } from "./_real_receipt.mjs";
 
 const CONFIG = { owner: "mnde-labs", repo: "exp-001", target_ref: "main" };

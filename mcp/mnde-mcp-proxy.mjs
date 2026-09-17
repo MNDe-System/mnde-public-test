@@ -5,11 +5,9 @@
 //     -> MNDe MCP proxy   (this process)
 //        -> upstream MCP server (spawned child)
 //
-// The proxy is transparent: it relays every method to the upstream UNCHANGED,
-// EXCEPT `tools/call`, which it gates through MNDe first. The gate uses the
-// executor whose run() is the forward to upstream — so on REFUSE the forward
-// never happens. The tool call you did not write now requires authority before
-// execution.
+// Protected tools/call uses the disabled executor and cannot reach upstream.
+// Only allowlisted protocol discovery/inspection and lifecycle notifications
+// pass through while independent freshness deployment proof is pending.
 //
 // Config (env):
 //   MNDE_SIDECAR_URL                MNDe sidecar (default http://127.0.0.1:8787)
@@ -146,14 +144,18 @@ async function handle(message) {
   const isRequest = id !== undefined && id !== null;
 
   if (!isRequest) {
-    upstream.notify(method, params); // forward agent notifications (e.g. notifications/initialized)
+    if (method === "notifications/initialized" || method === "notifications/cancelled") upstream.notify(method, params);
     return;
   }
   if (method === "tools/call") {
     await gateToolCall(id, params);
     return;
   }
-  // Everything else is passed through transparently; fail closed if upstream errors.
+  // Only protocol discovery/inspection passes while dispatch is disabled.
+  if (!["initialize", "ping", "tools/list", "resources/list", "resources/templates/list", "resources/read", "prompts/list", "prompts/get"].includes(method)) {
+    sendError(id, -32601, "ERR_FRESHNESS_DEPLOYMENT_DISABLED");
+    return;
+  }
   try {
     const result = await upstream.request(method, params, upstreamTimeoutMs);
     sendResult(id, result);

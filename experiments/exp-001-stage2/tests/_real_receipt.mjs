@@ -40,15 +40,16 @@ const DEFAULT_PARAMS = () => ({
   merge_method: "merge"
 });
 
-function policyRequest({ subject = "EXP001S2-SUBJECT", executionId = "EXP001S2-EXEC-1", action = "github.pull_request.merge", parameters, grant_id }) {
+function policyRequest({ subject = "EXP001S2-SUBJECT", executionId = "EXP001S2-EXEC-1", action = "github.pull_request.merge", parameters, grant_id = `grant:${executionId}`, expires_at, omitGrant = false, requestPatch }) {
   const req = {
     schema_version: "1.0", request_id: executionId, timestamp: SIGNED_AT,
     principal: { id: subject }, agent: { id: "agent-1" },
     tool: { tool_name: action }, parameters: parameters ?? DEFAULT_PARAMS(),
     environment: { region: "us-west-2" }, context: {}
   };
-  if (grant_id !== undefined && grant_id !== null) req.grant_id = grant_id; // signed grant/nonce identity
-  return req;
+  if (!omitGrant) req.grant_id = grant_id; // signed grant/nonce identity
+  if (expires_at !== undefined) req.expires_at = expires_at;
+  return Object.assign(req, requestPatch);
 }
 function allowPolicy(action) {
   return { schema_version: "1.0", policy_id: "pol-s2", version: "1", state: "ACTIVE",
@@ -61,7 +62,7 @@ async function buildAuthorityAndInner(over) {
   const root = { keyId: `${authorityId}-root`, ...generateAuthorityKeyPair() };
   const receiptKey = { keyId: `${authorityId}-receipt`, ...generateAuthorityKeyPair() };
   const authorityBundle = await buildAuthorityBundle({
-    authorityId, issuedAt: SIGNED_AT, notAfter: "2027-06-25T00:00:00.000Z", root,
+    authorityId, revocation: over.revocation ?? [], issuedAt: SIGNED_AT, notAfter: "2027-06-25T00:00:00.000Z", root,
     receiptKeys: [{ keyId: receiptKey.keyId, publicPem: receiptKey.publicPem, validFrom: "2026-01-01T00:00:00.000Z", validUntil: "2027-01-01T00:00:00.000Z" }]
   });
   const request = policyRequest(over);

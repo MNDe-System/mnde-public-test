@@ -2,7 +2,7 @@
 // declarations (real receipt + real verifier via _real_receipt.mjs), and proves
 // the production dispatch gate rejects a merely-branded test-only declaration.
 import { test, atest, done, assert } from "./_t.mjs";
-import { createAdapter, ATTEMPT } from "../src/adapter.mjs";
+import { createOfflineAdapter as createAdapter, ATTEMPT } from "../../../tests/support/offline_freshness_adapter.mjs";
 import { testOnlyVerifiedDeclaration, makeAPlus } from "../src/declaration.mjs";
 import { createFileClaimBackend } from "../src/claim_store.mjs";
 import { tmpDir } from "./_tmp.mjs";

@@ -24,7 +24,7 @@ const EXEC_ID_PATTERN = /^[A-Za-z0-9._-]{1,256}$/;
 const seenIds = new Set();
 
 // Returns the configured execution ID store directory, or null if MNDE_EXEC_ID_CACHE
-// is not set. When null, the caller skips the dedup check (opt-in feature).
+// is not set. Absence fails closed; this local store is not deployment authority.
 export function execIdDirPath() {
   return process.env.MNDE_EXEC_ID_CACHE ?? null;
 }
@@ -37,16 +37,12 @@ export function execIdDirPath() {
 //
 // Fails closed on any filesystem error.
 export function reserveExecutionId(executionId) {
-  if (!EXEC_ID_PATTERN.test(executionId)) return false;
+  if (typeof executionId !== "string" || !EXEC_ID_PATTERN.test(executionId)) return false;
 
   if (seenIds.has(executionId)) return false;
 
   const dir = execIdDirPath();
-  // Durable dedup requires a configured persistent store. Without
-  // MNDE_EXEC_ID_CACHE, file-based dedup is impossible (no stable path).
-  // ARM-level in-process dedup still protects within a single process
-  // lifetime. Return true so the request reaches the worker.
-  if (dir === null) return true;
+  if (typeof dir !== "string" || dir.length === 0) return false;
 
   try {
     mkdirSync(dir, { recursive: true, mode: 0o700 });

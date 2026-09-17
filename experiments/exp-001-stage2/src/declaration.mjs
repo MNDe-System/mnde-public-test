@@ -22,6 +22,8 @@
 // request body — the PR merge endpoint does not enforce it (target/base binding
 // is UNRESOLVED).
 
+import { verifyExecutorCredential } from "../../../src/custody/executor-credential.mjs";
+import { evaluateRevocation, findBundleKey } from "../../../src/custody/bundle.mjs";
 import { createHash } from "node:crypto";
 import { verifyAnyReceiptObject } from "../../../tools/verify.mjs";
 import { SIGNED_RECEIPT_SCHEMA } from "../../../src/authority-signing/index.mjs";
@@ -87,6 +89,7 @@ function extractAPlus(envelope) {
   return {
     subject,
     executionId,
+    expires_at: cr.expires_at ?? er?.expires_at ?? null,
     grant_id: grantId ?? null,        // grant/nonce identity where present (signed)
     action,
     repository: params.repository ?? null,
@@ -113,6 +116,7 @@ function brandedDeclaration({ provenance, verifiedAt, signedCanonicalDigest, aPl
     provenance,
     verifiedAt,
     signedCanonicalDigest,
+    aplusDigest: sha256hex(canonicalizeJson(aPlus)),
     declaration: aPlus,
     receiptRef,
     receiptHash,
@@ -145,6 +149,16 @@ export async function verifyDeclaration(envelope, trustedConfig = {}) {
   if (!envelope || typeof envelope !== "object") {
     return Object.freeze({ ok: false, reason: "ERR_NO_ENVELOPE" });
   }
+  // Copy BEFORE the first await: both verification and extraction use this snapshot.
+  try {
+    envelope = deepFreeze(structuredClone(envelope));
+    trustedConfig = deepFreeze(structuredClone(trustedConfig));
+  } catch { return Object.freeze({ ok: false, reason: "ERR_INVALID_SNAPSHOT" }); }
+  if (!trustedConfig || typeof trustedConfig !== "object" || Array.isArray(trustedConfig)
+      || (Object.hasOwn(trustedConfig, "namespace") && (typeof trustedConfig.namespace !== "string" || !trustedConfig.namespace))
+      || (Object.hasOwn(trustedConfig, "revokedGrantIds") && (!Array.isArray(trustedConfig.revokedGrantIds) || trustedConfig.revokedGrantIds.some(v => typeof v !== "string" || !v)))) {
+    return Object.freeze({ ok: false, reason: "ERR_INVALID_CONFIG" });
+  }
   // Structural gate first: only a v2 executor-bound envelope can be exact-action
   // authority. A policy-only receipt (or any other schema) is refused here before
   // it can be mistaken for execution authority.
@@ -153,7 +167,10 @@ export async function verifyDeclaration(envelope, trustedConfig = {}) {
   }
   // The verifier MUST be asked to require the executor layer. Without an out-of-band
   // executor identity + environment the executor binding cannot verify.
-  const opts = { ...trustedConfig, requireExecutor: true };
+  if (typeof trustedConfig.expectedExecutorId !== "string" || !trustedConfig.expectedExecutorId) {
+    return Object.freeze({ ok: false, reason: "ERR_EXPECTED_EXECUTOR_REQUIRED" });
+  }
+  const opts = { ...trustedConfig, now: trustedConfig.now ?? new Date().toISOString(), requireExecutor: true };
   let result;
   try {
     result = await verifyAnyReceiptObject(envelope, opts);
@@ -167,9 +184,36 @@ export async function verifyDeclaration(envelope, trustedConfig = {}) {
     const reason = result?.verified === true ? "ERR_NOT_EXECUTOR_BOUND" : "ERR_RECEIPT_UNVERIFIED";
     return Object.freeze({ ok: false, reason, detail: result?.reason ?? result?.state ?? null });
   }
+  if (result.decision !== "ALLOW") return Object.freeze({ ok: false, reason: "ERR_NOT_ALLOW" });
+  // Historical authenticity alone does not grant current execution authority.
+  const current = await verifyExecutorCredential(envelope.executor.credential, {
+    ...opts, requiredCapability: "sign_execution_receipt"
+  });
+  if (!current.ok) return Object.freeze({ ok: false, reason: current.code });
+  const receiptKey = findBundleKey(opts.authorityBundle, "receipt", envelope.custody_attestation.signing_key_id, opts.now, opts.now);
+  const keyIds = [envelope.executor.credential.key_id, opts.authorityBundle.root_key.key_id];
+  if (!receiptKey.ok || receiptKey.revoked_now || keyIds.some(key_id =>
+    evaluateRevocation(opts.authorityBundle.revocation, { key_id }, opts.now, opts.now).revoked_now)) {
+    return Object.freeze({ ok: false, reason: "ERR_CURRENT_KEY_UNTRUSTED" });
+  }
   // Snapshot + freeze the authenticated values BEFORE returning, so later mutation
   // of the caller's envelope cannot change what we authorized.
   const aPlus = deepFreeze(structuredClone(extractAPlus(envelope)));
+  const cr = typeof envelope.receipt.canonical_request === "string" ? JSON.parse(envelope.receipt.canonical_request) : envelope.receipt.canonical_request;
+  const er = cr.execution_request;
+  const identityFields = er
+    ? [cr.request_id, er.request_id, er.release_request?.execution_id, envelope.receipt.decision_output?.execution_id].filter(v => v !== undefined)
+    : [cr.request_id, envelope.receipt.decision_output?.execution_id].filter(v => v !== undefined);
+  const grants = er ? [cr.grant_id, er.grant_id, er.release_request?.grant_id].filter(v => v !== undefined) : [cr.grant_id];
+  if (!identityFields.length || identityFields.some(v => typeof v !== "string" || !v || v !== aPlus.executionId)
+      || !grants.length || grants.some(v => typeof v !== "string" || !v || v !== aPlus.grant_id)
+      || typeof aPlus.subject !== "string" || !aPlus.subject) {
+    return Object.freeze({ ok: false, reason: "ERR_AUTHORITY_IDENTITY" });
+  }
+  if ((Object.hasOwn(cr, "expires_at") || (er && Object.hasOwn(er, "expires_at"))) && (typeof aPlus.expires_at !== "string" || !Number.isFinite(Date.parse(aPlus.expires_at)) || Date.parse(opts.now) >= Date.parse(aPlus.expires_at))) {
+    return Object.freeze({ ok: false, reason: "ERR_AUTHORITY_EXPIRED" });
+  }
+  if (trustedConfig.revokedGrantIds?.includes(aPlus.grant_id)) return Object.freeze({ ok: false, reason: "ERR_GRANT_REVOKED" });
   let signedCanonicalDigest = null;
   try {
     const inner = envelope.receipt ?? envelope;
@@ -183,7 +227,7 @@ export async function verifyDeclaration(envelope, trustedConfig = {}) {
     aPlus,
     receiptRef: aPlus.receiptRef,
     receiptHash: envelope.custody_attestation?.receipt_hash ?? null,   // signed inner-receipt hash
-    trust: { source: result.trust_source ?? result.kind ?? null, key_id: result.custody?.key_id ?? null, executor_id: result.executor_id ?? null },
+    trust: { namespace: trustedConfig.namespace ?? null, valid_until: envelope.executor.credential.expires_at, source: result.trust_source ?? result.kind ?? null, key_id: result.custody?.key_id ?? null, executor_id: result.executor_id ?? null },
     // Consumption is NOT established by verification. Never treat this as single-use.
     freshness: { durably_consumed: false, basis: "NOT_ESTABLISHED_BY_VERIFICATION", note: "authenticity + executor binding only; durable single-use is F-001/F-002, unproven here" },
     production: true      // executor-bound v2 verified → production brand

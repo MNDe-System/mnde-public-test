@@ -10,7 +10,7 @@
 
 import { rmSync, cpSync, mkdirSync } from "node:fs";
 import { test, atest, done, assert } from "./_t.mjs";
-import { createAdapter, ATTEMPT } from "../src/adapter.mjs";
+import { createOfflineAdapter as createAdapter, ATTEMPT } from "../../../tests/support/offline_freshness_adapter.mjs";
 import { deriveClaimRecord } from "../src/freshness.mjs";
 import {
   createFileClaimBackend, createUnavailableBackend, createTimeoutBackend,

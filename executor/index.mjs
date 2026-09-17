@@ -1,28 +1,7 @@
-// @mnde/executor — authorize a function call through MNDe before running it.
-//
-// A developer wraps a risky action. MNDe is asked first. ALLOW runs it once;
-// REFUSE (or anything ambiguous) never runs it.
-//
-// ─────────────────────────────────────────────────────────────────────────────
-// SAFETY INVARIANT (this is the product claim):
-//
-//   There is exactly ONE call site for the wrapped function in this file, and it
-//   is reachable ONLY after the sidecar returned a decision that clears the
-//   strict execution gate. A bare `ALLOW` string is NOT sufficient. Execution
-//   requires a receipt that:
-//     1. is present,
-//     2. verifies offline (signature + authority),
-//     3. carries an `ALLOW` decision in its OWN signed body,
-//     4. is bound to THIS exact request — the execution id we generated and the
-//        exact action + parameters we sent, and
-//     5. matches the expected policy hash/version when the caller declares one.
-//   Any gap fails closed. Every other path — REFUSE, unreachable sidecar,
-//   malformed decision, timeout, missing/unverifiable/mismatched receipt —
-//   returns without calling `run()`.
-//
-//   If a tool is wrapped with MNDe, there is no code path where a REFUSE, or an
-//   ALLOW not backed by a verified request-bound receipt, executes.
-// ─────────────────────────────────────────────────────────────────────────────
+// @mnde/executor — receipt verification with protected callbacks disabled.
+// F-002 deployment proof is pending. execute/wrapTool never invoke the supplied
+// callback, even after an authentic, request-bound ALLOW. Offline verification
+// remains available. No caller flag or backend can enable dispatch.
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -232,7 +211,7 @@ export function createMndeExecutor(config = {}) {
 
   // The strict execution gate. Runs ONLY when the sidecar's HTTP decision was
   // ALLOW; returns { ok, reason } and never has a side effect. `ok:true` is the
-  // sole condition under which the wrapped function may run.
+  // historical authorization check; dispatch is separately disabled below.
   function authorizeExecution({ receipt, action, input, executionId, verified }) {
     if (!isPlainObject(receipt)) return { ok: false, reason: "ERR_NO_RECEIPT" };
     if (verified !== true) return { ok: false, reason: "ERR_RECEIPT_UNVERIFIED" };
@@ -370,27 +349,12 @@ export function createMndeExecutor(config = {}) {
       return buildResult({ decision: "REFUSE", executed: false, reason: authz.reason, receipt: decision.receipt ?? null, receiptPath: failPath, verified: verified ?? false, failClosed: true });
     }
 
-    // ALLOW + verified, request-bound receipt — the one and only place run() runs.
-    let runResult;
-    let runError;
-    let executed = false;
-    try {
-      executed = true;
-      runResult = await run();
-    } catch (error) {
-      runError = String(error?.message ?? error);
-    }
-    return buildResult({
-      decision: "ALLOW",
-      executed,
-      reason: decision.reason,
-      result: runResult,
-      error: runError,
-      receipt: decision.receipt,
-      receiptPath,
-      verified,
-      failClosed: false
-    });
+    // A verified receipt is not a durable single-use claim. This generic callback
+    // path is disabled until an independent claim service is deployed and bound
+    // inside a trusted executor. Caller flags/backends cannot enable it.
+    return buildResult({ decision: "REFUSE", executed: false,
+      reason: "ERR_FRESHNESS_DEPLOYMENT_DISABLED", receipt: decision.receipt,
+      receiptPath, verified, failClosed: true });
   }
 
   // Turn a raw function into an MNDe-guarded tool. Callers must not retain or

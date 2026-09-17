@@ -1,3 +1,4 @@
+import { createAdapter as createDisabledAdapter } from "../src/adapter.mjs";
 // EXP-001 Stage 2 — integration tests against the PRODUCTION claim backend
 // (node:sqlite: one transactional INSERT + two unique indexes; durable WAL;
 // consistent cross-process reads).
@@ -12,7 +13,7 @@ import { rmSync, cpSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { atest, done, assert } from "./_t.mjs";
-import { createAdapter, ATTEMPT } from "../src/adapter.mjs";
+import { createOfflineAdapter as createAdapter, ATTEMPT } from "../../../tests/support/offline_freshness_adapter.mjs";
 import { createSqliteClaimBackend, createLostAckButPresentBackend, createFileClaimBackend } from "../src/claim_store.mjs";
 import { deriveClaimRecord } from "../src/freshness.mjs";
 import { tmpDir } from "./_tmp.mjs";
@@ -106,11 +107,11 @@ await atest("SQLite: single-insert enforces both unique identities", async () =>
 });
 
 // Production posture must never fall back to a non-production backend.
-await atest("requireProductionBackend refuses a non-production (file model) backend", async () => {
+await atest("production adapter refuses backend injection regardless of flags", async () => {
   const t = spy();
   const fileB = createFileClaimBackend({ dir: tmpDir("prod-refuse") });
-  const rec = await createAdapter({ config: CONFIG, transport: t, claimBackend: fileB }).attemptMerge(await makeRealVerifiedDeclaration({ executionId: "RP-1" }));
-  assert.equal(rec.error, "ERR_PRODUCTION_BACKEND_REQUIRED");
+  const rec = await createDisabledAdapter({ config: CONFIG, transport: t, claimBackend: fileB }).attemptMerge(await makeRealVerifiedDeclaration({ executionId: "RP-1" }));
+  assert.equal(rec.error, "ERR_FRESHNESS_DEPLOYMENT_DISABLED");
   assert.equal(t.calls.length, 0);
 });
 

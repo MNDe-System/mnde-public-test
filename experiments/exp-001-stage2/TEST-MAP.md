@@ -1,3 +1,5 @@
+> Current safety posture (2026-09-17): live dispatch is disabled; injectable dispatch is isolated in tests/support. SQLite is same-machine model evidence, never deployment proof. The 82 tests now exercise that isolated model. See [the follow-up audit](../../docs/FRESHNESS-BOUNDARY-AUDIT.md). Earlier production-backend and closure wording below is superseded.
+
 # EXP-001 Stage 2 offline units — test → property map
 
 **Date:** 2026-09-17

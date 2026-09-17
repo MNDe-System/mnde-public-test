@@ -1,15 +1,15 @@
 // EXP-001 Stage 2 — durable claim backends.
 //
-// The claim backend closes F-001/F-002: atomic conditional first-claim (unique
+// Deployment requires an independent backend with atomic conditional first-claim (unique
 // constraint on BOTH identities), durable acknowledgement, consistent reads
 // across executor processes, and it must live OUTSIDE the executor-local rollback
 // domain (separately controlled storage, credentials, backups).
 //
 // Backends here:
-//   createSqliteClaimBackend  — PRODUCTION-shaped: one transactional INSERT with
+//   createSqliteClaimBackend  — same-machine integration model: one transactional INSERT with
 //     two unique indexes (namespace,exec_id) and (namespace,grant_id). Atomic
 //     across both identities; durable (WAL + synchronous=FULL); consistent across
-//     processes (SQLite locking + busy_timeout). production:true.
+//     processes (SQLite locking + busy_timeout). production:false; same-machine integration only.
 //   createFileClaimBackend    — crash-safe MODEL: a single atomic commit record
 //     + reconciled index files, serialized per instance. production:false.
 //   createFileClaimBackendUnsafe — the ORIGINAL two-write model, kept ONLY to
@@ -46,7 +46,7 @@ export function claimKeys(record) {
   return { execKey, grantKey };
 }
 
-// ── PRODUCTION backend: single transactional insert + two unique constraints ──
+// ── SQLite integration model: single transactional insert + two unique constraints ──
 export function createSqliteClaimBackend({ dbPath } = {}) {
   if (typeof dbPath !== "string" || dbPath.length === 0) throw new Error("sqlite claim backend requires { dbPath }");
   const { DatabaseSync } = loadSqlite();
@@ -62,7 +62,7 @@ export function createSqliteClaimBackend({ dbPath } = {}) {
   const selGrant = db.prepare("SELECT record FROM claims WHERE namespace=? AND grant_id=?");
 
   return {
-    kind: "sqlite", production: true,
+    kind: "sqlite", production: false,
     health() { try { db.prepare("SELECT 1 AS ok").get(); return { ok: true }; } catch (e) { return { ok: false, reason: String(e?.message ?? e) }; } },
     async claim(record) {
       const now = new Date().toISOString();

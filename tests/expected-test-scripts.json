@@ -38,6 +38,7 @@
   "test:external-signer",
   "test:feline",
   "test:fresh-setup",
+  "test:freshness-boundary",
   "test:graceful-shutdown",
   "test:historical-policy-bundle",
   "test:identity-assertion",
