@@ -3,10 +3,10 @@
 **Date:** 2026-09-17
 **Scope:** offline wiring + evidence validation. No network, no token, no live
 GitHub. Baseline `experiments/exp-001/` not rerun, not modified.
-**Count:** 69 passing (Unit 1: 13, Unit 2: 12, Unit 3: 8, verify fail-closed: 3,
-verify exact-action: 14, freshness F-001/F-002: 19). Reported separately from
-EXP-001's 30 baseline tests. Freshness test→finding mapping is in
-`FRESHNESS-DESIGN.md`.
+**Count:** 82 passing (Unit 1: 13, Unit 2: 12, Unit 3: 8, verify fail-closed: 3,
+verify exact-action: 14, freshness F-001/F-002: 19, freshness atomicity: 5,
+freshness integration/SQLite: 8). Reported separately from EXP-001's 30 baseline
+tests. Freshness test→finding mapping is in `FRESHNESS-DESIGN.md`.
 
 ## Unit 1 — fixed request construction (`test_build_request.mjs`)
 
@@ -81,5 +81,8 @@ repository.
 ## Bottom line
 
 Offline wiring checked; **GitHub source enforcement not yet measured**;
-target/base binding unresolved. **F-001 implemented and demonstrated; F-002
-mechanism implemented, deployment proof pending** (see `FRESHNESS-DESIGN.md`).
+target/base binding unresolved. Claim atomicity fixed (single transactional
+insert / crash-safe file model). **F-001 closed for the Stage 2 adapter path only
+(Stage 1 sidecar unchanged); F-002 mechanism demonstrated against a production
+backend in separate storage, deployment proof pending** (same-machine storage,
+not genuinely independent infrastructure). See `FRESHNESS-DESIGN.md`.

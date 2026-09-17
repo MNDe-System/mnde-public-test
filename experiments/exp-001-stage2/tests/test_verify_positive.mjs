@@ -86,7 +86,9 @@ await atest("a tampered attestation signature is refused before transport", asyn
   const { receipt, trustedConfig } = await makeRealExecutorBoundReceipt();
   const tampered = structuredClone(receipt);
   const v = tampered.custody_attestation.signature.value;
-  tampered.custody_attestation.signature.value = (v[8] === "0" ? "1" : "0") + v.slice(1);
+  // Deterministically change the first hex digit (0<->1) so the signature bytes
+  // always differ — a value derived from a different index could coincide.
+  tampered.custody_attestation.signature.value = (v[0] === "0" ? "1" : "0") + v.slice(1);
   await refusedBeforeTransport("tampered-signature", tampered, trustedConfig);
 });
 

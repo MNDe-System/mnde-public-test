@@ -72,23 +72,28 @@ plus a passing positive control — never from a stub or simulated observation.
 
 ## Test count (reported separately from EXP-001)
 
-**69 Stage 2 offline tests, all passing** — Unit 1: 13, Unit 2: 12, Unit 3: 8,
+**82 Stage 2 offline tests, all passing** — Unit 1: 13, Unit 2: 12, Unit 3: 8,
 verifyDeclaration fail-closed: 3, verifyDeclaration exact-action: 14, freshness
-(F-001/F-002): 19. Independent of the EXP-001 baseline's 30 tests, which were not
-rerun.
+(F-001/F-002): 19, freshness atomicity: 5, freshness integration (SQLite): 8.
+Independent of the EXP-001 baseline's 30 tests, which were not rerun.
 
 ## Freshness (F-001 / F-002)
 
 The protected dispatch path atomically **claims** the verified authority in a
 durable, out-of-rollback-domain backend **before any transport**, so one authority
 causes at most one dispatch attempt across restart or executor-local file
-restoration. No configured backend → refuse (F-001 fail-closed). See
-`FRESHNESS-DESIGN.md` for claim identity, crash ordering, the backend trust
-assumption, and the per-test result table. **Status:** F-001 implemented and
-demonstrated; **F-002 mechanism implemented but deployment proof pending** — the
-rollback test passes against a *separated model* backend and a negative control
-shows an in-domain backend does not close it, but a genuinely independent durable
-backend integration test is not runnable here. Live dispatch remains disabled.
+restoration. No configured backend → refuse (F-001 fail-closed). The production
+backend (`node:sqlite`) claims both identities in a single transactional insert
+with two unique constraints; `requireProductionBackend` refuses any non-production
+backend. See `FRESHNESS-DESIGN.md` for the claim identity, crash ordering, the
+audited atomicity fix, the backend trust boundary, and the per-test result table.
+
+**Status (scoped):** F-001 closed **for the Stage 2 adapter path only** — the
+Stage 1 sidecar still uses the optional `MNDE_EXEC_ID_CACHE`. Claim atomicity
+fixed (single transactional insert / crash-safe commit+reconcile). **F-002
+mechanism implemented and demonstrated against the production backend in separate
+storage, but deployment proof pending** — that backend is same-machine storage,
+not genuinely independent infrastructure. Live dispatch remains disabled.
 
 ## Status
 

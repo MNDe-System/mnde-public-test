@@ -25,6 +25,30 @@ fail-closed outcome.
   field): the claim **namespace**, the trust root, expected executor id,
   environment. The private JS production brand is **not** consumption evidence.
 
+## Audit addendum (review of commit `2aef7e68`)
+
+Two boundaries were audited before extending:
+
+1. **Atomicity across both keys — was a real defect, now fixed.** The original
+   file backend claimed `(namespace,exec_id)` and `(namespace,grant_id)` in **two
+   separate `O_EXCL` writes**. A crash between them left one identity unclaimed and
+   **reusable** (regression: `test_freshness_atomicity.mjs` shows the unsafe
+   backend reusing a grant after a partial claim). Fixes:
+   - **Production backend** (`createSqliteClaimBackend`): a **single transactional
+     `INSERT`** guarded by two unique indexes — `(namespace,exec_id)` and a partial
+     `(namespace,grant_id)` — so both identities are claimed atomically, or neither.
+   - **Crash-safe file model** (`createFileClaimBackend`): one atomic commit record
+     + reconciled index entries, serialized per instance; a crash after the commit
+     is healed by `reconcile()`. (The unsafe variant is retained only to
+     demonstrate the flaw.)
+2. **F-001 scope — narrow, stated explicitly.** The original optional
+   `MNDE_EXEC_ID_CACHE` behavior still governs the **Stage 1 sidecar** decision
+   path (`mnde-local-sidecar.mjs:1123` calls `reserveExecutionId`, off by default,
+   executor-local). The new claim gate lives **only in the Stage 2 adapter** and
+   does not touch `MNDE_EXEC_ID_CACHE`. **F-001 is therefore closed only for the
+   new Stage 2 adapter dispatch path — not for MNDe as a whole.** No broader claim
+   is made.
+
 ## Claim identity
 
 The adapter derives the claim itself (never a caller "claimed" flag), from the
@@ -82,12 +106,23 @@ executor's local files must not un-spend a claim. **Putting a second database
 file in the same restored directory does not meet this condition** (the negative-
 control test demonstrates it fails).
 
-**Backend used here:** `createFileClaimBackend` — a file-per-key O_EXCL **model**
-backend. O_EXCL gives atomic cross-process first-claim (the same primitive MNDe's
-own `execution_id_store` relies on). In the F-002 test it is placed in a directory
-**separate** from the modeled executor-local files, which **models** the
-out-of-domain property. It is **not** a production backend and does **not** by
-itself satisfy the independent-infrastructure requirement.
+**Backends:**
+- **Production:** `createSqliteClaimBackend` (`node:sqlite`) — one transactional
+  `INSERT` + two unique indexes (atomic across both identities), WAL +
+  `synchronous=FULL` (durable ack), `busy_timeout` for competing writers
+  (consistent cross-process claims). `production:true`. The Stage 2 adapter's
+  `requireProductionBackend` config refuses any non-production backend, so a
+  production deployment never falls back to the file model or memory.
+- **Model:** `createFileClaimBackend` — crash-safe (atomic commit record +
+  reconcile), single-process. Fine for offline model tests; not for production
+  cross-process concurrency.
+
+**Trust boundary actually used in tests:** a SQLite database **file** in a
+directory **separate** from the modeled executor-local files. That is genuinely
+separate *storage*, but on the **same machine** — **not** genuinely independent
+infrastructure (no separate credentials or backups). It **models** the
+out-of-rollback-domain property and demonstrates the mechanism; it is **not** a
+deployment proof. Live dispatch stays disabled (injected transport only).
 
 ## Result table
 
@@ -109,21 +144,35 @@ itself satisfy the independent-infrastructure requirement.
 | backend unavailable / timeout / lost-ack-present / contradictory | contract | fail closed, no provider request |
 | positive: fresh authority + healthy backend → one request | contract | not merely "deny everything" |
 | policy-only / copied marker / {verified:true} cannot dispatch | contract | only exact-action authority dispatches |
+| non-atomic backend reuses a grant after a partial claim | atomicity | documents the original defect |
+| crash-safe backend refuses grant/exec reuse after a post-commit crash | atomicity | commit+reconcile fixes it |
+| SQLite single-insert enforces both unique identities | atomicity | production atomic two-identity claim |
+| SQLite restore/restart → SPENT, zero transport | **F-002** | production backend in separate storage |
+| SQLite two separate processes racing → exactly one claim | contract | cross-process atomic first-claim |
+| SQLite crash-after-ack → recovery SPENT | crash | durable claim survives restart |
+| SQLite lost-ack-present → SPENT; unavailable → refuse | contract | fail closed |
+| requireProductionBackend refuses a file-model backend | **F-001** | no fallback to model/memory |
+| records authorization / claim / attempt / observation separately | contract | four distinct artifacts |
 
-## Status (honest)
+## Status (honest, scoped to what the tests prove)
 
-- **F-001 — implemented and demonstrated.** The protected path fails closed with
-  no durable backend and refuses replay across restart with one. Its restart
-  acceptance tests pass.
-- **F-002 — mechanism implemented; deployment proof pending.** The rollback
-  acceptance test passes **against a separated model backend**, and the negative
-  control shows an in-domain backend does not close it. Because the model backend
-  is not genuinely independent infrastructure, **F-002 is not yet closed in a
-  deployment.** Closing it requires an integration test against a real independent
-  durable backend: restore only the executor-local state and show the backend
-  still refuses the old authority. That infrastructure is unavailable here →
-  **F-002 implementation prepared, deployment proof pending.**
-- **Live dispatch remains disabled** (injected transport only). The remaining
-  blocker for F-002 closure is a production out-of-rollback-domain backend; the
-  G0 source probe, target/base binding, and observed-outcome receipt remain
-  separate work.
+- **F-001 — closed for the Stage 2 adapter dispatch path only.** That path fails
+  closed with no durable backend (`ERR_NO_CLAIM_BACKEND`), refuses a non-production
+  backend under `requireProductionBackend`, and refuses replay across restart with
+  a durable backend. **The broader MNDe sidecar/executor paths still use the
+  optional `MNDE_EXEC_ID_CACHE` and are NOT changed here.**
+- **Claim atomicity — fixed.** The production backend claims both identities in a
+  single transactional insert; the file model is crash-safe via commit+reconcile.
+  The partial-claim reuse regression is demonstrated (unsafe) and refused (fixed).
+- **F-002 — mechanism implemented and demonstrated against the production backend
+  in separate storage; DEPLOYMENT PROOF PENDING.** The restore/restart integration
+  test refuses the old authority with zero transport, separate processes racing
+  yield exactly one claim, and crash-after-ack and backend-loss all fail closed —
+  but the backend is same-machine storage, **not** genuinely independent
+  infrastructure. **F-002 is not described as fixed.** Deployment closure needs the
+  same integration test against a backend with separately controlled storage,
+  credentials, and backups. That infrastructure is unavailable here.
+- **Live dispatch remains disabled** (injected transport). Remaining F-002 blocker:
+  genuinely independent durable infrastructure. G0 source enforcement, target/base
+  binding, and the observed-outcome receipt remain separate work; a merge is not a
+  freshness anchor.

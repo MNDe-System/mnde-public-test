@@ -72,6 +72,11 @@ export function createAdapter({ config, transport, beforeDispatch, claimBackend 
     //    caller-supplied "claimed" flag.
     const derived = deriveClaimRecord(verifiedDeclaration, { namespace: config?.namespace });
     if (!derived.ok) return refused(derived.reason);
+    // Production posture: only a production backend may authorize a dispatch —
+    // never fall back to the file model or an in-memory store.
+    if (config?.requireProductionBackend && claimBackend?.production !== true) {
+      return refused("ERR_PRODUCTION_BACKEND_REQUIRED");
+    }
     const claim = await claimAuthority(claimBackend, derived.record);
 
     if (claim.decision === DISPATCH.NO_BACKEND) return refused("ERR_NO_CLAIM_BACKEND", { claim });

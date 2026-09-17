@@ -19,7 +19,9 @@ const TESTS = [
   "tests/test_adapter.mjs",
   "tests/test_verify_failclosed.mjs",
   "tests/test_verify_positive.mjs",
-  "tests/test_freshness.mjs"
+  "tests/test_freshness.mjs",
+  "tests/test_freshness_atomicity.mjs",
+  "tests/test_freshness_integration.mjs"
 ];
 
 let failures = 0;
