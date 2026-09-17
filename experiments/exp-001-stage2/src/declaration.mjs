@@ -24,6 +24,7 @@
 
 import { createHash } from "node:crypto";
 import { verifyAnyReceiptObject } from "../../../tools/verify.mjs";
+import { SIGNED_RECEIPT_SCHEMA } from "../../../src/authority-signing/index.mjs";
 import { canonicalizeJson } from "../../../shared/json.ts";
 
 // Two module-private brands, neither exported.
@@ -103,7 +104,7 @@ function extractAPlus(envelope) {
   };
 }
 
-function brandedDeclaration({ provenance, verifiedAt, signedCanonicalDigest, aPlus, trust, receiptRef, production = false }) {
+function brandedDeclaration({ provenance, verifiedAt, signedCanonicalDigest, aPlus, trust, receiptRef, freshness = null, production = false }) {
   const decl = deepFreeze({
     ok: true,
     provenance,
@@ -111,26 +112,56 @@ function brandedDeclaration({ provenance, verifiedAt, signedCanonicalDigest, aPl
     signedCanonicalDigest,
     declaration: aPlus,
     receiptRef,
-    trust
+    trust,
+    freshness
   });
   VERIFIED.add(decl);
   if (production) PRODUCTION_VERIFIED.add(decl);
   return decl;
 }
 
-// PRODUCTION-FACING. Real verification, fail closed.
+// PRODUCTION-FACING. The exact-action execution authority path.
+//
+// The Stage 2 design requires an EXECUTOR-BOUND `mnde.signed-receipt.v2` envelope
+// (mirroring the Stage 1 executor's requireExecutor gate). A policy decision that
+// is merely authentic is NOT execution authority: it lacks the executor binding.
+// So the production marker is minted ONLY when the real verifier returns a
+// custody-signed, executor-and-authority-verified result for a v2 envelope.
+//
+// trustedConfig MUST carry the out-of-band trust anchors the verifier needs:
+// { authorityBundle, trustedRootFingerprint, environmentId, expectedExecutorId,
+//   requireExecutor: true }. The trusted key comes from the caller's configured
+// bundle+fingerprint, never from the receipt itself.
+//
+// IMPORTANT: verification proves the approval is AUTHENTIC and executor-bound. It
+// does NOT prove the execution id was durably claimed/consumed — that is a
+// separate property (F-001/F-002) the verifier deliberately never touches. The
+// returned declaration records this limit and never claims single-use.
 export async function verifyDeclaration(envelope, trustedConfig = {}) {
   if (!envelope || typeof envelope !== "object") {
     return Object.freeze({ ok: false, reason: "ERR_NO_ENVELOPE" });
   }
+  // Structural gate first: only a v2 executor-bound envelope can be exact-action
+  // authority. A policy-only receipt (or any other schema) is refused here before
+  // it can be mistaken for execution authority.
+  if (envelope.schema_version !== SIGNED_RECEIPT_SCHEMA) {
+    return Object.freeze({ ok: false, reason: "ERR_NOT_EXECUTOR_BOUND", detail: `schema ${envelope.schema_version ?? "?"} is not ${SIGNED_RECEIPT_SCHEMA}` });
+  }
+  // The verifier MUST be asked to require the executor layer. Without an out-of-band
+  // executor identity + environment the executor binding cannot verify.
+  const opts = { ...trustedConfig, requireExecutor: true };
   let result;
   try {
-    result = await verifyAnyReceiptObject(envelope, trustedConfig);
+    result = await verifyAnyReceiptObject(envelope, opts);
   } catch {
     return Object.freeze({ ok: false, reason: "ERR_VERIFY_THREW" });
   }
-  if (result?.verified !== true) {
-    return Object.freeze({ ok: false, reason: "ERR_RECEIPT_UNVERIFIED", detail: result?.reason ?? null });
+  const executorBound = result?.verified === true
+    && result?.kind === "custody-signed"
+    && result?.state === "executor_and_authority_verified";
+  if (!executorBound) {
+    const reason = result?.verified === true ? "ERR_NOT_EXECUTOR_BOUND" : "ERR_RECEIPT_UNVERIFIED";
+    return Object.freeze({ ok: false, reason, detail: result?.reason ?? result?.state ?? null });
   }
   // Snapshot + freeze the authenticated values BEFORE returning, so later mutation
   // of the caller's envelope cannot change what we authorized.
@@ -147,8 +178,10 @@ export async function verifyDeclaration(envelope, trustedConfig = {}) {
     signedCanonicalDigest,
     aPlus,
     receiptRef: aPlus.receiptRef,
-    trust: { source: result.trust_source ?? result.kind ?? null, key_id: result.custody?.key_id ?? null },
-    production: true      // only the REAL verifier reaches here → production brand
+    trust: { source: result.trust_source ?? result.kind ?? null, key_id: result.custody?.key_id ?? null, executor_id: result.executor_id ?? null },
+    // Consumption is NOT established by verification. Never treat this as single-use.
+    freshness: { durably_consumed: false, basis: "NOT_ESTABLISHED_BY_VERIFICATION", note: "authenticity + executor binding only; durable single-use is F-001/F-002, unproven here" },
+    production: true      // executor-bound v2 verified → production brand
   });
 }
 

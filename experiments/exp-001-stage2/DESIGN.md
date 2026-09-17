@@ -207,4 +207,15 @@ conjuncts marked PASS.*
    held only by the adapter process. That requires you to provision both;
    Claude will not hold or place the token.
 
-**Nothing is built until you pick a direction on §10.1 and confirm §10.3.**
+**Resolved by audit (2026-09-17, `RECEIPT-CONTRACT-AUDIT.md`).** The *input*
+authority contract is settled: the production adapter accepts **only** a verified
+executor-bound `mnde.signed-receipt.v2` declaration (verified with
+`requireExecutor:true`). A policy decision that is merely authentic is **not**
+execution authority and is refused. This binds subject, action, every A⁺
+parameter (incl. `expected_source_sha`, `target_ref`, `expected_target_sha`),
+execution id, and the executor identity — but it does **not** prove durable
+consumption (F-001/F-002 remain separate and unproven). Note this is the *input*
+authorization contract; §10.2 (anchoring the *outcome* receipt over observed
+state) is still open — see `OUTCOME-BINDING-GAP.md`.
+
+**Nothing further is built until you pick a direction on §10.1 and confirm §10.3.**

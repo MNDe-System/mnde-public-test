@@ -3,8 +3,8 @@
 **Date:** 2026-09-17
 **Scope:** offline wiring + evidence validation. No network, no token, no live
 GitHub. Baseline `experiments/exp-001/` not rerun, not modified.
-**Count:** 41 passing (Unit 1: 13, Unit 2: 12, Unit 3: 8, verify fail-closed: 4,
-verify positive: 4). Reported separately from EXP-001's 30 baseline tests.
+**Count:** 50 passing (Unit 1: 13, Unit 2: 12, Unit 3: 8, verify fail-closed: 3,
+verify exact-action: 14). Reported separately from EXP-001's 30 baseline tests.
 
 ## Unit 1 — fixed request construction (`test_build_request.mjs`)
 
@@ -52,21 +52,29 @@ verify positive: 4). Reported separately from EXP-001's 30 baseline tests.
 | Test | Property checked |
 |---|---|
 | plain {verified:true} does not verify and is not branded | production path runs the real verifier; a self-declared flag is not proof |
-| buildMergeRequest refuses a plain {verified:true} | brand gate holds end-to-end |
-| custody envelope with NO authority bundle fails closed | verification without the trusted bundle → not authorized |
-| foreign-authority envelope rejected against a different bundle | an untrusted signer does not verify |
+| buildMergeRequest refuses a plain {verified:true} | wiring brand gate holds |
+| executor-bound v2 envelope with NO trust anchors fails closed | verification without out-of-band bundle/fingerprint/env/executor → not authorized |
 
-## verifyDeclaration positive — real receipt + real verifier (`test_verify_positive.mjs`)
+## verifyDeclaration exact-action authority (`test_verify_positive.mjs`)
+
+Uses generated in-memory keys and an independently configured trusted public key.
+Every refusal is confirmed to make **zero transport calls** via the adapter.
 
 | Test | Property checked |
 |---|---|
-| a real signed receipt verifies through the production verifier and is production-branded | the production path accepts a genuinely valid receipt and marks it production-verified |
-| the signed A⁺ reaches the fixed request builder unchanged | authenticated head SHA + repo/PR flow through to the request untouched |
-| tampering the decision breaks verification | the positive result depends on real signatures, not the fixture |
-| tampering a request parameter (source sha) breaks verification | request tampering fails closed under the real verifier |
+| an executor-bound v2 receipt verifies and is production-branded | the production path accepts the exact-action authority the design requires |
+| the signed A⁺ reaches the fixed request builder unchanged | authenticated head SHA + repo/PR flow through untouched; expected_target_sha carried, never sent |
+| verification does NOT establish durable single-use | consumption is a separate, unproven property (F-001/F-002); a signature is not replay protection |
+| a valid policy-only receipt cannot dispatch | an authentic policy decision is not execution authority (ERR_NOT_EXECUTOR_BOUND) |
+| a foreign signer is refused before transport | a different authority does not verify against the trusted bundle |
+| a changed trusted root fingerprint is refused | the trusted key is out-of-band; a wrong anchor rejects |
+| a tampered attestation signature is refused | executor/authority signature integrity |
+| changed subject / execID / action / parameter / source-sha / target / expected-target-sha refused | every signed A⁺ field is bound; any change breaks verification, zero transport calls |
 
-Keys for the positive path are generated in memory (PEM strings) and never
-written to disk — nothing enters the repository, nothing to clean up.
+Keys for the positive/executor-bound path: root/receipt/executor generated in
+memory; the receipt private key + bundle are written to an OS temp dir OUTSIDE
+the repo only for signing and removed immediately after — nothing enters the
+repository.
 
 ## Bottom line
 

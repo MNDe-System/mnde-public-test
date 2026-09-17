@@ -4,6 +4,21 @@
 the proposed observation reference, record the gap in the design rather than
 silently adding unsigned claims to a signed receipt."*
 
+## Input vs. outcome (clarified after the receipt-contract audit)
+
+Two different bindings must not be conflated:
+
+- **Input authorization — RESOLVED.** The adapter now requires a verified
+  executor-bound `mnde.signed-receipt.v2` declaration as its *input* authority
+  (`RECEIPT-CONTRACT-AUDIT.md`). That is real and enforced offline.
+- **Outcome receipt — STILL A GAP (this document).** Signing the *observed
+  result* (PR head, merged state, base SHA, merge commit) back into a signed
+  structure that ties A⁺ to what actually happened is not implemented.
+- **Durable consumption — SEPARATE AND UNPROVEN.** Neither binding proves the
+  execution id was durably claimed/consumed. The verified declaration records
+  `freshness.durably_consumed:false`. A signature is not replay protection
+  (F-001/F-002).
+
 ## The gap
 
 The build spec says to **provisionally reuse the existing `mnde.signed-receipt.v2`

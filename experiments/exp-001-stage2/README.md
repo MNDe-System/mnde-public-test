@@ -31,16 +31,21 @@ calls.** Does not touch or rerun the frozen `experiments/exp-001/` baseline
 
 ## Authorization boundary
 
-A JavaScript brand or a `{verified:true}` field alone does **not** authorize a
-dispatch. The adapter's production entry (`attemptMerge`) requires a declaration
-that passed the **real** receipt verifier (`isProductionVerified`, an
-unexported WeakSet only `verifyDeclaration` populates). The labelled test-only
-fixture carries the *wiring* brand for Unit 1/2 construction tests but can never
-enter the production brand, and is refused at the adapter
-(`ERR_NOT_PRODUCTION_VERIFIED`) before any transport call. The positive path is
-proven with a genuine policy-engine receipt signed by an in-memory, ephemeral
-authority (keys never written to disk) and verified by the actual trusted
-verifier (`tests/_real_receipt.mjs`, `tests/test_verify_positive.mjs`).
+The production path accepts **only a verified executor-bound
+`mnde.signed-receipt.v2` envelope** — the exact-action execution authority the
+Stage 2 design requires. `verifyDeclaration` mints the private
+`PRODUCTION_VERIFIED` brand only when the real verifier returns
+`verified:true` / `kind:custody-signed` / `state:executor_and_authority_verified`
+for a v2 envelope; the adapter's `attemptMerge` requires that brand before it
+builds or dispatches anything. A JavaScript brand, a `{verified:true}` field, the
+labelled test-only fixture, **and a policy-only receipt** all fail this and are
+refused (`ERR_NOT_PRODUCTION_VERIFIED` / `ERR_NOT_EXECUTOR_BOUND`) with zero
+transport calls. The positive path is proven with a genuine v2 executor-bound
+envelope produced offline from the repository's own primitives (`_real_receipt.mjs`)
+and verified by the actual trusted verifier; private keys are written to an OS
+temp dir outside the repo and removed immediately after signing. See
+`RECEIPT-CONTRACT-AUDIT.md` for the full trace, including the separate,
+**unproven** durable-consumption claim (a signature is not replay protection).
 
 ## Run
 
@@ -67,10 +72,13 @@ plus a passing positive control — never from a stub or simulated observation.
 
 ## Test count (reported separately from EXP-001)
 
-**41 Stage 2 offline tests, all passing** — Unit 1: 13, Unit 2: 12, Unit 3: 8
+**50 Stage 2 offline tests, all passing** — Unit 1: 13, Unit 2: 12, Unit 3: 8
 (incl. 2 dispatch-authorization security tests), verifyDeclaration fail-closed:
-4, verifyDeclaration positive (real receipt + real verifier): 4. This is
-independent of the EXP-001 baseline's 30 tests, which were not rerun.
+3, verifyDeclaration exact-action: 14 (executor-bound positive, plus policy-only /
+foreign-signer / changed-trusted-key / tampered-signature / changed
+subject·execID·action·param·source-sha·target·expected-target-sha refusals, each
+with zero transport calls). Independent of the EXP-001 baseline's 30 tests, which
+were not rerun.
 
 ## Status
 
