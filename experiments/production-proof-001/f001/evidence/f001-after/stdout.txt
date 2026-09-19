@@ -1,0 +1,17 @@
+{"evidence":"local-upstream-events","events":[]}
+✔ F-001: disabled proxy never starts an authority-bearing upstream (78.4892ms)
+{"evidence":"local-upstream-events","events":[]}
+✔ F-001: discovery never transfers inherited authority (70.9671ms)
+{"evidence":"local-upstream-events","events":[]}
+✔ F-001: inspection and lifecycle methods cannot reach an authority-bearing handler (76.5924ms)
+{"evidence":"local-upstream-events","events":[]}
+{"evidence":"local-upstream-events","events":[]}
+✔ F-001: tools, custom requests, notifications and restarts never reach upstream (150.423ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 476.5016

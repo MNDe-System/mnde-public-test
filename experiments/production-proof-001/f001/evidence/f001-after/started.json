@@ -1,0 +1,10 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "--test",
+    "experiments/production-proof-001/f001/test_f001_proxy.mjs"
+  ],
+  "cwd": "C:\\Users\\Shadow\\Downloads\\INsol\\mnde-public-test\\",
+  "started": "2026-09-18T07:12:31.604Z",
+  "node": "v24.14.1"
+}

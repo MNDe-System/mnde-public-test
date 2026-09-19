@@ -136,6 +136,7 @@
     "shell-mcp-server": "node ./mcp/shell-mcp-server.mjs",
     "shell-demo": "node ./scripts/shell-demo.mjs",
     "test:shell": "node ./tests/test_shell_policy.mjs",
+    "test:shipped-surface-bypass": "node ./tests/test_shipped_surface_bypass.mjs",
     "receipts:refresh": "node ./scripts/refresh-demo-receipts.mjs",
     "test:receipt-verifier": "node ./scripts/test-receipt-verifier.mjs",
     "test:correctness": "node ./tests/test_correctness_fixes.mjs",

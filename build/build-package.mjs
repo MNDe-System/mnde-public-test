@@ -98,7 +98,22 @@ const NEVER_COPY = new Set([
 // stays minimal and dev proof tooling never ships. `npm run reviewer-kit` still
 // runs it from the source checkout; it is simply absent from the tarball.
 const EXCLUDE_FILES = new Set([
-  join(repoRoot, "tools", "reviewer-kit.mjs")
+  join(repoRoot, "tools", "reviewer-kit.mjs"),
+  // Production Proof 001, Phase 2 / F-001 shipped-surface hardening.
+  // These are the raw MCP stdio *client* (spawns an arbitrary upstream command
+  // with inherited environment) and the demo drivers / demo servers that exist
+  // only to exercise it. The deployment-hold proxy no longer imports the client,
+  // and no shipped bin or runtime path (mnde, mnde-sidecar, the gated MCP server)
+  // imports any of these. Removing them from the tarball keeps the raw
+  // upstream-spawn capability (audit path E07) and the ungated demo upstream
+  // (E14) out of the distributed artifact. They remain in the source checkout
+  // for local demos and tests; see experiments/production-proof-001/f001/.
+  join(repoRoot, "mcp", "stdio-client.mjs"),
+  join(repoRoot, "mcp", "example-upstream-server.mjs"),
+  join(repoRoot, "mcp", "shell-mcp-server.mjs"),
+  join(repoRoot, "scripts", "mcp-demo.mjs"),
+  join(repoRoot, "scripts", "mcp-proxy-demo.mjs"),
+  join(repoRoot, "scripts", "shell-demo.mjs")
 ].map((p) => p.toLowerCase()));
 
 function isExcluded(absPath) {

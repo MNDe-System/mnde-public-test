@@ -1,0 +1,9 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "experiments/exp-001-stage2/run-tests.mjs"
+  ],
+  "cwd": "C:\\Users\\Shadow\\Downloads\\INsol\\mnde-public-test\\",
+  "started": "2026-09-18T07:12:56.081Z",
+  "node": "v24.14.1"
+}

@@ -81,6 +81,7 @@
   "test:reviewer-kit",
   "test:root-signer",
   "test:shell",
+  "test:shipped-surface-bypass",
   "test:sidecar",
   "test:sidecar-cli-hostile",
   "test:sidecar-pe",

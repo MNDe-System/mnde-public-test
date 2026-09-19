@@ -1,0 +1,46 @@
+(node:19588) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ F-001/F-002: production backend substitution and copied flags never call provider (26.7217ms)
+✔ F-002: production factory rejects injected backend/config; absent or corrupt trusted file refuses (3.5429ms)
+✔ F-001: verification snapshots before await, freezes identities, hashes canonical A+ (15.2942ms)
+✔ F-001: absent/null/empty/non-string grant IDs and null execution IDs refuse (105.3418ms)
+✔ F-001: expiry, revoked grant, wrong executor, policy-only and wrong namespace refuse (54.9539ms)
+✔ F-001/F-002 model: duplicates independently spend execution/grant, including altered action (64.0589ms)
+✔ F-001/F-002 model: faults, timeout, lost acknowledgement, inconsistent lookup never send (23.0729ms)
+✔ F-001/F-002 same-machine model: two OS executors race, one durable claim and fixed provider request (367.8544ms)
+✔ F-001/F-002 same-machine model: restart and restored executor snapshot cannot resend (837.9322ms)
+✔ F-001/F-002 same-machine model: process crash before-claim, recovery never resends uncertain attempt (922.9383ms)
+✔ F-001/F-002 same-machine model: process crash after-claim, recovery never resends uncertain attempt (723.0956ms)
+✔ F-001/F-002 same-machine model: process crash after-start, recovery never resends uncertain attempt (646.1775ms)
+✔ F-001: conflicting signed execution/grant aliases refuse (37.3779ms)
+✔ F-001: signed revocation after receipt issuance blocks new execution authority (12.0501ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4096.9896
+✔ F-001 Stage 1: unset local cache helper refuses (1.1123ms)
+✔ F-001 Stage 1 actual legacy sidecar: unset/missing/corrupt cache and restart refuse, zero provider calls (2216.6505ms)
+✔ F-001 Stage 1 actual policy-engine sidecar: unset/missing/corrupt cache and restart refuse, zero provider calls (2000.9097ms)
+✔ F-001 public executor/wrapTool/Stage 2 adapter: authentic v2 refuses across OS restarts and local snapshot restore (842.9617ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5331.4407
+✔ F-001 mcp/mnde-mcp-server.mjs: restart refuses tools; discovery remains; proxy unknown requests and notifications cannot bypass (506.3332ms)
+✔ F-001 mcp/mnde-mcp-proxy.mjs: restart refuses tools; discovery remains; proxy unknown requests and notifications cannot bypass (158.6449ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 788.8662
