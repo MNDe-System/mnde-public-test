@@ -82,6 +82,7 @@
   "test:replay",
   "test:reviewer-kit",
   "test:root-signer",
+  "test:sbom",
   "test:shell",
   "test:shipped-surface-bypass",
   "test:sidecar",

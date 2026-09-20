@@ -2,6 +2,8 @@
 
 This inventory is based on files present in the repository and the root `package-lock.json`. It is not a legal opinion.
 
+The attribution and NOTICE columns are judgments and are maintained by hand. The derived facts in this file - package versions, the third-party package set, and asset hashes - are checked against the tree by `npm run test:sbom`, which fails the build when they drift. See [SBOM.md](SBOM.md), which is generated rather than written.
+
 ## Repository License
 
 | Item | License | Copyright owner | Attribution requirements | NOTICE requirements | Status |
@@ -14,19 +16,20 @@ The root [LICENSE](LICENSE) restricts use to evaluation and forbids sale, sublic
 
 | Package | Version | License | Supplier | Copyright owner | Attribution requirements | NOTICE requirements | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `mnde-public-test` | `0.1.0` | Custom MNDe Public Testing License | MNDe project | MNDe project | Preserve repository license | None identified | Known |
+| `mnde-public-test` | `0.1.1` | Custom MNDe Public Testing License | MNDe project | MNDe project | Preserve repository license | None identified | Known |
 | `@mnde/executor` | `0.1.0` | Custom MNDe Public Testing License via `../LICENSE` | MNDe project | MNDe project | Preserve repository license | None identified | Known |
+| `typescript` | `5.9.3` | Apache-2.0 | Microsoft (npm registry) | Microsoft Corporation | Apache-2.0 attribution applies on redistribution; not redistributed here | Apache-2.0 NOTICE obligation applies only on redistribution; not redistributed here | Known |
 
-Root `package-lock.json` lists no third-party npm packages. `package.json` has no `dependencies` or `devDependencies`.
+Root `package-lock.json` resolves one third-party npm package, `typescript`, declared in `devDependencies`. It is a build-time dependency: `npm ci` installs it in this repository, npm does not install it for anyone who consumes the published package, and the published `files` list (`dist`, `README.md`) does not contain it. `package.json` declares no runtime `dependencies`.
 
 ## Assets
 
 | Asset | License | Copyright owner | Attribution requirements | NOTICE requirements | Hash |
 | --- | --- | --- | --- | --- | --- |
-| `brand/mnde-wordmark.svg` | Covered by repository license unless separately licensed | MNDe project | Preserve repository license | None identified | `sha256:e80e775bb4fe13b1b22f3761a2a3790d7dac249ee2cac765405113c8d57951e7` |
-| `brand/mnde-mark.svg` | Covered by repository license unless separately licensed | MNDe project | Preserve repository license | None identified | `sha256:d5eac8004a4a695c34cef6e5f00dc0519b83223d8e8471433c4d4dcc058687aa` |
-| `brand/mnde-mark-mono.svg` | Covered by repository license unless separately licensed | MNDe project | Preserve repository license | None identified | `sha256:3ce8059b68114bb1626fbe3685e2bd9dbb78bc24d2f6b6301af47a9beb19941e` |
-| `brand/favicon.svg` | Covered by repository license unless separately licensed | MNDe project | Preserve repository license | None identified | `sha256:5a471dbf0a17e168384f22aa71b23b76482d44a8c24a6fe0a3253d0e4761d442` |
+| `brand/mnde-wordmark.svg` | Covered by repository license unless separately licensed | MNDe project | Preserve repository license | None identified | `sha256:6ae4e78e306afdb3efd2b85385a1efc25b4208f35777c0c87eb2c577f3a80fc0` |
+| `brand/mnde-mark.svg` | Covered by repository license unless separately licensed | MNDe project | Preserve repository license | None identified | `sha256:aa96f8bb8e92e8dcdcaf3c4d275ef1882f24c361ea91578c9ec5fdb2b65c4cf8` |
+| `brand/mnde-mark-mono.svg` | Covered by repository license unless separately licensed | MNDe project | Preserve repository license | None identified | `sha256:eb8cdbbdcb14f2029f10a67a6c8041e4e6ccb574e9dd586469e007e64d55db32` |
+| `brand/favicon.svg` | Covered by repository license unless separately licensed | MNDe project | Preserve repository license | None identified | `sha256:122d062dac790b8324386a7edd6a893bb8284e6c976e93897537e5537dc4afc2` |
 
 ## Fonts
 
@@ -48,4 +51,4 @@ Documentation appears to be original repository content. No copied third-party p
 
 ## NOTICE Status
 
-No third-party dependency currently requires a NOTICE file based on the root package lock. Create `NOTICE` before adding dependencies or assets that require attribution notices.
+The one third-party dependency in the root lockfile, `typescript`, is Apache-2.0. The Apache-2.0 NOTICE obligation (section 4(d)) attaches to redistribution of the work or of a derivative work. `typescript` is a build-time dependency and is not redistributed by this repository, so no NOTICE file is required today. Create `NOTICE` before shipping any Apache-2.0 or similarly attributed dependency inside a published artifact.

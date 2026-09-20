@@ -6,7 +6,9 @@ This document describes the current supply chain posture and gaps for MNDe Publi
 
 - The runtime package has no third-party npm dependencies; TypeScript 5.9.3 is
   pinned as a development-only build dependency in `package-lock.json`.
-- `SBOM.md` records current package and asset hashes.
+- `SBOM.md` is generated from the working tree by `npm run sbom` and re-derived
+  and compared by `npm run test:sbom`, which runs in the default suite. A stale
+  version, hash, asset or lockfile entry fails the build.
 - Tests are enumerated in `tests/expected-test-scripts.json` and run through `scripts/run-all-tests.mjs`.
 - The repository license restricts evaluation use.
 
@@ -17,7 +19,8 @@ no external dependency tree. If dependencies are added later:
 
 - Commit lockfile updates.
 - Record each dependency in [LICENSES.md](LICENSES.md).
-- Update [SBOM.md](SBOM.md).
+- Regenerate [SBOM.md](SBOM.md) with `npm run sbom`. `npm run test:sbom` fails
+  until the committed file matches the tree, so this cannot be forgotten.
 - Review transitive licenses and security advisories.
 
 ## Implemented Release Controls
@@ -27,6 +30,7 @@ no external dependency tree. If dependencies are added later:
 - Release manifest generation.
 - Source commit binding in packaged release identity and the release manifest.
 - Package identity tests.
+- Generated SBOM enforced in CI (`npm run test:sbom`).
 - Clean packaged-install verification outside the repository.
 - Content-based private-key exclusion during packaging and private-key exclusion tests.
 
@@ -76,8 +80,9 @@ configuration the gate depends on.
 - Release artifact signing. The tarball carries no detached signature;
   provenance attestation is the only signed statement about it.
 - Reproducible-build proof.
-- SBOM generation as part of the release workflow. `SBOM.md` is maintained by
-  hand and is neither generated nor checked by CI.
+- A machine-readable SBOM. `SBOM.md` is generated from the tree and enforced by
+  CI, but it is Markdown: there is no CycloneDX or SPDX document, it is not
+  signed, and the release workflow does not attach it as a release asset.
 - Desktop installer production.
 - Installer signing.
 
@@ -104,7 +109,9 @@ Remaining gaps before enterprise or government use:
 - Reproducible-build proof.
 - General-purpose automated dependency and repository-wide secret scanning.
 - Maintainer access-control documentation.
-- SBOM generation integrated into release workflow.
+- A machine-readable, signed SBOM attached to a published release. Generation
+  and drift-checking are implemented; the standard-format, signed and published
+  artifact is not.
 - Vulnerability response process for third-party dependencies.
 
 The release approval process is no longer a gap: it is implemented as the
