@@ -3,6 +3,12 @@
 This runbook prepares and verifies the npm release artifacts. It does not grant
 authorization to publish, tag, push, sign, or upload anything.
 
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) automates
+the steps below and halts on a GitHub Environment approval gate before it tags
+or publishes; see [`release-automation.md`](release-automation.md). This runbook
+remains the specification of what must happen and the procedure to follow by
+hand. The workflow has never been run.
+
 ## Preconditions
 
 - The working tree is clean and on the intended `main` commit.
