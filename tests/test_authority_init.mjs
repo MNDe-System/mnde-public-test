@@ -92,6 +92,41 @@ async function main() {
       assert.equal(r.ok, false);
       assert.match(r.reason, /local.*demo|demo/);
     });
+
+    // The pre-flight evaluates every step at ONE instant. It used to judge the
+    // bundle's expiry window at the wall clock while judging the ledger key at
+    // the injected `now`, so this suite's own fixture — minted at NOW with a
+    // 90-day bundle lifetime — began failing as BUNDLE_STALE the moment real
+    // time passed NOW + 90 days, on every branch at once.
+    //
+    // Both halves matter. Honouring the clock must not become a way to accept
+    // an expired bundle in production, where no caller passes one.
+    const preflightEnv = {
+      MNDE_PROFILE: "production",
+      MNDE_RECEIPT_SIGNING_MODE: "custody",
+      MNDE_KEY_CUSTODY: "file-backed-production",
+      MNDE_AUTHORITY_BUNDLE: res.paths.bundle,
+      MNDE_RECEIPT_SIGNING_KEY: res.paths.receiptPrivate,
+      MNDE_RECEIPT_KEY_ID: res.receiptKeyId,
+      MNDE_LEDGER_SIGNING_KEY: res.paths.ledgerPrivate,
+      MNDE_LEDGER_KEY_ID: res.ledgerKeyId
+    };
+
+    await test("the pre-flight judges bundle expiry at the instant it was given", async () => {
+      // Inside the bundle's window, whatever the wall clock says today.
+      const inside = await assertTrustRoot(preflightEnv, { repoRoot, now: NOW });
+      assert.equal(inside.ok, true, inside.detail || inside.reason_code);
+    });
+
+    await test("an expired bundle still fails closed", async () => {
+      // One day past not_after (NOW + 90 days). This is the production path:
+      // no injected clock means the wall clock, and a bundle past its window
+      // must refuse to anchor trust.
+      const past = new Date(Date.parse(NOW) + 91 * 24 * 60 * 60 * 1000).toISOString();
+      const expired = await assertTrustRoot(preflightEnv, { repoRoot, now: past });
+      assert.equal(expired.ok, false, "a bundle past not_after must not pass the pre-flight");
+      assert.equal(expired.reason_code, "ERR_CUSTODY_BUNDLE_STALE");
+    });
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
