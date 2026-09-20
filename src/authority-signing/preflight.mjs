@@ -124,7 +124,10 @@ export async function assertTrustRoot(env = process.env, options = {}) {
   //    and that the configured public key matches the bundle key.
   //    Imported lazily so local profile never loads the custody subsystem.
   const { loadSigningConfig } = await import("./index.mjs");
-  const signing = await loadSigningConfig(env);
+  // Same instant as step 6's ledger self-test below. A pre-flight that judged
+  // the bundle's expiry at one time and the ledger key at another would not be
+  // the single deterministic gate this file claims to be.
+  const signing = await loadSigningConfig(env, { now: options.now });
   if (!signing.ok) {
     return fail(
       signing.reason_code ?? "ERR_CUSTODY_UNAVAILABLE",
