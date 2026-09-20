@@ -1,0 +1,60 @@
+{
+  "canonical_request": "{\"execution_request\":{\"actor\":{\"user_id\":\"EXP001-SUBJECT-A\"},\"execution\":{\"auto_scale\":false,\"max_retries\":0,\"max_scale_multiplier\":1,\"retry_on_fail\":false},\"orbit_intent\":{\"action\":\"execute\",\"boundary\":\"reviewer-kit\",\"lifecycle_state\":\"ARMED\",\"orbit_version\":\"2.0\",\"payload\":{\"tool_calls\":[{\"parameters\":{\"operation\":\"merge\",\"pull_request\":17,\"repository\":\"mnde-exp-001\",\"source_commit\":\"abc123\",\"target_ref\":\"refs/heads/main\"},\"priority\":1,\"tool\":\"github.merge\"}]},\"signatures\":[{\"alg\":\"hmac-sha256\",\"sig\":\"reviewer-kit\"}]},\"parameters\":{\"installation_id\":\"INSTALLATION-UNASSIGNED\",\"tester_id\":\"EXP001-SUBJECT-A\"},\"release_request\":{\"already_consumed\":false,\"execution_id\":\"EXP-C001-1789526144356\",\"hold_state\":\"APPROVED\"},\"request_id\":\"EXP-C001-1789526144356\",\"resources\":{\"gpu_count\":1,\"gpu_type\":\"a10g\",\"hours\":1},\"runtime_observation\":{\"actual_gpu_count\":1,\"actual_hours\":1,\"actual_total_cost_cents\":500,\"kill_switch_active\":false},\"submitted_region\":\"us-west-2\",\"tool_calls\":[{\"parameters\":{\"operation\":\"merge\",\"pull_request\":17,\"repository\":\"mnde-exp-001\",\"source_commit\":\"abc123\",\"target_ref\":\"refs/heads/main\"},\"priority\":1,\"tool\":\"github.merge\"}]},\"policy_document\":{\"policy_version\":\"policy.v1\",\"rules\":{\"allow_auto_scale\":false,\"max_gpu_count\":4,\"max_hours\":8,\"max_retry_count\":1,\"max_total_cost_cents\":10000,\"require_manual_approval_above_cents\":5000},\"schema_version\":\"ecs.policy.v1\",\"trust\":{\"key_id\":\"85535d7b96bdd743\",\"key_version\":\"ed25519.v1\",\"public_key\":\"55ddc014f25e30d393b6ef3057c5df5f8394cb1c466d4c1e9d9ef1e00d4e53f5\",\"signature\":\"91d19e35fe5158b0154bc8516946ad1111d8abb49002b5048e1af12cac6367b8906bfe6e21c54fb731fc19a080e4a52ddd48e5bb887ac6eed99a938e92ed6a0d\"}},\"pricing_data\":{\"gpu_hour_cents\":500}}",
+  "decision_output": {
+    "allowed_cost_usd": "5.00",
+    "decision": "ALLOW",
+    "decision_hash": "f2dddedb1a062e3216549d9bc90ddfd2a2b97d4a415a71df36110579af2ad1dd",
+    "execution_id": "EXP-C001-1789526144356",
+    "key_set_version": "receipt-key-set-v1",
+    "policy_hash": "acbd4b9d8339f32aa4273caa73ed49995c9c4ca7e9df9b62ceb14286c1b8ca87",
+    "policy_version": "policy.v1",
+    "prevented_cost_usd": "0.00",
+    "reason_code": "OK_ALLOW",
+    "request_hash": "3590972b51592532cc73b66defa74eeec276a43af82afd36ea73f03ab676716c",
+    "total_cost_usd": "5.00"
+  },
+  "pipeline_trace": {
+    "arm": {
+      "allowed_cost_cents": 500,
+      "decision": "ALLOW",
+      "execution_id": "EXP-C001-1789526144356",
+      "layer": "arm",
+      "prevented_cost_cents": 0,
+      "projected_total_cost_cents": 500,
+      "reason_code": "OK_ARM"
+    },
+    "orbit": {
+      "decision": "ALLOW",
+      "layer": "orbit",
+      "reason_code": "OK_ORBIT",
+      "validation_hash": "8b80db5a987cfb008bff117d78f9c06673e91401c733cb00587be2c9c2102efd"
+    },
+    "preflight": {
+      "layer": "preflight",
+      "policy_hash": "acbd4b9d8339f32aa4273caa73ed49995c9c4ca7e9df9b62ceb14286c1b8ca87",
+      "policy_version": "policy.v1",
+      "request_hash": "3590972b51592532cc73b66defa74eeec276a43af82afd36ea73f03ab676716c"
+    },
+    "ramona": {
+      "decision": "ALLOW",
+      "layer": "ramona",
+      "reason_code": "OK_RAM0NA",
+      "runtime_hash": "4a36d19a9b1609ddd67cbfb5c9f6ab2a4e5e3f590a3c588f20219dd442db5e99"
+    }
+  },
+  "request_hash": "3590972b51592532cc73b66defa74eeec276a43af82afd36ea73f03ab676716c",
+  "schema_version": "ecs.receipt.v2",
+  "signature": {
+    "algorithm": "HMAC-SHA256",
+    "key_id": "demo-legacy-signature-key",
+    "value": "9f6d765a07eff2dd5dff41886cc32399a14867aea901da2702231fca0712bf5a"
+  },
+  "verifiable_signature": {
+    "algorithm": "ED25519",
+    "authority_id": "mnde-public-test-local",
+    "key_id": "receipt-key-local",
+    "public_key_fingerprint": "b4d8b634c1a80b86d1b2c51b3796d67597a9f1bc1b511be654a066845767839b",
+    "signed_at": "2026-09-16T02:35:44.375Z",
+    "value": "fbbf3e822f1d42e1824ccd6f01b72dfa297fa6e481b135a525b28ac2666a4137c536b6100cf21b7de98e52dc23dee2bef70ffba9f2fbebc7ad3a326aabdc030d"
+  }
+}

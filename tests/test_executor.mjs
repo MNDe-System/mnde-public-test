@@ -7,11 +7,12 @@
 
 import assert from "node:assert/strict";
 import http from "node:http";
-import { existsSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
 
 import { createMndeExecutor } from "../executor/index.mjs";
 import { startMndeSidecar } from "../executor/sidecar-harness.mjs";
-import { verificationPassed, verifyReceiptFile } from "../tools/verify-receipt.mjs";
+import { verifyAnyReceiptObject } from "../tools/verify.mjs";
+import { makeRealExecutorBoundReceipt } from "../experiments/exp-001-stage2/tests/_real_receipt.mjs";
 
 // Dedicated port: 8787 is the sidecar's real default, so a developer's live
 // sidecar may legitimately own it while tests run.
@@ -37,18 +38,16 @@ async function main() {
 
   const sidecar = await startMndeSidecar({ url: SIDECAR_URL, testerId: "EXEC-TEST-001" });
   const mnde = createMndeExecutor({ sidecarUrl: SIDECAR_URL, receiptsDir: RECEIPTS_DIR });
-  let allowReceiptPath = null;
+
 
   try {
-    await test("1. ALLOW runs the function", async () => {
+    await test("1. Safety hold refuses callbacks, including caller-labelled reads", async () => {
       let ran = false;
-      const r = await mnde.execute({ action: "read_status", input: {}, run: async () => { ran = true; return "ok"; } });
-      assert.equal(r.decision, "ALLOW");
-      assert.equal(r.executed, true);
-      assert.equal(ran, true);
-      assert.equal(r.result, "ok");
-      assert.ok(r.receiptPath && existsSync(r.receiptPath), "ALLOW must store a receipt");
-      allowReceiptPath = r.receiptPath;
+      const r = await mnde.execute({ action: "read_status", input: {}, run: async () => { ran = true; } });
+      assert.equal(r.decision, "REFUSE");
+      assert.equal(r.executed, false);
+      assert.equal(ran, false);
+      assert.equal(r.reason, "ERR_FRESHNESS_DEPLOYMENT_DISABLED");
     });
 
     await test("2. REFUSE does not run the function", async () => {
@@ -64,31 +63,30 @@ async function main() {
       assert.equal(r.result, undefined);
     });
 
-    await test("3. A throwing function does not erase the receipt", async () => {
+    await test("3. A throwing callback is never entered during the safety hold", async () => {
       const r = await mnde.execute({ action: "read_status", input: {}, run: async () => { throw new Error("boom"); } });
-      assert.equal(r.decision, "ALLOW");
-      assert.equal(r.executed, true);
-      assert.match(String(r.error), /boom/);
-      assert.ok(r.receiptPath && existsSync(r.receiptPath), "receipt must survive a throwing run()");
+      assert.equal(r.decision, "REFUSE");
+      assert.equal(r.executed, false);
+      assert.equal(r.error, undefined);
     });
 
-    await test("6. Receipt verifies offline", async () => {
-      assert.ok(allowReceiptPath, "need an ALLOW receipt from test 1");
-      assert.equal(verificationPassed(verifyReceiptFile(allowReceiptPath)), true);
+    await test("6. Authentic receipts still verify offline during the safety hold", async () => {
+      const f = await makeRealExecutorBoundReceipt();
+      assert.equal((await verifyAnyReceiptObject(f.receipt, f.trustedConfig)).verified, true);
     });
 
-    await test("7. Duplicate execution_id refuses the second run", async () => {
+    await test("7. Reused execution_id refuses both callbacks while dispatch is disabled", async () => {
       const id = `exec-dup-${Date.now()}`;
       let ranA = false;
       let ranB = false;
       const a = await mnde.execute({ action: "read_status", input: {}, executionId: id, run: async () => { ranA = true; return "a"; } });
       const b = await mnde.execute({ action: "read_status", input: {}, executionId: id, run: async () => { ranB = true; return "b"; } });
-      assert.equal(a.decision, "ALLOW");
-      assert.equal(ranA, true);
+      assert.equal(a.decision, "REFUSE");
+      assert.equal(ranA, false);
       assert.equal(b.decision, "REFUSE");
       assert.equal(b.executed, false);
       assert.equal(ranB, false, "the second run of a consumed execution_id must NOT execute");
-      assert.equal(b.reason, "ERR_EXECUTION_ID_REPLAYED");
+      assert.equal(b.reason, "ERR_FRESHNESS_DEPLOYMENT_DISABLED");
     });
   } finally {
     await sidecar.stop();

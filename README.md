@@ -1,3 +1,5 @@
+> Freshness safety hold: decision delivery and protected executor/MCP dispatch are disabled pending an independently operated claim backend and rollback proof. Health, discovery, and offline receipt verification remain available. `MNDE_EXEC_ID_CACHE` cannot enable dispatch. See [operator changes and evidence](docs/FRESHNESS-BOUNDARY-AUDIT.md).
+
 <p align="left"><img src="brand/mnde-wordmark.svg" alt="MNDe" height="80"></p>
 
 # MNDe Public Test

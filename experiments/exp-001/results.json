@@ -1,0 +1,552 @@
+{
+  "experiment_id": "MNDE-EXP-001",
+  "stage": 1,
+  "title": "Exact Approval Binding — MNDe as-is (no GitHub adapter)",
+  "mnde_commit": "9295635b6d92cc448b9fefa8524d1a21e8f0e4d6",
+  "branch": "feat/sidecar-graceful-shutdown",
+  "working_tree_dirty_excluding_experiment": false,
+  "node_version": "v24.14.1",
+  "platform": "win32",
+  "run_at": "2026-09-16T02:35:48.799Z",
+  "scope": "Tests MNDe's actual claim: exact binding of a declared action to a verified, request-bound, single-use receipt gating a local run() call. No GitHub machinery added; no MNDe source modified.",
+  "totals": {
+    "tests": 30,
+    "pass": 27,
+    "fail": 2,
+    "inconclusive": 1
+  },
+  "per_conjunct": [
+    {
+      "conjunct": "A-encoding",
+      "total": 11,
+      "pass": 11,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "conjunct": "C-binding",
+      "total": 9,
+      "pass": 8,
+      "fail": 0,
+      "inconclusive": 1
+    },
+    {
+      "conjunct": "D-freshness",
+      "total": 5,
+      "pass": 3,
+      "fail": 2,
+      "inconclusive": 0
+    },
+    {
+      "conjunct": "crypto-custody",
+      "total": 5,
+      "pass": 5,
+      "fail": 0,
+      "inconclusive": 0
+    }
+  ],
+  "conjuncts": [
+    {
+      "name": "A-encoding",
+      "evidence": "A_encoding.json",
+      "conjunct": "A-encoding",
+      "total": 11,
+      "fail": 0,
+      "inconclusive": 0,
+      "notes": [
+        "A6: MNDe applies no Unicode normalization; NFC and NFD forms are distinct authorization identities. Safe against collision, but a downstream executor that normalizes refs before acting could re-introduce ambiguity (Stage 2 concern)."
+      ],
+      "results": [
+        {
+          "id": "A1",
+          "conjunct": "A-encoding",
+          "verdict": "PASS",
+          "expected": "identical identity",
+          "observed": {
+            "a": "{\"operation\":\"merge\",\"repository\":\"r\",\"target_ref\":\"main\"}",
+            "b": "{\"operation\":\"merge\",\"repository\":\"r\",\"target_ref\":\"main\"}",
+            "collision": true
+          },
+          "detail": {
+            "label": "key-order independence"
+          },
+          "at": "2026-09-16T02:35:43.638Z"
+        },
+        {
+          "id": "A2",
+          "conjunct": "A-encoding",
+          "verdict": "PASS",
+          "expected": "reject (duplicate_json_keys)",
+          "observed": "REJECTED:duplicate_json_keys",
+          "detail": {
+            "label": "duplicate key rejection"
+          },
+          "at": "2026-09-16T02:35:43.640Z"
+        },
+        {
+          "id": "A3",
+          "conjunct": "A-encoding",
+          "verdict": "PASS",
+          "expected": "distinct identities",
+          "observed": {
+            "a": "{\"pull_request\":17}",
+            "b": "{\"pull_request\":\"17\"}",
+            "collision": false
+          },
+          "detail": {
+            "label": "numeric-vs-string PR id"
+          },
+          "at": "2026-09-16T02:35:43.640Z"
+        },
+        {
+          "id": "A4",
+          "conjunct": "A-encoding",
+          "verdict": "PASS",
+          "expected": "distinct identities",
+          "observed": {
+            "a": "{\"target_ref\":\"main\"}",
+            "b": "{\"target_ref\":\"refs/heads/main\"}",
+            "collision": false
+          },
+          "detail": {
+            "label": "short vs full ref"
+          },
+          "at": "2026-09-16T02:35:43.640Z"
+        },
+        {
+          "id": "A5",
+          "conjunct": "A-encoding",
+          "verdict": "PASS",
+          "expected": "distinct identities",
+          "observed": {
+            "a": "{\"target_ref\":\"main\"}",
+            "b": "{\"target_ref\":\"Main\"}",
+            "collision": false
+          },
+          "detail": {
+            "label": "ref case sensitivity"
+          },
+          "at": "2026-09-16T02:35:43.640Z"
+        },
+        {
+          "id": "A6",
+          "conjunct": "A-encoding",
+          "verdict": "PASS",
+          "expected": "distinct identities",
+          "observed": {
+            "a": "{\"target_ref\":\"café\"}",
+            "b": "{\"target_ref\":\"café\"}",
+            "collision": false
+          },
+          "detail": {
+            "label": "unicode NFC vs NFD"
+          },
+          "at": "2026-09-16T02:35:43.640Z"
+        },
+        {
+          "id": "A7",
+          "conjunct": "A-encoding",
+          "verdict": "PASS",
+          "expected": "distinct identities",
+          "observed": {
+            "a": "{\"target_ref\":\"main\"}",
+            "b": "{\"target_ref\":\"main \"}",
+            "collision": false
+          },
+          "detail": {
+            "label": "value whitespace significance"
+          },
+          "at": "2026-09-16T02:35:43.640Z"
+        },
+        {
+          "id": "A8",
+          "conjunct": "A-encoding",
+          "verdict": "PASS",
+          "expected": "reject (invalid_json_number)",
+          "observed": "REJECTED:invalid_json_number",
+          "detail": {
+            "label": "float rejected"
+          },
+          "at": "2026-09-16T02:35:43.640Z"
+        },
+        {
+          "id": "A8b",
+          "conjunct": "A-encoding",
+          "verdict": "PASS",
+          "expected": "reject (invalid_json_number)",
+          "observed": "REJECTED:invalid_json_number",
+          "detail": {
+            "label": "exponent rejected"
+          },
+          "at": "2026-09-16T02:35:43.640Z"
+        },
+        {
+          "id": "A9",
+          "conjunct": "A-encoding",
+          "verdict": "PASS",
+          "expected": "reject (invalid_json_number)",
+          "observed": "REJECTED:invalid_json_number",
+          "detail": {
+            "label": "unsafe integer rejected"
+          },
+          "at": "2026-09-16T02:35:43.640Z"
+        },
+        {
+          "id": "A10",
+          "conjunct": "A-encoding",
+          "verdict": "PASS",
+          "expected": "identical identity",
+          "observed": {
+            "a": "{\"a\":1,\"b\":2}",
+            "b": "{\"a\":1,\"b\":2}",
+            "collision": true
+          },
+          "detail": {
+            "label": "inter-token whitespace"
+          },
+          "at": "2026-09-16T02:35:43.640Z"
+        }
+      ]
+    },
+    {
+      "name": "C-binding",
+      "evidence": "C_binding.json",
+      "conjunct": "C-binding",
+      "total": 9,
+      "fail": 0,
+      "inconclusive": 1,
+      "results": [
+        {
+          "id": "C001",
+          "conjunct": "C-binding",
+          "verdict": "PASS",
+          "expected": "ALLOW + executed once + verified",
+          "observed": {
+            "decision": "ALLOW",
+            "executed": true,
+            "verified": true,
+            "ran": 1,
+            "reason": "OK_ALLOW"
+          },
+          "detail": {},
+          "at": "2026-09-16T02:35:44.408Z"
+        },
+        {
+          "id": "T005",
+          "conjunct": "C-binding",
+          "verdict": "PASS",
+          "expected": "REFUSE, run() not called",
+          "observed": {
+            "decision": "REFUSE",
+            "executed": false,
+            "ran": 0,
+            "reason": "ERR_RECEIPT_ACTION_MISMATCH",
+            "failClosed": true
+          },
+          "detail": {
+            "label": "action substitution (merge→force_push)"
+          },
+          "at": "2026-09-16T02:35:44.448Z"
+        },
+        {
+          "id": "T001",
+          "conjunct": "C-binding",
+          "verdict": "PASS",
+          "expected": "REFUSE, run() not called",
+          "observed": {
+            "decision": "REFUSE",
+            "executed": false,
+            "ran": 0,
+            "reason": "ERR_RECEIPT_ACTION_MISMATCH",
+            "failClosed": true
+          },
+          "detail": {
+            "label": "target ref mutation (main→production)"
+          },
+          "at": "2026-09-16T02:35:44.466Z"
+        },
+        {
+          "id": "T002",
+          "conjunct": "C-binding",
+          "verdict": "PASS",
+          "expected": "REFUSE, run() not called",
+          "observed": {
+            "decision": "REFUSE",
+            "executed": false,
+            "ran": 0,
+            "reason": "ERR_RECEIPT_ACTION_MISMATCH",
+            "failClosed": true
+          },
+          "detail": {
+            "label": "source commit mutation (abc123→def456)"
+          },
+          "at": "2026-09-16T02:35:44.482Z"
+        },
+        {
+          "id": "T003",
+          "conjunct": "C-binding",
+          "verdict": "PASS",
+          "expected": "REFUSE, run() not called",
+          "observed": {
+            "decision": "REFUSE",
+            "executed": false,
+            "ran": 0,
+            "reason": "ERR_RECEIPT_ACTION_MISMATCH",
+            "failClosed": true
+          },
+          "detail": {
+            "label": "pull request mutation (17→18)"
+          },
+          "at": "2026-09-16T02:35:44.497Z"
+        },
+        {
+          "id": "T004",
+          "conjunct": "C-binding",
+          "verdict": "PASS",
+          "expected": "REFUSE, run() not called",
+          "observed": {
+            "decision": "REFUSE",
+            "executed": false,
+            "ran": 0,
+            "reason": "ERR_RECEIPT_ACTION_MISMATCH",
+            "failClosed": true
+          },
+          "detail": {
+            "label": "repository mutation"
+          },
+          "at": "2026-09-16T02:35:44.512Z"
+        },
+        {
+          "id": "Tid",
+          "conjunct": "C-binding",
+          "verdict": "PASS",
+          "expected": "REFUSE, run() not called",
+          "observed": {
+            "decision": "REFUSE",
+            "executed": false,
+            "ran": 0,
+            "reason": "ERR_RECEIPT_REQUEST_MISMATCH",
+            "failClosed": true
+          },
+          "detail": {
+            "label": "execution-id substitution (receipt reused for a new call)"
+          },
+          "at": "2026-09-16T02:35:44.529Z"
+        },
+        {
+          "id": "T007",
+          "conjunct": "C-binding",
+          "verdict": "PASS",
+          "expected": "REFUSE, run() not called",
+          "observed": {
+            "decision": "REFUSE",
+            "executed": false,
+            "ran": 0,
+            "reason": "ERR_SUBJECT_MISMATCH",
+            "failClosed": true
+          },
+          "detail": {
+            "label": "subject mismatch (expected B, receipt A)"
+          },
+          "at": "2026-09-16T02:35:44.546Z"
+        },
+        {
+          "id": "T009-exec",
+          "conjunct": "C-binding",
+          "verdict": "INCONCLUSIVE",
+          "expected": "characterize executor replay of identical request",
+          "observed": {
+            "decision": "ALLOW",
+            "executed": true,
+            "ran": 1
+          },
+          "detail": {
+            "label": "identical-request replay at executor gate",
+            "interpretation": "Executor re-authorizes an identical declared request when re-presented the same receipt+id; it is a per-call binding check, NOT a single-use ledger. Consumption must be enforced by the sidecar (conjunct D)."
+          },
+          "at": "2026-09-16T02:35:44.561Z"
+        }
+      ]
+    },
+    {
+      "name": "D-freshness",
+      "evidence": "D_freshness.json",
+      "conjunct": "D-freshness",
+      "total": 5,
+      "fail": 2,
+      "inconclusive": 0,
+      "results": [
+        {
+          "id": "D1",
+          "conjunct": "D-freshness",
+          "verdict": "PASS",
+          "expected": "first ALLOW, replay REFUSE (consumed)",
+          "observed": {
+            "first": {
+              "decision": "ALLOW",
+              "reason": "OK_ALLOW"
+            },
+            "replay": {
+              "decision": "REFUSE",
+              "reason": "ERR_EXECUTION_ID_DUPLICATE"
+            },
+            "storeFiles": [
+              "D1-1789526145211"
+            ]
+          },
+          "detail": {},
+          "at": "2026-09-16T02:35:45.273Z"
+        },
+        {
+          "id": "D2",
+          "conjunct": "D-freshness",
+          "verdict": "PASS",
+          "expected": "consumed id still REFUSED after restart",
+          "observed": {
+            "first": {
+              "decision": "ALLOW",
+              "reason": "OK_ALLOW"
+            },
+            "afterRestart": {
+              "decision": "REFUSE",
+              "reason": "ERR_EXECUTION_ID_DUPLICATE"
+            }
+          },
+          "detail": {},
+          "at": "2026-09-16T02:35:46.242Z"
+        },
+        {
+          "id": "D3",
+          "conjunct": "D-freshness",
+          "verdict": "FAIL",
+          "expected": "rolled-back consumed id must NOT re-authorize",
+          "observed": {
+            "consumed": {
+              "decision": "ALLOW",
+              "reason": "OK_ALLOW"
+            },
+            "afterRollback": {
+              "decision": "ALLOW",
+              "reason": "OK_ALLOW"
+            },
+            "storeBefore": [
+              "D3-1789526146242"
+            ],
+            "storeAfterRollback": []
+          },
+          "detail": {
+            "note": "Freshness state lives entirely in the local FS store; a rollback of that store reverts Consumed→Unused. No out-of-rollback-domain anchor exists."
+          },
+          "at": "2026-09-16T02:35:47.191Z"
+        },
+        {
+          "id": "D4",
+          "conjunct": "D-freshness",
+          "verdict": "FAIL",
+          "expected": "default posture must not allow replay across restart",
+          "observed": {
+            "first": {
+              "decision": "ALLOW",
+              "reason": "OK_ALLOW"
+            },
+            "afterRestart": {
+              "decision": "ALLOW",
+              "reason": "OK_ALLOW"
+            }
+          },
+          "detail": {
+            "note": "MNDE_EXEC_ID_CACHE unset by default → only in-process dedup, which resets on restart. Durable single-use is opt-in, not the default."
+          },
+          "at": "2026-09-16T02:35:48.118Z"
+        },
+        {
+          "id": "D5",
+          "conjunct": "D-freshness",
+          "verdict": "PASS",
+          "expected": "same-process replay refused even without durable store",
+          "observed": {
+            "first": {
+              "decision": "ALLOW",
+              "reason": "OK_ALLOW"
+            },
+            "replay": {
+              "decision": "REFUSE",
+              "reason": "ERR_EXECUTION_ID_REPLAYED"
+            }
+          },
+          "detail": {},
+          "at": "2026-09-16T02:35:48.621Z"
+        }
+      ]
+    },
+    {
+      "name": "crypto-custody",
+      "evidence": "E_crypto_custody.json",
+      "group": "crypto-custody-selfcheck",
+      "total": 5,
+      "fail": 0,
+      "results": [
+        {
+          "id": "CS1",
+          "conjunct": "crypto",
+          "verdict": "PASS",
+          "expected": "valid custody-signed receipt verifies",
+          "observed": {
+            "verified": true,
+            "reason": null
+          },
+          "detail": {},
+          "at": "2026-09-16T02:35:48.782Z"
+        },
+        {
+          "id": "CS2",
+          "conjunct": "crypto",
+          "verdict": "PASS",
+          "expected": "inner-receipt tamper is detected (verify fails)",
+          "observed": {
+            "verified": false,
+            "reason": "receipt hash mismatch"
+          },
+          "detail": {},
+          "at": "2026-09-16T02:35:48.783Z"
+        },
+        {
+          "id": "CS3",
+          "conjunct": "crypto",
+          "verdict": "PASS",
+          "expected": "attestation signature tamper is detected",
+          "observed": {
+            "verified": false,
+            "reason": "SIGNATURE_INVALID"
+          },
+          "detail": {},
+          "at": "2026-09-16T02:35:48.784Z"
+        },
+        {
+          "id": "CS4",
+          "conjunct": "crypto",
+          "verdict": "PASS",
+          "expected": "foreign-authority (untrusted signer) receipt is rejected",
+          "observed": {
+            "verified": false,
+            "reason": "authority fingerprint mismatch"
+          },
+          "detail": {},
+          "at": "2026-09-16T02:35:48.786Z"
+        },
+        {
+          "id": "CS5",
+          "conjunct": "crypto",
+          "verdict": "PASS",
+          "expected": "wrong pinned root fingerprint is rejected",
+          "observed": {
+            "verified": false,
+            "reason": "bundle: UNTRUSTED_ROOT"
+          },
+          "detail": {},
+          "at": "2026-09-16T02:35:48.786Z"
+        }
+      ]
+    }
+  ]
+}

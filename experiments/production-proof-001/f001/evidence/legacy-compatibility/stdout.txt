@@ -1,0 +1,73 @@
+{"version":"baseline","cwd":"C:\\Users\\Shadow\\AppData\\Local\\Temp\\mnde-f001-compat-3lTpqr\\baseline","exitCode":1,"error":null}
+MNDe MCP Proxy — protecting a server you did not write
+
+  [PASS] 1-2. upstream tools are visible through the proxy
+  [FAIL] 3. ALLOW forwards the call to upstream: call.isError was true (expected false). Diagnostics: {
+  "call_isError": true,
+  "mnde_decision": "REFUSE",
+  "mnde_forwarded": false,
+  "mnde_reason": "ERR_FRESHNESS_DEPLOYMENT_DISABLED",
+  "mnde_failClosed": false,
+  "upstream_ran": false,
+  "proxy_stderr": "[mnde-proxy] ready; upstream=C:\\Program Files\\nodejs\\node.exe mcp/example-upstream-server.mjs; sidecar=http://127.0.0.1:8807\n",
+  "call_content": "[\n  {\n    \"type\": \"text\",\n    \"text\": \"REFUSE — MNDe blocked read_status (ERR_FRESHNESS_DEPLOYMENT_DISABLED). Not forwarded to upstream.\"\n  },\n  {\n    \"type\": \"text\",\n    \"text\": \"{\\\"mnde\\\":{\\\"decision\\\":\\\"REFUSE\\\",\\\"reason\\\":\\\"ERR_FRESHNESS_DEPLOYMENT_DISABLED\\\",\\\"executed\\\":false,\\\"forwarded\\\":false,\\\"receiptPath\\\":\\\"C:\\\\\\\\Users\\\\\\\\Shadow\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\mnde-f001-compat-3lTpqr\\\\\\\\baseline\\\\\\\\mnde-receipts\\\\\\\\mcp-proxy-tests\\\\\\\\receipt-read_status-1789715688783-27956-1.json\\\",\\\"verified\\\":true,\\\"failClosed\\\":false}}\"\n  }\n]"
+}
+  [FAIL] 3a. proxy forwards only the name and arguments authorized by the receipt: the authorized call must reach upstream
+  [PASS] 3b. non-object arguments are rejected before authorization or forwarding
+  [PASS] 4-5. REFUSE is not forwarded; upstream marker stays absent
+  [PASS] 6. receipt verifies offline
+  [FAIL] 7. upstream crash fails closed: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- 'ERR_UPSTREAM_UNAVAILABLE'
+
+  [FAIL] 8. malformed upstream response fails closed: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- 'ERR_UPSTREAM_BAD_RESPONSE'
+
+
+FAIL MCP proxy tests (4/8)
+{"version":"remediated","cwd":"C:\\Users\\Shadow\\AppData\\Local\\Temp\\mnde-f001-compat-3lTpqr\\remediated","exitCode":1,"error":null}
+MNDe MCP Proxy — protecting a server you did not write
+
+  [FAIL] 1-2. upstream tools are visible through the proxy: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
++   'mnde_proxy_status'
+-   'delete_backups',
+-   'read_status',
+-   'restart_service'
+  ]
+
+  [FAIL] 3. ALLOW forwards the call to upstream: call.isError was true (expected false). Diagnostics: {
+  "call_isError": true,
+  "mnde_decision": "REFUSE",
+  "mnde_forwarded": false,
+  "mnde_reason": "ERR_FRESHNESS_DEPLOYMENT_DISABLED",
+  "mnde_failClosed": true,
+  "upstream_ran": false,
+  "proxy_stderr": "[mnde-proxy] protected execution disabled; upstream not started; local status only\n",
+  "call_content": "[\n  {\n    \"type\": \"text\",\n    \"text\": \"FAIL-CLOSED — MNDe blocked read_status (ERR_FRESHNESS_DEPLOYMENT_DISABLED). Upstream is not started.\"\n  },\n  {\n    \"type\": \"text\",\n    \"text\": \"{\\\"mnde\\\":{\\\"decision\\\":\\\"REFUSE\\\",\\\"reason\\\":\\\"ERR_FRESHNESS_DEPLOYMENT_DISABLED\\\",\\\"executed\\\":false,\\\"forwarded\\\":false,\\\"receiptPath\\\":null,\\\"verified\\\":false,\\\"failClosed\\\":true}}\"\n  }\n]"
+}
+  [FAIL] 3a. proxy forwards only the name and arguments authorized by the receipt: the authorized call must reach upstream
+  [PASS] 3b. non-object arguments are rejected before authorization or forwarding
+  [PASS] 4-5. REFUSE is not forwarded; upstream marker stays absent
+  [FAIL] 6. receipt verifies offline: need a receipt from the ALLOW call
+  [FAIL] 7. upstream crash fails closed: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- 'ERR_UPSTREAM_UNAVAILABLE'
+
+  [FAIL] 8. malformed upstream response fails closed: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- 'ERR_UPSTREAM_BAD_RESPONSE'
+
+
+FAIL MCP proxy tests (2/8)
