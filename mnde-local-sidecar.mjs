@@ -64,6 +64,7 @@ import {
   parseAuthorityAssertion,
   refusalBody
 } from "./sidecar/auth_authority.mjs";
+import { execIdDirPath, reserveExecutionId } from "./sidecar/execution_id_store.mjs";
 import { replayReceiptDeterministically } from "./sidecar/replay_engine.mjs";
 import { assertStartupDirectoryPermissions } from "./sidecar/startup_checks.mjs";
 import {
@@ -72,6 +73,7 @@ import {
   waitForQuiescence
 } from "./sidecar/graceful_shutdown.mjs";
 import { getReleaseIdentity } from "./src/release/identity.mjs";
+import { executionAvailabilityMeta } from "./src/execution-availability/index.mjs";
 
 const HOST = "127.0.0.1";
 const PORT = parseBindPort(process.env.MNDE_BIND_PORT, 8787);
@@ -357,6 +359,7 @@ let PRELOADED_SIGNING_CONFIG = null;
 // audit integrity.
 assertStartupDirectoryPermissions([
   { name: "nonce cache", dir: nonceDirPath() },
+  { name: "execution ID store", dir: execIdDirPath() },
   { name: "receipt log", dir: dirname(RECEIPT_LOG_PATH) },
   { name: "auth audit log", dir: dirname(AUTH_AUDIT_LOG_PATH) }
 ]);
@@ -731,6 +734,9 @@ async function fail(res, reason_code, status = 200, extra = {}, timings = {}) {
     decision_hash: persisted.receipt?.decision_output?.decision_hash ?? extra.decision_hash ?? null,
     receipt: persisted.ok ? persisted.receipt : null,
     receipt_persisted: persisted.ok,
+    // Every decision response states execution availability, refusals included —
+    // a caller must never have to infer it from the absence of a field.
+    execution: executionAvailabilityMeta(),
     ...publicExtra
   }, timings);
 }
@@ -745,6 +751,7 @@ function failWithoutReceipt(res, reason_code, status = 200, extra = {}, timings 
     decision_hash: extra.decision_hash ?? null,
     receipt: null,
     receipt_persisted: false,
+    execution: executionAvailabilityMeta(),
     ...publicExtra
   }, timings);
 }
@@ -961,6 +968,11 @@ async function respondPolicyEngine(res, request, timings, totalStarted, caller) 
     decision_engine: "policy-engine",
     // Ledger status lives OUTSIDE the receipt (never mutates receipt bytes).
     ...(ledgerMeta ? { ledger: ledgerMeta } : {}),
+    // Execution availability, same convention as ledger status. The AUTHORITATIVE
+    // statement is the signed `execution_status` field inside the receipt body;
+    // this envelope copy is for operators and dashboards and can be stripped in
+    // transit, which is exactly why it is not the one that counts.
+    execution: executionAvailabilityMeta(),
     // Deployment state surfaced to operators only (API/logs); NOT in the signed receipt.
     ...(policyConfigurationState ? { policy_configuration_state: policyConfigurationState } : {}),
     decision: outcome.decision,
@@ -1099,7 +1111,7 @@ async function handleDecide(req, res) {
       await new Promise(() => {});
       return;
     }
-    await readStrictObject(req, timings);
+    const { value: request, raw } = await readStrictObject(req, timings);
     timings.body_read_complete_ms = ms();
     if (TEST_HARNESS_ENABLED && req.headers["x-mnde-shutdown-test"] === "slow") {
       // Bounded delay AFTER the body is captured, so real application work
@@ -1109,11 +1121,123 @@ async function handleDecide(req, res) {
       await new Promise((resolve) => setTimeout(resolve, Number.isSafeInteger(slowMs) && slowMs > 0 ? slowMs : 300));
     }
 
-    // Approval delivery is disabled: executor-local replay files cannot establish
-    // the independent rollback boundary. Do not fall back to memory or local files.
+    // Durable execution ID dedup: reserve the execution ID globally before any
+    // evaluation work. Uses O_EXCL file creation so the reservation survives
+    // process restart and is atomic across all worker threads. Fail closed if
+    // the ID has already been used or cannot be reserved.
+    const executionId =
+      request?.execution_request?.release_request?.execution_id ??
+      request?.execution_request?.request_id ??
+      request?.request_id;
+    if (typeof executionId === "string" && executionId.length > 0) {
+      if (!reserveExecutionId(executionId)) {
+        timings.total_server_ms = Math.max(0, Math.round(performance.now() - totalStarted));
+        recordTimings(timings);
+        await fail(res, "ERR_EXECUTION_ID_DUPLICATE", 200, { execution_id: executionId, timings }, timings);
+        return;
+      }
+    }
+
+    if (DECISION_ENGINE === "policy-engine") {
+      await respondPolicyEngine(res, request, timings, totalStarted, req._mndeCaller);
+      return;
+    }
+    const runtimeInput = createRuntimeInput(request, policy);
+    timings.execution_start_ms = ms();
+    const submitted = workerPool.submit(canonicalizeJson(runtimeInput));
+    if (!submitted.ok) {
+      recordAdmissionRefusal(submitted.reason_code);
+      timings.total_server_ms = Math.max(0, Math.round(performance.now() - totalStarted));
+      recordTimings(timings);
+      await fail(res, submitted.reason_code, 200, { saturation_signal: "worker_pool_queue", raw_body: raw }, timings);
+      return;
+    }
+    const workerReply = await submitted.result;
+    timings.execution_finish_ms = ms();
+    timings.worker_queue_wait_ms = Math.max(0, Math.round(workerReply.queue_wait_ms ?? 0));
+    timings.worker_exec_ms = Math.max(0, Math.round(workerReply.exec_ms ?? 0));
+    Object.assign(timings, workerReply.timings ?? {});
+    if (!workerReply.ok) {
+      counters.worker_refusals += 1;
+      timings.total_server_ms = Math.max(0, Math.round(performance.now() - totalStarted));
+      recordTimings(timings);
+      await fail(res, workerReply.reason_code, 200, { timings, raw_body: raw }, timings);
+      return;
+    }
+    const result = workerReply.result;
+    if ("parse_boundary" in result) {
+      timings.total_server_ms = Math.max(0, Math.round(performance.now() - totalStarted));
+      recordTimings(timings);
+      await fail(res, result.reason_code, 200, {
+        request_hash: result.request_hash,
+        decision_hash: result.decision_hash,
+        timings,
+        raw_body: raw
+      }, timings);
+      return;
+    }
+    if (result.receipt.decision_output.decision === "ALLOW" && !result.receipt.signature && !result.receipt.verifiable_signature) {
+      counters.unsigned_allows_blocked += 1;
+      timings.total_server_ms = Math.max(0, Math.round(performance.now() - totalStarted));
+      recordTimings(timings);
+      await fail(res, "ERR_RECEIPT_SIGNATURE_INVALID", 200, { timings, raw_body: raw }, timings);
+      return;
+    }
+    // Custody signing (opt-in), applied to the built receipt before delivery.
+    // Fails closed: custody selected + signing failure => the request fails.
+    const signed = await signForDelivery(result.receipt);
+    if (!signed.ok) {
+      timings.total_server_ms = Math.max(0, Math.round(performance.now() - totalStarted));
+      recordTimings(timings);
+      failWithoutReceipt(res, signed.reason_code, 200, {
+        request_hash: result.receipt.request_hash,
+        decision_hash: result.receipt.decision_output.decision_hash
+      }, timings);
+      return;
+    }
+    const queueStarted = performance.now();
+    const queued = await receiptQueue.enqueue(signed.receipt);
+    timings.receipt_enqueue_ms = Math.max(0, Math.round(performance.now() - queueStarted));
+    if (!queued.ok) {
+      counters.refused_overload += 1;
+      counters.refused_receipt_queue_saturated += queued.reason_code === RECEIPT_QUEUE_SATURATED ? 1 : 0;
+      counters.receipt_refusals += 1;
+      timings.total_server_ms = Math.max(0, Math.round(performance.now() - totalStarted));
+      recordTimings(timings);
+      await fail(res, queued.reason_code, 200, {
+        request_hash: result.receipt.request_hash,
+        decision_hash: result.receipt.decision_output.decision_hash,
+        timings,
+        raw_body: raw
+      }, timings);
+      return;
+    }
+    let ledgerMeta = null;
+    if (LEDGER_RUNTIME.enabled) {
+      const ledger = await recordReceiptInLedger({ runtime: LEDGER_RUNTIME, receipt: signed.receipt, durable: queued.durable, profile: RUNTIME_PROFILE, engine: LEDGER_ENGINE, flush: () => receiptQueue.flush(), signLedger: LEDGER_SIGN });
+      if (ledger.failClosed) {
+        counters.receipt_refusals += 1;
+        timings.total_server_ms = Math.max(0, Math.round(performance.now() - totalStarted));
+        recordTimings(timings);
+        await fail(res, ledger.code, 200, { request_hash: result.receipt.request_hash, decision_hash: result.receipt.decision_output.decision_hash, timings, raw_body: raw }, timings);
+        return;
+      }
+      ledgerMeta = ledgerResponseMeta(ledger);
+    } else if (RECEIPT_QUEUE_CONFIG.durability_mode === "strict_audit") {
+      const durable = await queued.durable;
+      timings.persistence_flush_ms = durable.persistence_flush_ms ?? 0;
+    }
     timings.total_server_ms = Math.max(0, Math.round(performance.now() - totalStarted));
     recordTimings(timings);
-    await fail(res, "ERR_FRESHNESS_DEPLOYMENT_DISABLED", 200, { timings }, timings);
+    const apiBody = apiResponseFromReceipt(result.receipt);
+    // Deliver the custody-signed envelope in place of the inner receipt.
+    if (apiBody.receipt && signed.receipt !== result.receipt) apiBody.receipt = signed.receipt;
+    // Ledger status lives OUTSIDE the receipt (never mutates receipt bytes).
+    // Execution availability rides OUTSIDE the receipt, exactly like ledger
+    // status, and never mutates receipt bytes. The AUTHORITATIVE statement is
+    // the signed `execution_status` field inside the receipt body; this is the
+    // convenience copy for operators and dashboards.
+    response(res, 200, { ...apiBody, ...(ledgerMeta ? { ledger: ledgerMeta } : {}), execution: executionAvailabilityMeta(), ...(SIGNING_MODE === "custody" ? { receipt_signing: "custody" } : {}), ...(req._mndeCaller ? { authenticated_caller: req._mndeCaller.id } : {}), timings }, timings);
   } catch (error) {
     if (error?.message?.startsWith("ERR_RECEIPT_FLUSH_FAILED")) counters.flush_failures += 1;
     if (error?.message === WORKER_TIMEOUT) counters.request_timeout_refusals += 1;

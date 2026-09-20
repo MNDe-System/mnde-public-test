@@ -86,11 +86,21 @@ async function main() {
       try {
         await client.request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "0" } });
         client.notify("notifications/initialized", {});
+        // The shipped proxy refuses locally and starts no upstream. It holds no
+        // executor and produces no receipt, by design: the shipped-surface guard
+        // (tests/test_shipped_surface_bypass.mjs) forbids an executor callback or
+        // any spawn path in the distributed artifact.
+        //
+        // KNOWN EVIDENCE GAP: because the proxy never reaches the sidecar, a
+        // blocked MCP tool call produces no signed decision and no ledger entry.
+        // Closing that means letting the shipped proxy hold an executor, which is
+        // a deliberate trade against that guard and is not made here.
         const allow = await client.request("tools/call", { name: "read_status", arguments: {} });
         const allowEnv = JSON.parse(allow.content.find((c) => { try { return JSON.parse(c.text).mnde; } catch { return false; } }).text).mnde;
-        assert.equal(allowEnv.decision, "ALLOW");
-        const allowReceipt = JSON.parse(readFileSync(allowEnv.receiptPath, "utf8"));
-        assert.equal(allowReceipt.schema_version, "mnde.pe.receipt.v1");
+        assert.equal(allowEnv.decision, "REFUSE", "a policy-ALLOW tool name must not become an execution");
+        assert.equal(allowEnv.executed, false);
+        assert.equal(allowEnv.forwarded, false);
+        assert.equal(existsSync(marker), false, "nothing may reach upstream while execution is disabled");
 
         const refuse = await client.request("tools/call", { name: "delete_backups", arguments: { path: "backups/", script: "rm -rf backups/" } });
         const refuseEnv = JSON.parse(refuse.content.find((c) => { try { return JSON.parse(c.text).mnde; } catch { return false; } }).text).mnde;

@@ -18,6 +18,7 @@ import { RECEIPT_SIGNATURE_ALGORITHM, signReceiptPayload, verifyReceiptPayloadSi
 import { findAuthorityReceiptKey, loadAuthorityBundle, loadAuthorityBundleForReceipt } from "../../shared/authority-manifest.mjs";
 import { findBundleKey, fingerprintOf, verifyAuthorityBundle } from "../custody/index.mjs";
 import { evaluatePolicyRequest } from "./index.mjs";
+import { EXECUTION_STATUS_DISABLED, receiptExecutionStatus } from "../execution-availability/index.mjs";
 import { verifyHistoricalPolicyBundleProvenance } from "../policy-bundles/index.mjs";
 
 // Default: relative to this module's own install location (unchanged behavior
@@ -112,6 +113,18 @@ export function buildPolicyReceipt(request, policy, options = {}) {
   if (policyBundleProvenance !== undefined && !isBundleProvenance(policyBundleProvenance, decision.policy_hash)) {
     throw new Error("ERR_POLICY_BUNDLE_PROVENANCE_INVALID");
   }
+  // Defaults to the deployment-wide state. An explicit option exists so tests can
+  // build receipts for both postures; it cannot widen authority, because nothing
+  // reads this field to decide whether to execute — the executor refuses on its
+  // own state, not on anything carried in a receipt.
+  // undefined = use the deployment-wide state (production always wants this).
+  // null      = explicitly omit the field, i.e. build an execution-enabled receipt.
+  const executionStatus = options.executionStatus === undefined
+    ? receiptExecutionStatus()
+    : options.executionStatus;
+  if (executionStatus !== undefined && executionStatus !== null && executionStatus !== EXECUTION_STATUS_DISABLED) {
+    throw new Error(`ERR_UNSUPPORTED_EXECUTION_STATUS: ${executionStatus}`);
+  }
 
   const payload = {
     schema_version: receiptSchema,
@@ -126,6 +139,18 @@ export function buildPolicyReceipt(request, policy, options = {}) {
     policy_hash: decision.policy_hash,
     authority_chain_hash: decision.authority_chain_hash,
     ...(policyBundleProvenance ? { policy_bundle_provenance: structuredClone(policyBundleProvenance) } : {}),
+    // Execution availability at decision time. Embedded ONLY while protected
+    // execution is unavailable, so receipts issued once dispatch is live are
+    // byte-identical to historical ones and no conformance vector moves. It sits
+    // inside `payload`, so it is covered by verifiable_signature and cannot be
+    // stripped in transit without breaking the signature.
+    //
+    // Its meaning is narrow and important: this receipt records that policy
+    // approved the request, AND that MNDe could not have executed it. An ALLOW
+    // carrying execution_status:"DISABLED" is evidence of a decision, never an
+    // execution grant. Absence of the field is not permission either — the
+    // executor's strict gate is the enforcement point in both cases.
+    ...(executionStatus ? { execution_status: executionStatus } : {}),
     decision_output: decision
   };
 

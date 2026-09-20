@@ -150,7 +150,8 @@
     "test:executor-lifecycle": "node ./tests/test_executor_lifecycle.mjs",
     "test:executor-signer-load": "node ./tests/test_executor_signer_load.mjs",
     "test:executor-readiness": "node ./tests/test_executor_readiness.mjs",
-    "test:freshness-boundary": "node ./tests/run-freshness-boundary.mjs"
+    "test:freshness-boundary": "node ./tests/run-freshness-boundary.mjs",
+    "test:decision-not-execution": "node ./tests/test_decision_not_execution.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

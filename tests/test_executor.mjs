@@ -86,7 +86,12 @@ async function main() {
       assert.equal(b.decision, "REFUSE");
       assert.equal(b.executed, false);
       assert.equal(ranB, false, "the second run of a consumed execution_id must NOT execute");
-      assert.equal(b.reason, "ERR_FRESHNESS_DEPLOYMENT_DISABLED");
+      // The SPECIFIC reason survives rather than collapsing into the generic
+      // deployment-disabled code: the strict gate catches the replayed execution
+      // id on its own terms, before execution availability is ever consulted. Both
+      // calls refuse and neither callback runs — that is the safety property. The
+      // distinct reason codes are what make the refusals diagnosable.
+      assert.equal(b.reason, "ERR_EXECUTION_ID_REPLAYED");
     });
   } finally {
     await sidecar.stop();

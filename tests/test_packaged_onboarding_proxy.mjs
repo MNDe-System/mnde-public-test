@@ -34,14 +34,14 @@ function assertOk(label, result) {
   return result;
 }
 
-function initializeProxy(proxyPath, upstreamPath, packageRoot) {
+function initializeProxy(proxyPath, packageRoot) {
   return new Promise((resolveProxy, reject) => {
     const child = spawn(process.execPath, [proxyPath], {
       cwd: packageRoot,
       env: {
         ...process.env,
-        MNDE_PROXY_UPSTREAM_COMMAND: process.execPath,
-        MNDE_PROXY_UPSTREAM_ARGS: JSON.stringify([upstreamPath]),
+        // Deliberately unreachable: the proxy must initialize and refuse without
+        // a sidecar, and must not start an upstream either way.
         MNDE_SIDECAR_URL: "http://127.0.0.1:1"
       },
       stdio: ["pipe", "pipe", "pipe"]
@@ -101,14 +101,30 @@ try {
   const packageRoot = join(projectDir, "node_modules", "mnde-public-test", "dist");
   const onboardingCli = join(packageRoot, "bin", "mnde.mjs");
   const proxyPath = join(packageRoot, "mcp", "mnde-mcp-proxy.mjs");
-  const upstreamPath = join(packageRoot, "mcp", "example-upstream-server.mjs");
   assert.ok(existsSync(proxyPath), "packed artifact must contain the MCP proxy");
-  assert.ok(existsSync(upstreamPath), "packed artifact must contain the proxy test upstream");
+
+  // The shipped artifact deliberately carries NO demo upstream and no raw stdio
+  // client. stdio-client.mjs spawns an arbitrary command with the parent's
+  // environment inherited; the demo servers exist only to exercise it. Nothing in
+  // the shipped product imports any of them, so they are excluded from the tarball
+  // (build/build-package.mjs) and remain in the source checkout for local demos.
+  // Asserting their ABSENCE keeps that capability from quietly returning.
+  for (const excluded of [
+    ["mcp", "example-upstream-server.mjs"],
+    ["mcp", "stdio-client.mjs"],
+    ["mcp", "shell-mcp-server.mjs"],
+    ["scripts", "mcp-demo.mjs"],
+    ["scripts", "mcp-proxy-demo.mjs"],
+    ["scripts", "shell-demo.mjs"]
+  ]) {
+    assert.equal(existsSync(join(packageRoot, ...excluded)), false,
+      `packed artifact must NOT contain ${excluded.join("/")}`);
+  }
 
   const configPath = join(projectDir, ".mcp.json");
   writeFileSync(configPath, `${JSON.stringify({
     mcpServers: {
-      example: { command: process.execPath, args: [upstreamPath] }
+      example: { command: process.execPath, args: ["--version"] }
     }
   }, null, 2)}\n`);
 
@@ -129,8 +145,12 @@ try {
     assert.ok(!relative(packageRoot, referencedProxy).startsWith(".."), "proxy reference must stay inside the installed package");
   }
 
-  const initialized = await initializeProxy(proxyPath, upstreamPath, packageRoot);
-  assert.equal(initialized.result.serverInfo.name, "example-upstream");
+  // The installed proxy starts and identifies as ITSELF, not as an upstream it
+  // proxied through to. It spawns no child: protected execution is disabled, so
+  // there is nothing to forward to and no upstream process to start.
+  const initialized = await initializeProxy(proxyPath, packageRoot);
+  assert.equal(initialized.result.serverInfo.name, "mnde-proxy");
+  assert.match(initialized.result.instructions ?? "", /execution is disabled/i);
 
   console.log("PASS packaged onboarding references and starts the installed MCP proxy");
 } finally {

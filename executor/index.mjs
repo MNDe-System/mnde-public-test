@@ -1,7 +1,31 @@
-// @mnde/executor — receipt verification with protected callbacks disabled.
-// F-002 deployment proof is pending. execute/wrapTool never invoke the supplied
-// callback, even after an authentic, request-bound ALLOW. Offline verification
-// remains available. No caller flag or backend can enable dispatch.
+// @mnde/executor — the enforcement point. Authorize a call through MNDe, then
+// decide whether MNDe may actually perform it.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// ALLOW MEANS "POLICY APPROVED THIS REQUEST."
+// ALLOW DOES NOT MEAN "EXECUTION HAPPENED" OR "EXECUTION IS PERMITTED NOW."
+//
+// The sidecar evaluates policy, signs a receipt, and appends it to the execution
+// ledger. That receipt is real, verifiable evidence of a decision. It is not an
+// execution grant, and a consumer that reads ALLOW from /v1/decisions and acts on
+// it has not been authorized by MNDe — it has bypassed the enforcement point,
+// which is this file.
+//
+// Protected execution is currently DISABLED. execute() and wrapTool() never
+// invoke the supplied callback, even after an authentic, request-bound ALLOW that
+// clears the strict gate. Offline verification remains fully available. No caller
+// flag, backend, or environment variable enables dispatch.
+//
+// Why: a verified receipt is a signature, and a signature can be presented twice.
+// After a crash, a restart, or a restore of executor-local files, the same
+// authentic ALLOW authorizes the same effect again (finding F-001). Closing that
+// needs durable single-use redemption in a store the executor operator cannot roll
+// back. See src/execution-availability/index.mjs and docs/FRESHNESS-BOUNDARY-AUDIT.md.
+//
+// The strict gate below is still enforced and still meaningful: it is what makes
+// a receipt binding evidence rather than a decoration, and it is what a future
+// typed effect will sit behind.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -10,6 +34,7 @@ import { reviewerRequest } from "../scripts/reviewer-request.mjs";
 import { verifyReceiptFile, verificationPassed } from "../tools/verify-receipt.mjs";
 import { verifyAnyReceiptFile } from "../tools/verify.mjs";
 import { isSignedReceiptEnvelope, SIGNED_RECEIPT_SCHEMA } from "../src/authority-signing/index.mjs";
+import { ERR_EXECUTION_DISABLED } from "../src/execution-availability/index.mjs";
 import { canonicalizeJson, parseStrictJson } from "../shared/json.ts";
 import { resolveBearerToken, bearerAuthHeader } from "./bearer.mjs";
 
@@ -349,11 +374,24 @@ export function createMndeExecutor(config = {}) {
       return buildResult({ decision: "REFUSE", executed: false, reason: authz.reason, receipt: decision.receipt ?? null, receiptPath: failPath, verified: verified ?? false, failClosed: true });
     }
 
-    // A verified receipt is not a durable single-use claim. This generic callback
-    // path is disabled until an independent claim service is deployed and bound
-    // inside a trusted executor. Caller flags/backends cannot enable it.
+    // THE ENFORCEMENT POINT. Control reaches here only with an authentic,
+    // request-bound ALLOW that cleared the strict gate above — and it still does
+    // not execute. A verified receipt is a signature, and a signature can be
+    // presented twice; nothing in it makes it single-use. Until durable single-use
+    // redemption is wired and proven, every protected effect is refused.
+    //
+    // This is what separates the two facts: the receipt above is genuine evidence
+    // that policy approved the request. It is not, and never was, permission to
+    // act. No caller flag, backend, or environment variable reaches this branch.
+    // There is deliberately no generic run() call site below, and flipping the
+    // flag in src/execution-availability/index.mjs would not create one. Arbitrary
+    // JavaScript cannot be shown to be idempotent, single-effect, or free of a
+    // second egress path, so enabling dispatch means building a narrow typed
+    // effect that derives its request from signed fields — not restoring a
+    // callback. Deleting this return does not give you an executor; it gives you
+    // an undefined result and a failing freshness suite.
     return buildResult({ decision: "REFUSE", executed: false,
-      reason: "ERR_FRESHNESS_DEPLOYMENT_DISABLED", receipt: decision.receipt,
+      reason: ERR_EXECUTION_DISABLED, receipt: decision.receipt,
       receiptPath, verified, failClosed: true });
   }
 

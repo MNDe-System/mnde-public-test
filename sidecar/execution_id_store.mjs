@@ -15,6 +15,7 @@
 
 import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { join } from "node:path";
+import { isDispatchEnabled } from "../src/execution-availability/index.mjs";
 
 // Pattern for safe execution IDs. Must be non-empty, 1-256 chars, URL-safe.
 // No slashes, no dots that could traverse directories.
@@ -24,7 +25,11 @@ const EXEC_ID_PATTERN = /^[A-Za-z0-9._-]{1,256}$/;
 const seenIds = new Set();
 
 // Returns the configured execution ID store directory, or null if MNDE_EXEC_ID_CACHE
-// is not set. Absence fails closed; this local store is not deployment authority.
+// is not set. This local store is best-effort dedup, NOT the freshness boundary —
+// see src/execution-availability/index.mjs. A same-machine file the executor
+// operator can delete or restore cannot establish single-use redemption, so it is
+// never what stands between a replayed receipt and an effect. That is the
+// executor's job, and it currently refuses every protected effect outright.
 export function execIdDirPath() {
   return process.env.MNDE_EXEC_ID_CACHE ?? null;
 }
@@ -42,7 +47,24 @@ export function reserveExecutionId(executionId) {
   if (seenIds.has(executionId)) return false;
 
   const dir = execIdDirPath();
-  if (typeof dir !== "string" || dir.length === 0) return false;
+  // Durable dedup requires a configured persistent store. Without
+  // MNDE_EXEC_ID_CACHE there is no stable path, so file-based dedup across
+  // processes is impossible; in-process dedup (above) still applies.
+  //
+  // What to do about that depends on whether a decision can become an effect:
+  //
+  //   Execution DISABLED — a decision is evidence, not a grant, and the executor
+  //     refuses every protected effect regardless. Reissuing a decision for a
+  //     repeated execution id costs nothing and cannot cause an action. Proceed,
+  //     so a real policy decision is produced and ledgered. Refusing here instead
+  //     would collapse every decision on a default install into one reason code
+  //     while protecting nothing.
+  //
+  //   Execution ENABLED — an unconfigured store must never look like dedup.
+  //     Fail closed. (The real redemption point is the durable claim backend, not
+  //     this same-machine file, which the operator can delete or restore; this is
+  //     a second line, not the boundary.)
+  if (typeof dir !== "string" || dir.length === 0) return !isDispatchEnabled();
 
   try {
     mkdirSync(dir, { recursive: true, mode: 0o700 });

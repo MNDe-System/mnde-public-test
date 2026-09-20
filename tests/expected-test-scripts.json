@@ -16,6 +16,7 @@
   "test:custody-lifecycle",
   "test:dashboard",
   "test:data-root-receipts",
+  "test:decision-not-execution",
   "test:engine-default",
   "test:event-import",
   "test:execution-gate",

@@ -186,7 +186,12 @@ try {
     assert.equal(rejected.reason_code, "ERR_EXECUTOR_IDENTITY_MISMATCH");
   });
 
-  await test("strict executor runs exactly once with a real verified v2 executor-bound receipt", async () => {
+  // The strongest form of the ALLOW-is-not-permission contract: a REAL,
+  // executor-bound, custody-signed v2 receipt from a live sidecar, verified under
+  // a pinned trust root and the expected executor identity. Everything the strict
+  // gate can ask for is satisfied — and it still does not execute, because none of
+  // it makes the receipt single-use.
+  await test("strict executor runs zero times even with a real verified v2 executor-bound receipt", async () => {
     const guarded = createMndeExecutor({
       sidecarUrl: sidecar.url,
       receiptsDir: join(dir, "strict-executor-valid"),
@@ -202,10 +207,13 @@ try {
       executionId: "strict-executor-v2-valid",
       run: async () => { executorCallCount += 1; return "ok"; }
     });
+    // The evidence is genuine and fully verified.
     assert.equal(result.verified, true);
-    assert.equal(result.executed, true);
-    assert.equal(executorCallCount, 1);
     assert.equal(result.receipt.schema_version, "mnde.signed-receipt.v2");
+    // And it is still not permission.
+    assert.equal(result.executed, false);
+    assert.equal(executorCallCount, 0, "a fully verified executor-bound ALLOW must still not execute");
+    assert.equal(result.failClosed, true);
   });
 
   await test("strict executor calls the protected action zero times for the wrong expected executor id", async () => {
