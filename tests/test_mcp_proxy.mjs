@@ -1,21 +1,22 @@
-// MNDe MCP Proxy — proves MNDe protects tools you did not write.
+// MNDe MCP Proxy — proves the deployment-hold proxy exposes no upstream and
+// forwards nothing.
 //
 //   npm run test:mcp-proxy
 //
-// Covers all nine acceptance criteria for proxy mode against a plain upstream
-// MCP server, including upstream crash and malformed-response fail-closed.
+// Contract under test (Production Proof 001, Phase 2 / F-001 holding action):
+// the proxy MUST NOT start an upstream, MUST NOT forward, and MUST refuse every
+// protected tool fail-closed. Discovery reveals only the local status tool.
+// Live dispatch is disabled at the frozen source (commit 7de0163, "disable
+// unproven dispatch"); the earlier "ALLOW forwards to upstream" assertions
+// encoded a contract that has been false since that commit and are replaced here
+// by the stronger "there is no upstream to reach" assertions.
 
 import assert from "node:assert/strict";
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
-import { startMndeSidecar } from "../executor/sidecar-harness.mjs";
 import { createStdioClient } from "../mcp/stdio-client.mjs";
-import { verificationPassed, verifyReceiptFile } from "../tools/verify-receipt.mjs";
 
-// Dedicated port: 8787 is the sidecar's real default, so a developer's live
-// sidecar may legitimately own it while tests run.
-const SIDECAR_URL = "http://127.0.0.1:8807";
 const RECEIPTS_DIR = "./mnde-receipts/mcp-proxy-tests";
 const MARKER = join(process.cwd(), "mnde-receipts", "mcp-proxy-test-marker.txt");
 
@@ -48,9 +49,12 @@ function blocks(call) {
 const mndeOf = (call) => blocks(call).find((block) => block.mnde)?.mnde;
 const upstreamRan = (call) => blocks(call).some((block) => block.source === "upstream");
 
+// `mode` and the upstream args are deliberately hostile: a real upstream command
+// is configured and a crash/malformed mode is requested. The deployment-hold
+// proxy must ignore all of it and never start a child, so these settings must
+// have no observable effect.
 function makeProxy(mode) {
   return createStdioClient(process.execPath, ["mcp/mnde-mcp-proxy.mjs"], {
-    MNDE_SIDECAR_URL: SIDECAR_URL,
     MNDE_MCP_MARKER: MARKER,
     MNDE_MCP_RECEIPTS_DIR: RECEIPTS_DIR,
     MNDE_UPSTREAM_MODE: mode,
@@ -59,116 +63,106 @@ function makeProxy(mode) {
   });
 }
 async function handshake(client) {
-  await client.request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } });
+  const init = await client.request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } });
   client.notify("notifications/initialized", {});
+  return init;
 }
 
 async function main() {
-  console.log("MNDe MCP Proxy — protecting a server you did not write\n");
-  const sidecar = await startMndeSidecar({ url: SIDECAR_URL });
+  console.log("MNDe MCP Proxy — deployment hold: no upstream, nothing forwarded\n");
 
   const proxy = makeProxy("normal");
   try {
-    await handshake(proxy);
+    const init = await handshake(proxy);
 
-    await test("1-2. upstream tools are visible through the proxy", async () => {
+    await test("1-2. discovery reveals only the local status tool, no upstream tools", async () => {
+      assert.equal(init.serverInfo?.name, "mnde-proxy");
       const list = await proxy.request("tools/list", {});
       const names = list.tools.map((tool) => tool.name);
-      assert.deepEqual(names.sort(), ["delete_backups", "read_status", "restart_service"]);
-    });
-
-    let allowEnv;
-    await test("3. ALLOW forwards the call to upstream", async () => {
-      const call = await proxy.request("tools/call", { name: "read_status", arguments: { service: "billing" } });
-      allowEnv = mndeOf(call);
-
-      // Instrument full diagnostic state for transient failure diagnosis
-      if (call.isError !== false) {
-        const errorDetails = {
-          call_isError: call.isError,
-          mnde_decision: allowEnv?.decision,
-          mnde_forwarded: allowEnv?.forwarded,
-          mnde_upstreamError: allowEnv?.upstreamError,
-          mnde_reason: allowEnv?.reason,
-          mnde_failClosed: allowEnv?.failClosed,
-          upstream_ran: upstreamRan(call),
-          proxy_stderr: proxy.getStderr(),
-          call_content: JSON.stringify(call.content, null, 2)
-        };
-        throw new Error(
-          `call.isError was ${call.isError} (expected false). Diagnostics: ${JSON.stringify(errorDetails, null, 2)}`
-        );
+      assert.deepEqual(names, ["mnde_proxy_status"], "only the local status tool must be visible");
+      for (const upstreamTool of ["delete_backups", "read_status", "restart_service"]) {
+        assert.equal(names.includes(upstreamTool), false, `upstream tool ${upstreamTool} must not be discoverable`);
       }
-
-      assert.equal(call.isError, false);
-      assert.equal(allowEnv.decision, "ALLOW");
-      assert.equal(allowEnv.forwarded, true);
-      assert.equal(upstreamRan(call), true, "the call must have reached the upstream server");
     });
 
-    await test("3a. proxy forwards only the name and arguments authorized by the receipt", async () => {
+    await test("3. a protected tool call is refused fail-closed and never forwarded", async () => {
+      const call = await proxy.request("tools/call", { name: "read_status", arguments: { service: "billing" } });
+      const env = mndeOf(call);
+      assert.equal(call.isError, true, "a protected call must be an error under deployment hold");
+      assert.equal(env.decision, "REFUSE");
+      assert.equal(env.reason, "ERR_FRESHNESS_DEPLOYMENT_DISABLED");
+      assert.equal(env.forwarded, false, "nothing may be forwarded");
+      assert.equal(env.executed, false);
+      assert.equal(env.failClosed, true);
+      assert.equal(upstreamRan(call), false, "no upstream may run");
+      assert.equal(existsSync(MARKER), false);
+    });
+
+    await test("3a. extra top-level control fields cannot cause any forwarding", async () => {
       const call = await proxy.request("tools/call", {
         name: "read_status",
         arguments: { service: "billing" },
         unbound_execution_control: { target: "production" }
       });
-      const upstream = blocks(call).find((block) => block.source === "upstream");
-      assert.ok(upstream, "the authorized call must reach upstream");
-      assert.deepEqual(upstream.received_param_keys, ["arguments", "name"], "unbound top-level controls must be stripped before forwarding");
+      assert.equal(call.isError, true);
+      assert.equal(mndeOf(call).forwarded, false);
+      assert.equal(upstreamRan(call), false, "no crafted control field may reach an upstream");
     });
 
-    await test("3b. non-object arguments are rejected before authorization or forwarding", async () => {
+    await test("3b. non-object arguments are rejected before anything runs", async () => {
       await assert.rejects(
         () => proxy.request("tools/call", { name: "delete_backups", arguments: ["backups/"] }),
         /arguments must be an object/
       );
-      assert.equal(existsSync(MARKER), false, "invalid arguments must never reach the destructive upstream tool");
+      assert.equal(existsSync(MARKER), false, "invalid arguments must never reach any tool");
     });
 
-    await test("4-5. REFUSE is not forwarded; upstream marker stays absent", async () => {
+    await test("4-5. a destructive tool is refused; the upstream marker stays absent", async () => {
       const call = await proxy.request("tools/call", { name: "delete_backups", arguments: { path: "backups/", script: "rm -rf backups/" } });
       const env = mndeOf(call);
       assert.equal(call.isError, true);
       assert.equal(env.decision, "REFUSE");
       assert.equal(env.forwarded, false, "a refused call must NOT be forwarded upstream");
       assert.equal(upstreamRan(call), false);
-      assert.equal(existsSync(MARKER), false, "the upstream destructive tool must not have run");
+      assert.equal(existsSync(MARKER), false, "the destructive tool must not have run");
     });
 
-    await test("6. receipt verifies offline", async () => {
-      assert.ok(allowEnv?.receiptPath, "need a receipt from the ALLOW call");
-      assert.equal(verificationPassed(verifyReceiptFile(allowEnv.receiptPath)), true);
+    await test("6. the local status tool reports execution and upstream disabled", async () => {
+      const call = await proxy.request("tools/call", { name: "mnde_proxy_status", arguments: {} });
+      assert.equal(call.isError, false);
+      const state = JSON.parse(call.content[0].text);
+      assert.equal(state.executionEnabled, false);
+      assert.equal(state.upstreamStarted, false);
+      assert.equal(state.reason, "ERR_FRESHNESS_DEPLOYMENT_DISABLED");
+      await assert.rejects(
+        () => proxy.request("tools/call", { name: "mnde_proxy_status", arguments: { any: "thing" } }),
+        /takes no arguments/
+      );
     });
   } finally {
     await proxy.stop();
   }
 
-  const crashProxy = makeProxy("crash-on-call");
-  try {
-    await handshake(crashProxy);
-    await test("7. upstream crash fails closed", async () => {
-      const call = await crashProxy.request("tools/call", { name: "read_status", arguments: {} });
-      const env = mndeOf(call);
-      assert.equal(call.isError, true, "a crashed upstream must not produce a success result");
-      assert.equal(env.upstreamError, "ERR_UPSTREAM_UNAVAILABLE");
-      assert.equal(existsSync(MARKER), false);
-    });
-  } finally {
-    await crashProxy.stop();
-  }
-
-  const malformedProxy = makeProxy("malformed-on-call");
-  try {
-    await handshake(malformedProxy);
-    await test("8. malformed upstream response fails closed", async () => {
-      const call = await malformedProxy.request("tools/call", { name: "read_status", arguments: {} });
-      const env = mndeOf(call);
-      assert.equal(call.isError, true, "a malformed upstream response must not be passed off as success");
-      assert.equal(env.upstreamError, "ERR_UPSTREAM_BAD_RESPONSE");
-    });
-  } finally {
-    await malformedProxy.stop();
-    await sidecar.stop();
+  // The proxy must not start an upstream even when a crashing or malformed
+  // upstream is configured: there is no upstream to crash, so the outcome is an
+  // ordinary fail-closed refusal, and the process reports it never started one.
+  for (const mode of ["crash-on-call", "malformed-on-call"]) {
+    const proxy = makeProxy(mode);
+    try {
+      await handshake(proxy);
+      await test(`7-8. configured upstream mode "${mode}" starts no upstream and still refuses`, async () => {
+        const call = await proxy.request("tools/call", { name: "read_status", arguments: {} });
+        const env = mndeOf(call);
+        assert.equal(call.isError, true);
+        assert.equal(env.reason, "ERR_FRESHNESS_DEPLOYMENT_DISABLED");
+        assert.equal(env.forwarded, false);
+        assert.equal(upstreamRan(call), false);
+        assert.equal(existsSync(MARKER), false);
+        assert.match(proxy.getStderr(), /upstream not started/i, "the proxy must report it started no upstream");
+      });
+    } finally {
+      await proxy.stop();
+    }
   }
 
   const failed = results.filter((ok) => !ok).length;

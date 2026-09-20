@@ -135,6 +135,9 @@ export function decidePolicyEngine(body, config, options = {}) {
     // forwarded so scope-bound (mnde.authority_grant.v1) grants can bind their
     // `principal` field against it — never against the request body directly.
     caller: options.caller,
+    // Omitted (undefined) means "use the deployment-wide state", which is what
+    // production always wants. Only tests pass this explicitly.
+    executionStatus: options.executionStatus,
     now
   });
   return {

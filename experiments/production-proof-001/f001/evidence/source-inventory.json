@@ -1,0 +1,7935 @@
+{
+  "head": "2f941741b8b44f177ead69610595f510efc30873",
+  "branch": "codex/production-proof-phase2-f001",
+  "frozenTag": "7de01634ca7b7e180574c756472885cffadc187f",
+  "trackedSourceFiles": 295,
+  "note": "Post-fix bytes; paths and candidate line numbers only. Classification requires manual call tracing in AUDIT.md.",
+  "files": [
+    {
+      "path": "arm/engine.ts",
+      "sha256": "a4f289cc916ea7cbaf8ed0e42014d2b80172d1503317eb054721f4e4bd27cf87",
+      "matches": {
+        "egress": [],
+        "execution": [
+          26,
+          158,
+          162
+        ],
+        "authority": [
+          1,
+          31,
+          40,
+          43,
+          46,
+          47,
+          53,
+          54,
+          55,
+          58,
+          59,
+          74,
+          92,
+          104,
+          118,
+          131,
+          143,
+          155,
+          167,
+          182,
+          194,
+          198,
+          199,
+          207,
+          209,
+          211,
+          216,
+          221,
+          234
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "arm/index.ts",
+      "sha256": "06edd49fb427cbe24144ac711220f1fee7a4689281f613a8b9d7d69b705acf2f",
+      "matches": {
+        "egress": [],
+        "execution": [
+          31,
+          32,
+          49,
+          51
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "arm/types.ts",
+      "sha256": "f81a49f5654f70c1e8874490a2f59235e02dd85d9b9a9bd4cefb0247f05621f6",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "audit/node_runtime.ts",
+      "sha256": "d54f20f61827bca4a7b4de581010e81fbd853363b0c0e19ca75021132ec6f4f8",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          2,
+          16,
+          106,
+          111,
+          112,
+          113,
+          127,
+          132,
+          134,
+          136,
+          156,
+          197,
+          208,
+          209
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "bin/mnde-authority.mjs",
+      "sha256": "377f9409392d74e137c1ecb2c2142936e7ab11159800bc2a0f831c1e4e4858f3",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          11,
+          17,
+          20,
+          21,
+          46,
+          53,
+          69,
+          78,
+          79,
+          81,
+          83,
+          84,
+          86,
+          101,
+          116,
+          118,
+          135,
+          136
+        ],
+        "localMutation": [
+          17,
+          66,
+          107
+        ]
+      }
+    },
+    {
+      "path": "bin/mnde-sidecar.mjs",
+      "sha256": "0afb3f8418b46fef72f3a22e4eacdd49a101f9b2f88c1d26a9a15f739305644b",
+      "matches": {
+        "egress": [
+          20,
+          63,
+          87,
+          215,
+          217,
+          239,
+          254
+        ],
+        "execution": [
+          54
+        ],
+        "authority": [
+          21,
+          28,
+          31,
+          36,
+          39,
+          45,
+          46,
+          95,
+          161,
+          162,
+          174,
+          208,
+          209,
+          219,
+          242
+        ],
+        "localMutation": [
+          21,
+          57,
+          140,
+          141,
+          182,
+          184,
+          264
+        ]
+      }
+    },
+    {
+      "path": "bin/mnde.mjs",
+      "sha256": "3cfecd4801b90c698f871550dc1ea9580156d3e13aeddfb75c6c940ab0c08214",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          13,
+          180,
+          181,
+          182,
+          183,
+          184,
+          185
+        ],
+        "localMutation": [
+          13,
+          192
+        ]
+      }
+    },
+    {
+      "path": "build/build-package.mjs",
+      "sha256": "6262f8f91bab54b799306dde2f719e2fa5e97fd25e777d48a168fac4b539326a",
+      "matches": {
+        "egress": [
+          33,
+          207
+        ],
+        "execution": [],
+        "authority": [
+          34,
+          38,
+          87,
+          151,
+          164,
+          179,
+          196,
+          227,
+          240,
+          242,
+          261,
+          262
+        ],
+        "localMutation": [
+          34,
+          135,
+          139,
+          140,
+          161,
+          165,
+          180,
+          252
+        ]
+      }
+    },
+    {
+      "path": "build/lib/private-key-scan.mjs",
+      "sha256": "b725d045868cf74032d902ebcdf4b52f95252f80915c6f6c8792e1991e9b4e53",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          27,
+          37,
+          45,
+          55
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "build/release.mjs",
+      "sha256": "6a82473e9aa53f5b8a060b0c19d039ed77d063b7429b3d355dafd083b2a3554d",
+      "matches": {
+        "egress": [
+          18,
+          41,
+          42
+        ],
+        "execution": [],
+        "authority": [
+          19,
+          25,
+          56,
+          97,
+          115,
+          116,
+          157
+        ],
+        "localMutation": [
+          19,
+          85,
+          87,
+          136,
+          159
+        ]
+      }
+    },
+    {
+      "path": "cosmetic/feline-input.mjs",
+      "sha256": "b41a97099df692fc9fd4e10762fab243c192e38db79fddd7784182d986a957ec",
+      "matches": {
+        "egress": [],
+        "execution": [
+          114,
+          117
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "examples/executor-wrapper/agent-tool-wrapper.js",
+      "sha256": "b8ecb9ec44d868b56ea77cfa7b5329b5f988de27bff06544dc7b893e01cf0565",
+      "matches": {
+        "egress": [],
+        "execution": [
+          27,
+          50
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "examples/executor-wrapper/delete-backups-blocked.js",
+      "sha256": "59823d2c3b0a0d97572000c45bc9b03b1f6d15bf6d41bfb15f2424c6f8efde1f",
+      "matches": {
+        "egress": [],
+        "execution": [
+          19,
+          22,
+          39
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "examples/executor-wrapper/deploy-requires-approval.js",
+      "sha256": "55cf5ec17550c92ff0839b06a1169c706c1f005f6f929af16412813d08bced78",
+      "matches": {
+        "egress": [],
+        "execution": [
+          30,
+          34,
+          46,
+          61
+        ],
+        "authority": [
+          11
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "examples/executor-wrapper/read-status.js",
+      "sha256": "fa435a8b9d2c2c240e308b65c64680012230c708c25068cd5ff936494eb277da",
+      "matches": {
+        "egress": [],
+        "execution": [
+          15,
+          18,
+          36
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "executor/bearer.mjs",
+      "sha256": "49f8844d280f8c8f293af9e3414c5a0a4792ff71d18a30d767c6d7940656e8ad",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          3,
+          7,
+          8,
+          9,
+          12,
+          13
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "executor/index.mjs",
+      "sha256": "7adade2bdd74ddd360fca6aa88593f6775707528ce0573438c3fede6390fae9c",
+      "matches": {
+        "egress": [
+          16,
+          265
+        ],
+        "execution": [
+          262,
+          294,
+          296,
+          301,
+          316,
+          325,
+          332,
+          365
+        ],
+        "authority": [
+          6,
+          14,
+          36,
+          161,
+          162,
+          169,
+          170,
+          171,
+          172,
+          173,
+          176,
+          181,
+          182,
+          183,
+          237,
+          267
+        ],
+        "localMutation": [
+          6,
+          186,
+          190
+        ]
+      }
+    },
+    {
+      "path": "executor/sidecar-harness.mjs",
+      "sha256": "92eedc2736c11d6c1b26e2ca79bb5ffb3503fd4b41e2e240a40baabe95edcb09",
+      "matches": {
+        "egress": [
+          9,
+          19,
+          65,
+          119
+        ],
+        "execution": [
+          95,
+          141
+        ],
+        "authority": [
+          38,
+          52,
+          60
+        ],
+        "localMutation": [
+          10,
+          29
+        ]
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/run-tests.mjs",
+      "sha256": "01b289300a9e9a8483b130745e8171c1b2ac3eb6ee09773c7130dd9a2ea99552",
+      "matches": {
+        "egress": [
+          9,
+          31
+        ],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/src/adapter.mjs",
+      "sha256": "716b94180948fdbf838135c3f0b7322b9856db80e49d771fefa2b4e2d9927c8d",
+      "matches": {
+        "egress": [],
+        "execution": [
+          7
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/src/build_request.mjs",
+      "sha256": "17b65cc73023b179633d28cac66ae731bd6bfed42907fa4e8597a0e00c686487",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/src/claim_store.mjs",
+      "sha256": "7c8a34a47f01126bb6397cb23b747e9eb1bfd66a9e2be872654d017c609af1dc",
+      "matches": {
+        "egress": [
+          54,
+          55,
+          56,
+          57,
+          58,
+          59
+        ],
+        "execution": [
+          3,
+          67,
+          71,
+          118,
+          165,
+          179,
+          182,
+          185,
+          189
+        ],
+        "authority": [
+          6,
+          10,
+          23,
+          45,
+          46,
+          57,
+          59,
+          60,
+          62,
+          71,
+          76,
+          77,
+          84,
+          100,
+          101,
+          111,
+          120,
+          123,
+          125,
+          133,
+          140,
+          141,
+          148,
+          150,
+          166,
+          168,
+          172
+        ],
+        "localMutation": [
+          9,
+          23,
+          60,
+          71,
+          94,
+          159
+        ]
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/src/declaration.mjs",
+      "sha256": "436b48d4220f88f5c71274af27df9c45452e0eb563b35ba3eb45745bef10c265",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          25,
+          74,
+          81,
+          87,
+          93,
+          159,
+          188,
+          189,
+          194,
+          207,
+          209,
+          216,
+          230
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/src/evidence.mjs",
+      "sha256": "3f6f782842d4ccb57b58fc64d1b1e3544664fd3867a35a96987eed5aed341781",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          3,
+          6,
+          25,
+          26,
+          43,
+          46,
+          48,
+          53
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/src/freshness.mjs",
+      "sha256": "b12933c5db3b1786010da1e61f5b6a06f605c732fc91e2897425f8f0414b56be",
+      "matches": {
+        "egress": [],
+        "execution": [
+          16,
+          55
+        ],
+        "authority": [
+          33,
+          39,
+          63
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/_guard.mjs",
+      "sha256": "da8775aaa7ba1059bd484e62bd9aa4d691b45d95b8954be8fc1239c3b21b0a8d",
+      "matches": {
+        "egress": [
+          21,
+          22,
+          23
+        ],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/_real_receipt.mjs",
+      "sha256": "a711805f8f96b9638dd1c9a968097dce844aed1df7b2b68119a4d2162ac4f20e",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          25,
+          43,
+          50,
+          101,
+          117,
+          118,
+          119
+        ],
+        "localMutation": [
+          19,
+          110,
+          111,
+          121
+        ]
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/_t.mjs",
+      "sha256": "dcb0941d8d8cf95ef79f5587573e16d1443b9a224cad65fa4cbda03f88bd84de",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/_tmp.mjs",
+      "sha256": "404d0e544e7baf5255ea66b78d72ae13d66144f70d10d3d6bc88668adb13b93f",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/test_adapter.mjs",
+      "sha256": "ee4e6842d678f3aa59bce42bdfe427bd48a7e1cd0b43dd271b370b0a0130e76e",
+      "matches": {
+        "egress": [
+          92
+        ],
+        "execution": [
+          24,
+          36,
+          38,
+          54,
+          56,
+          66,
+          76,
+          85
+        ],
+        "authority": [
+          42,
+          43,
+          44
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/test_build_request.mjs",
+      "sha256": "2588cd92cbaf5abc50c76cbafe906dd498e39736243c4a14e5f88da215f1adc3",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/test_evidence.mjs",
+      "sha256": "5a3870094f1c4155ec91d796697306d925619f5811f0d8dfc451ca45af8adde9",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          96,
+          97
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/test_freshness.mjs",
+      "sha256": "bd1e104ad4437f5a0952fa31092ed40d65035a10aa9f4efffa843b1334be2166",
+      "matches": {
+        "egress": [],
+        "execution": [
+          32,
+          36,
+          40,
+          49,
+          63,
+          67,
+          83,
+          92,
+          104,
+          108,
+          115,
+          125,
+          126,
+          133,
+          134,
+          141,
+          145,
+          150,
+          151,
+          152,
+          161,
+          168,
+          175,
+          189,
+          202,
+          206,
+          211,
+          213,
+          215,
+          219,
+          223,
+          227,
+          229,
+          237,
+          241,
+          243,
+          252,
+          258,
+          263,
+          273,
+          277,
+          279
+        ],
+        "authority": [
+          81,
+          122,
+          125,
+          126,
+          130,
+          131,
+          133,
+          134,
+          141,
+          142,
+          185,
+          209,
+          221,
+          252
+        ],
+        "localMutation": [
+          11,
+          77,
+          88,
+          103,
+          111
+        ]
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/test_freshness_atomicity.mjs",
+      "sha256": "44f01024a4cc263d92a8eba11fd5efcebb996b48a66fa268394b338014ad27a3",
+      "matches": {
+        "egress": [],
+        "execution": [
+          14,
+          17,
+          25,
+          33,
+          38,
+          41,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51
+        ],
+        "authority": [
+          1,
+          12,
+          14,
+          16,
+          17,
+          18,
+          19,
+          22,
+          25,
+          26,
+          27,
+          33,
+          48,
+          50,
+          51
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/test_freshness_integration.mjs",
+      "sha256": "40d1f629bfdc1168e8d0e5763d589afc0fbbd2e1cce902618e1f38c44838b4f1",
+      "matches": {
+        "egress": [
+          11,
+          60
+        ],
+        "execution": [
+          35,
+          42,
+          57,
+          61,
+          69,
+          78,
+          83,
+          84,
+          88,
+          92,
+          102,
+          103,
+          104,
+          105,
+          113,
+          123
+        ],
+        "authority": [
+          9,
+          32,
+          53,
+          69,
+          86,
+          101,
+          104,
+          120
+        ],
+        "localMutation": [
+          3,
+          12,
+          30,
+          39
+        ]
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/test_verify_failclosed.mjs",
+      "sha256": "6bef0691cd3ca23c3af0e1b68f7b41812f345135a71ee5d24253eff6dd546ffc",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          2
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001-stage2/tests/test_verify_positive.mjs",
+      "sha256": "a13e5418d11169d718b67013290f79df5910c3d6f47d48cc6917240bb9ac2a81",
+      "matches": {
+        "egress": [],
+        "execution": [
+          26,
+          63
+        ],
+        "authority": [
+          5,
+          72,
+          76
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001/attacks/a_encoding.mjs",
+      "sha256": "fdea81a9c4cbeadd3802eb88d0ebfac839f88c3d5e9e93c3ff43b7780c4739d1",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          98,
+          99
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001/attacks/c_binding.mjs",
+      "sha256": "b099a8104ef16b67e574b9f05ec026e1767bf7e8bdfc916bbd41ef8c5c833c2e",
+      "matches": {
+        "egress": [
+          47,
+          74
+        ],
+        "execution": [
+          7,
+          55,
+          58,
+          83,
+          84,
+          87,
+          115
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001/attacks/d_freshness.mjs",
+      "sha256": "0c3b0c7d5fc4535e764c047504ae296eaafcb393fc2f3f78edfb0bb6ddb76322",
+      "matches": {
+        "egress": [
+          20,
+          33
+        ],
+        "execution": [],
+        "authority": [],
+        "localMutation": [
+          11,
+          84
+        ]
+      }
+    },
+    {
+      "path": "experiments/exp-001/attacks/e_crypto_custody.mjs",
+      "sha256": "e45786439c9c722cd438c50a238077d4c1cc16acffc0a5ec973830fba4f10953",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          8,
+          57,
+          63
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "experiments/exp-001/harness/common.mjs",
+      "sha256": "9daa8af7e5cf3e3d1df9d6294d1064d8fb1adf03434627cd7be0d4d9a5083214",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": [
+          9,
+          18,
+          19,
+          35
+        ]
+      }
+    },
+    {
+      "path": "experiments/exp-001/run-all.mjs",
+      "sha256": "aaff3c239133cc1fc84a4c19f7bf5e8a61e99bcd44f39eee94810d6271f7e445",
+      "matches": {
+        "egress": [
+          7,
+          24,
+          37
+        ],
+        "execution": [
+          58
+        ],
+        "authority": [
+          8,
+          41
+        ],
+        "localMutation": [
+          8,
+          75
+        ]
+      }
+    },
+    {
+      "path": "mcp/example-upstream-server.mjs",
+      "sha256": "4b2b17937cb3055e3b2e95112df59a4cb2acdb1bf70cf13e6251c037f8905244",
+      "matches": {
+        "egress": [],
+        "execution": [
+          71
+        ],
+        "authority": [
+          12,
+          33
+        ],
+        "localMutation": [
+          10,
+          34,
+          71
+        ]
+      }
+    },
+    {
+      "path": "mcp/guarded-tools.mjs",
+      "sha256": "c46a07284c1b8c738e49f58176b2f97fae3705cfccce5e86d3b49fb2d78e936c",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          41
+        ],
+        "localMutation": [
+          8,
+          42
+        ]
+      }
+    },
+    {
+      "path": "mcp/mnde-mcp-proxy.mjs",
+      "sha256": "50de8df9536486ea46be96946e357157f4abbe5152208583af2643322ed09db2",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          3
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "mcp/mnde-mcp-server.mjs",
+      "sha256": "aadcaca7cb69b91fb52891d12a813465431c6983f72cecb76b3ce12031b184c4",
+      "matches": {
+        "egress": [
+          10,
+          20
+        ],
+        "execution": [
+          56,
+          57
+        ],
+        "authority": [
+          20,
+          21
+        ],
+        "localMutation": [
+          57
+        ]
+      }
+    },
+    {
+      "path": "mcp/shell-mcp-server.mjs",
+      "sha256": "4f9462a0a51bb47114580020795c3344a3fe6fa80e2123961582d4b330526666",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          18,
+          19
+        ],
+        "localMutation": [
+          12,
+          45
+        ]
+      }
+    },
+    {
+      "path": "mcp/stdio-client.mjs",
+      "sha256": "9d550d7df5a33f7f73ff328ec27e3f0753eab269ff9caaa9d9a99380bb0f4c5e",
+      "matches": {
+        "egress": [
+          7,
+          10
+        ],
+        "execution": [
+          69,
+          73,
+          95,
+          114,
+          117
+        ],
+        "authority": [
+          10
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "mnde-local-sidecar.mjs",
+      "sha256": "fc755520f434bf990a74f9397b2ab862f90938a939f87ef71782606ff7f81b05",
+      "matches": {
+        "egress": [
+          1130,
+          1138,
+          1141,
+          1348,
+          1436,
+          1567,
+          1665,
+          1672
+        ],
+        "execution": [
+          178,
+          271,
+          437,
+          602,
+          1109
+        ],
+        "authority": [
+          3,
+          8,
+          77,
+          84,
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          106,
+          114,
+          115,
+          119,
+          120,
+          121,
+          122,
+          123,
+          125,
+          128,
+          157,
+          158,
+          159,
+          162,
+          163,
+          164,
+          165,
+          166,
+          296,
+          313,
+          319,
+          320,
+          321,
+          322,
+          327,
+          328,
+          329,
+          333,
+          343,
+          371,
+          381,
+          382,
+          395,
+          398,
+          404,
+          405,
+          409,
+          410,
+          453,
+          460,
+          479,
+          484,
+          493,
+          497,
+          505,
+          517,
+          528,
+          536,
+          537,
+          542,
+          543,
+          571,
+          583,
+          876,
+          984,
+          1092,
+          1160,
+          1210,
+          1589,
+          1592,
+          1669
+        ],
+        "localMutation": [
+          3,
+          1593
+        ]
+      }
+    },
+    {
+      "path": "orbit/engine.ts",
+      "sha256": "ec4e4d70ca77997cb07d0b9c56cf556008c8b879f47f955e9bde97bc309b8eaf",
+      "matches": {
+        "egress": [],
+        "execution": [
+          12,
+          29
+        ],
+        "authority": [
+          9,
+          11,
+          79,
+          80,
+          91,
+          92
+        ],
+        "localMutation": [
+          9
+        ]
+      }
+    },
+    {
+      "path": "orbit/index.ts",
+      "sha256": "a41faa3bda14da33a4919a088e8fd1ce74b4fd32e598fb62a83ed001f773b662",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "orbit/types.ts",
+      "sha256": "a0504a9ff518824342cdb500d134c1c1aac31af5cc58d5fda5f9a8fb3549655d",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "preflight/engine.ts",
+      "sha256": "bbfb2dbbe1834c8a74d20901403cd8d35fa3715a961c15507b714619ff994924",
+      "matches": {
+        "egress": [],
+        "execution": [
+          245,
+          271,
+          354,
+          368,
+          385,
+          389,
+          425,
+          452,
+          499
+        ],
+        "authority": [
+          226,
+          289,
+          293,
+          478
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "preflight/index.ts",
+      "sha256": "f12d6b7955ca2c42b1c0d343a5a7c119fea8f45bc5a7796e88d52e8d58a9dde6",
+      "matches": {
+        "egress": [],
+        "execution": [
+          153,
+          184
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "preflight/types.ts",
+      "sha256": "89aac304193162322985a3f8d028450d27be69ab0ed07d8e0a9d139e728d5921",
+      "matches": {
+        "egress": [],
+        "execution": [
+          19
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "ram0na/engine.ts",
+      "sha256": "3baaf6167b125a76c89c5375180b1a7256d121df206c16d2674208005bb8ac4d",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          34,
+          38,
+          39
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "ram0na/index.ts",
+      "sha256": "ae092772e2b955ac85f31219fcff5979a16a08facd6cec2e79d318c367ed717e",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "ram0na/types.ts",
+      "sha256": "cbc2477cb2afed187151f71ce6903b5752cd380113fc37bb7378af711d0224c5",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "reviewer-kit/allow-demo.ps1",
+      "sha256": "c1fe0897b0980742644c4ea62175fd8837a5004bd2d45937c3c44bfdcb46b211",
+      "matches": {
+        "egress": [
+          6
+        ],
+        "execution": [
+          26
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "reviewer-kit/refuse-demo.ps1",
+      "sha256": "9f01216a82fbad07b8669d51bc0dce388482aee092259ce7af1a3608e0c8926d",
+      "matches": {
+        "egress": [
+          6
+        ],
+        "execution": [
+          26
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "reviewer-kit/run-review.ps1",
+      "sha256": "921967ab3c80a34ee9b77efcc106041f79754d2392c9acb6e695ad1751f2e48a",
+      "matches": {
+        "egress": [
+          11
+        ],
+        "execution": [],
+        "authority": [
+          13,
+          80,
+          87,
+          89,
+          92,
+          96,
+          97,
+          99,
+          210
+        ],
+        "localMutation": [
+          83,
+          88,
+          89,
+          90
+        ]
+      }
+    },
+    {
+      "path": "reviewer-kit/test-reviewer-kit.ps1",
+      "sha256": "0f9698916bacb718e6106ffc42885002ccbc7684c424d3555d78cd9320b35c99",
+      "matches": {
+        "egress": [
+          23
+        ],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "reviewer-kit/verify-independent.ps1",
+      "sha256": "c08bb23c82ac694613da89819853e64770ca292ac4d032be5980fb4bc5f23be2",
+      "matches": {
+        "egress": [
+          32
+        ],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "reviewer-kit/verify-receipt.ps1",
+      "sha256": "24c208fd28285857b20817e50f47c945536bb8fc3348f97217b76078c65a1420",
+      "matches": {
+        "egress": [
+          11
+        ],
+        "execution": [],
+        "authority": [
+          12,
+          22,
+          24,
+          25,
+          28,
+          43,
+          46
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "reviewer-kit/verify-review.ps1",
+      "sha256": "338e30b0b2a215e86e780928f2962019db72b44a76dc71814081a2b0c84c881c",
+      "matches": {
+        "egress": [
+          6
+        ],
+        "execution": [
+          18,
+          28
+        ],
+        "authority": [
+          71,
+          72,
+          73,
+          75,
+          92
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "scripts/bootstrap_dev_receipt_keys.mjs",
+      "sha256": "93d9cb5713b91bee2d88b1148e817dfd82795c0d9add35cf9632ad9847eea911",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          2,
+          32,
+          33,
+          42,
+          45,
+          47,
+          49,
+          53,
+          58,
+          61,
+          69,
+          76,
+          81,
+          90,
+          91,
+          96,
+          97,
+          106,
+          107,
+          108,
+          114,
+          130
+        ],
+        "localMutation": [
+          2,
+          73,
+          74,
+          91,
+          92,
+          97,
+          98
+        ]
+      }
+    },
+    {
+      "path": "scripts/check-whitespace.mjs",
+      "sha256": "c2f000864c1e86942362e69fb1737efb4a9eadfb0182ef9e6f10376e6c064782",
+      "matches": {
+        "egress": [
+          2,
+          8
+        ],
+        "execution": [],
+        "authority": [
+          3,
+          30
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "scripts/desktop-smoke.mjs",
+      "sha256": "bf1894721d79c8dbbbe3816d31a01e6863fc127f26e647e3371ceb4f0aa21810",
+      "matches": {
+        "egress": [
+          2,
+          20
+        ],
+        "execution": [
+          26
+        ],
+        "authority": [
+          6
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "scripts/executor-blocked-demo.mjs",
+      "sha256": "39f835b59ebd8dd1887a471e77f99ea09bf8b4cb46bc9f8af0dcf6b733a8bd7f",
+      "matches": {
+        "egress": [
+          13,
+          29,
+          52
+        ],
+        "execution": [],
+        "authority": [
+          13,
+          15,
+          16
+        ],
+        "localMutation": [
+          2,
+          18,
+          19,
+          40,
+          46,
+          74
+        ]
+      }
+    },
+    {
+      "path": "scripts/executor-demo.mjs",
+      "sha256": "d045600fc6090a4c946faca0591524609a7c53f62b543e6edf3d6fcaa41e06a0",
+      "matches": {
+        "egress": [
+          13,
+          67
+        ],
+        "execution": [
+          30,
+          47,
+          72
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "scripts/export-authority-bundle.mjs",
+      "sha256": "f79355f592d7446c01a6685fdbae020a2447c08cdc159fd67db7761161515a38",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          22
+        ],
+        "localMutation": [
+          13,
+          38
+        ]
+      }
+    },
+    {
+      "path": "scripts/hostile-input-proof.mjs",
+      "sha256": "8fb811f356e33c25a1605c95654bcd0ff4853fd7a8f21b3790636d86b348d0d0",
+      "matches": {
+        "egress": [
+          12,
+          26
+        ],
+        "execution": [],
+        "authority": [
+          12
+        ],
+        "localMutation": [
+          2,
+          14,
+          15,
+          48,
+          72
+        ]
+      }
+    },
+    {
+      "path": "scripts/init-production-authority.mjs",
+      "sha256": "ee0c00b77aa45d61b009c2f80ef017b6ffbf387e8358e3fc13f1e9d3657d998a",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          7,
+          31,
+          33,
+          60,
+          77,
+          79,
+          94,
+          97,
+          190,
+          192,
+          194,
+          195,
+          196,
+          198,
+          202,
+          214,
+          234
+        ],
+        "localMutation": [
+          25,
+          136,
+          151,
+          155
+        ]
+      }
+    },
+    {
+      "path": "scripts/ledger-proof.mjs",
+      "sha256": "ae04a522e2a8ab3bdecfcc82d0fe9e693db9611e94b7dca2268e4563988b8c96",
+      "matches": {
+        "egress": [
+          23
+        ],
+        "execution": [],
+        "authority": [
+          13,
+          32,
+          49,
+          50,
+          69,
+          70
+        ],
+        "localMutation": [
+          13,
+          53
+        ]
+      }
+    },
+    {
+      "path": "scripts/mcp-demo.mjs",
+      "sha256": "b7bf05d4aa01996842d01c93ce053d69e4122d055d88a56f9086bfaf83b33ce3",
+      "matches": {
+        "egress": [
+          17
+        ],
+        "execution": [
+          53,
+          58,
+          61,
+          65,
+          73
+        ],
+        "authority": [],
+        "localMutation": [
+          10,
+          42
+        ]
+      }
+    },
+    {
+      "path": "scripts/mcp-proxy-demo.mjs",
+      "sha256": "b16b47990813aa2e046d225470dd3114d479701429a054434dcd2f911122549a",
+      "matches": {
+        "egress": [
+          17
+        ],
+        "execution": [
+          60,
+          61,
+          65,
+          69,
+          78
+        ],
+        "authority": [],
+        "localMutation": [
+          10,
+          48
+        ]
+      }
+    },
+    {
+      "path": "scripts/refresh-demo-receipts.mjs",
+      "sha256": "578d74a2ca700eac2b48705f65abdb978d41f6d03687560dbc34d13190aa9c9a",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          3,
+          19,
+          37,
+          52,
+          57,
+          124,
+          142,
+          144,
+          152,
+          160,
+          167
+        ],
+        "localMutation": [
+          3,
+          29,
+          30,
+          192
+        ]
+      }
+    },
+    {
+      "path": "scripts/reviewer-kit-pe.mjs",
+      "sha256": "c3208388e56808a1375bd9e6082e14c9de2097657c0f893dcd13bf64a5008116",
+      "matches": {
+        "egress": [
+          28,
+          39
+        ],
+        "execution": [],
+        "authority": [],
+        "localMutation": [
+          9,
+          32
+        ]
+      }
+    },
+    {
+      "path": "scripts/reviewer-request.mjs",
+      "sha256": "f8cbb69a74f109f4fc6098f0e0479ac8c461c190f7f8bbdca8453e6ad8a49118",
+      "matches": {
+        "egress": [],
+        "execution": [
+          10
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "scripts/run-all-tests.mjs",
+      "sha256": "8f0c56a13848846c9a008fa770d03cb049249a12acea253cc8369a3cd3420401",
+      "matches": {
+        "egress": [
+          2,
+          44,
+          45
+        ],
+        "execution": [],
+        "authority": [
+          3,
+          8,
+          9,
+          44
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "scripts/run-ci.mjs",
+      "sha256": "5d4ad2d4be1f48618ac239f68e7be28e4c9ddf184d9b8cb90d672fb4b33e9e3b",
+      "matches": {
+        "egress": [
+          2,
+          18,
+          19
+        ],
+        "execution": [],
+        "authority": [
+          18
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "scripts/setup.mjs",
+      "sha256": "f05cdf0e608806d6403da73ab975dcf199d9fc2432cf696922e80387501955af",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "scripts/shell-demo.mjs",
+      "sha256": "740d173b38582cac2b803b5b67ca30f7e512c3fda108a8228eaf311f7e2b6476",
+      "matches": {
+        "egress": [],
+        "execution": [
+          56,
+          57,
+          67
+        ],
+        "authority": [
+          9,
+          34,
+          41
+        ],
+        "localMutation": [
+          9,
+          47
+        ]
+      }
+    },
+    {
+      "path": "scripts/start-sidecar.mjs",
+      "sha256": "8a1f7f4f6bc3cca59e68ae6731a11f4dda312b475f1443b678004610cb5702cc",
+      "matches": {
+        "egress": [
+          14,
+          37,
+          115,
+          219
+        ],
+        "execution": [
+          145,
+          225
+        ],
+        "authority": [
+          33,
+          35,
+          38,
+          40,
+          90,
+          97,
+          101,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          112
+        ],
+        "localMutation": [
+          15,
+          69,
+          70,
+          72,
+          73
+        ]
+      }
+    },
+    {
+      "path": "scripts/test-fresh-setup.mjs",
+      "sha256": "3ff1af15f5fefcda7a520ad7cbacd5c1f6e546c2a4be38983bf6602b0f1ddddc",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          2,
+          7,
+          48,
+          56,
+          64
+        ],
+        "localMutation": [
+          2,
+          16,
+          28,
+          29,
+          34,
+          35,
+          37,
+          38,
+          41,
+          42,
+          44,
+          62,
+          63
+        ]
+      }
+    },
+    {
+      "path": "scripts/test-receipt-verifier.mjs",
+      "sha256": "6be71f0ed6beb36b386c4163e2dca4994d1cd458ffab5f69bf41be83a0274502",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "scripts/test-replay-verification.mjs",
+      "sha256": "d33502e6fc5b95968629a9e42f8c928fac5c25ec14ebb3b2b4a763bd566407cc",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "scripts/tester-id.mjs",
+      "sha256": "e8047881854c6bac3da6eaea1edd9fc4d64a45c81602470cb68b816486c4a497",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          2,
+          24,
+          32
+        ],
+        "localMutation": [
+          2,
+          43,
+          44
+        ]
+      }
+    },
+    {
+      "path": "scripts/trust-enroll-executor.mjs",
+      "sha256": "d29a00c079d5cec64890fe556c8c41d95dab52880f3511c94a5483e070f71f77",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          2,
+          6,
+          7,
+          8,
+          20,
+          22,
+          28,
+          29,
+          32,
+          41,
+          42,
+          43,
+          129,
+          152,
+          160,
+          169,
+          170,
+          172,
+          175,
+          178,
+          196,
+          198,
+          200,
+          216,
+          220,
+          226,
+          228,
+          233
+        ],
+        "localMutation": [
+          22,
+          119,
+          218,
+          219,
+          220
+        ]
+      }
+    },
+    {
+      "path": "scripts/verify-ledger.mjs",
+      "sha256": "6e8d2a845ca7abd3bea5d278e5514668c84823dcc9f40ebf63346dd748bb3826",
+      "matches": {
+        "egress": [
+          41
+        ],
+        "execution": [],
+        "authority": [
+          21,
+          27,
+          30,
+          51,
+          52,
+          55
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "scripts/verify-published-bundle.mjs",
+      "sha256": "b6af26adde6e4a250f5c8272cae6058fbaa4bf8f60b802f02073374e32b07b1a",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          23,
+          41,
+          87,
+          91
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shared/authority-manifest.mjs",
+      "sha256": "f1bea1e5a94c0100ec8531e178e320300ccc296e20d89f02ed110deb9219506a",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          2,
+          21,
+          37,
+          38,
+          91,
+          102,
+          117,
+          118
+        ],
+        "localMutation": [
+          2,
+          100,
+          103,
+          104
+        ]
+      }
+    },
+    {
+      "path": "shared/contracts.ts",
+      "sha256": "c9b826bf222ed1a8d2f7dd09d6e79629c1c51b2501e76ccb582f7eca98bb54bb",
+      "matches": {
+        "egress": [],
+        "execution": [
+          24,
+          64,
+          110
+        ],
+        "authority": [
+          18,
+          93,
+          156
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shared/decision-engine.mjs",
+      "sha256": "ce67fa815f6ca01d0e7c6e83bc44bea88c4e780383f0d6e795489e1e10cbc1de",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          28,
+          36
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shared/hash.ts",
+      "sha256": "fa942ce020e06b26b391d97aa28567a1ef5cfbd21842d2068cfc98cbaf44badb",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shared/index.ts",
+      "sha256": "77cd359da7b68fb4941fa3842c3a29c3772008e5a1b8dbe476e356bc1c6a961c",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shared/json.ts",
+      "sha256": "1e7200e948a049fea75b9f7a55ee06454ec36bfdcbe6a5e699965284191e3e22",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          39,
+          42,
+          86,
+          87,
+          92,
+          97
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shared/policy-trust.ts",
+      "sha256": "2bc44e5c1a2268e88d66e673ea92b527b8c68c194d83d087963e718a0b7355b4",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shared/receipt-replay.mjs",
+      "sha256": "a687e174210d0dc5d0f4b19455a24d374929fb8be35f0d0134dd6fb43faf25b1",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shared/receipt-signing.ts",
+      "sha256": "b47a1997a1103ef54768113e61b52fb4cb906f57c234cfa52fba485e5fca4cea",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          2,
+          13,
+          14,
+          16,
+          17,
+          19,
+          30,
+          43,
+          50,
+          52,
+          58,
+          66,
+          74,
+          75,
+          82,
+          83,
+          84,
+          85
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shared/runtime-profile.mjs",
+      "sha256": "0962ee1228f510513937610f25a08a21d0aaca23c2d1cfce0ae2bff6bd2a8a67",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shared/state.ts",
+      "sha256": "d0d05f0c8a2a004fbf0c6e8a93e5c44ffead4d46f295a3acfa99969576ab70a2",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          8,
+          32,
+          33,
+          46,
+          47,
+          49,
+          52,
+          53,
+          56,
+          60,
+          61,
+          99,
+          100,
+          102,
+          103,
+          104,
+          111,
+          115,
+          116,
+          118,
+          121,
+          122,
+          136,
+          140,
+          141,
+          147,
+          154,
+          157,
+          158,
+          165,
+          168,
+          178
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shared/types.ts",
+      "sha256": "814f7ac44176961427213dc0bf5821d1a6276ec7889b9c0f47a9cf89d02ebcc8",
+      "matches": {
+        "egress": [],
+        "execution": [
+          34
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shell/policy.mjs",
+      "sha256": "3030ad3b04a48b955886f850a284a8ecdf800cd40e04f33bb6d8eb34180586d7",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "shell/receipt.mjs",
+      "sha256": "c05426d8af5633c2639cbcd010d5c7fce48775478528aaa6a43aca4a44b02f48",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          23,
+          24
+        ],
+        "localMutation": [
+          10,
+          75,
+          77
+        ]
+      }
+    },
+    {
+      "path": "sidecar/auth_authority.mjs",
+      "sha256": "a3520b78732b93565436fc3178b9edc1f12643a0698b6aad58163746aac5daa2",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          2,
+          84,
+          117,
+          180,
+          281
+        ],
+        "localMutation": [
+          2,
+          143,
+          158,
+          214,
+          285
+        ]
+      }
+    },
+    {
+      "path": "sidecar/deterministic_worker.mjs",
+      "sha256": "52a739e82f25485a8a303e9e574e727d36691626dc3f93ac3cd13471d36fc6c1",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          5,
+          7,
+          13
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "sidecar/deterministic_worker_pool.mjs",
+      "sha256": "66a1fa4c922d4a699108cd3b908c13db72f69162b497a8c72be637bc2ddde6d1",
+      "matches": {
+        "egress": [],
+        "execution": [
+          89,
+          125,
+          132,
+          166,
+          181,
+          196,
+          201
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "sidecar/execution_id_store.mjs",
+      "sha256": "c5471b1b8337bc616aa9ac0936e45ea76eab3379a3bfaa5d03f82ead6da584cb",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          29
+        ],
+        "localMutation": [
+          16,
+          48
+        ]
+      }
+    },
+    {
+      "path": "sidecar/graceful_shutdown.mjs",
+      "sha256": "392814175e4e0933cdcb4688c77a4bb48c75c528e0b173dc4f2cc798335c4dcf",
+      "matches": {
+        "egress": [],
+        "execution": [
+          50,
+          76,
+          120,
+          128,
+          153
+        ],
+        "authority": [
+          36
+        ],
+        "localMutation": [
+          128
+        ]
+      }
+    },
+    {
+      "path": "sidecar/http_admission.mjs",
+      "sha256": "59064836e92145e853582f3f7245fe45e6b6663746416192d3f99c884453d53a",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          54,
+          62
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "sidecar/production_api.mjs",
+      "sha256": "5941673e360ef3888c61cb99c2d27dd31b9a57231602366fcc1d8620c59d8378",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          93,
+          233
+        ],
+        "localMutation": [
+          1,
+          213,
+          219,
+          220
+        ]
+      }
+    },
+    {
+      "path": "sidecar/receipt_persistence_queue.mjs",
+      "sha256": "491102788284878ca964b776a3c09e458c86d21cd346aab8faa060f6a54038fd",
+      "matches": {
+        "egress": [],
+        "execution": [
+          140,
+          182,
+          188
+        ],
+        "authority": [],
+        "localMutation": [
+          1,
+          86,
+          138
+        ]
+      }
+    },
+    {
+      "path": "sidecar/refusal_receipt.mjs",
+      "sha256": "fdc5ee6caaa3042566f3545e52a29d632bcfdd98f9184f38be6af70295fa21c9",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "sidecar/replay_engine.mjs",
+      "sha256": "4a9179543032be2c1427a98a2c2ccc989eca6c6e7c16dc9ac82b6173f851f507",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "sidecar/runtime_request.mjs",
+      "sha256": "9d7070feafb04f3835a47a9b15182a4c9c284a54e4edd1503561ff56b15e75f9",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          3
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "sidecar/runtime_watchdog.mjs",
+      "sha256": "305573520b4442f57bae67ed084f5b8e17e0acc80e85479ce90a9f3934b74ab9",
+      "matches": {
+        "egress": [],
+        "execution": [
+          51
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "sidecar/socket_registry.mjs",
+      "sha256": "917fda7ee984ac1e14f0ea2096c1f0e62d715e78dcd9d145dbff41aa125854fb",
+      "matches": {
+        "egress": [],
+        "execution": [
+          38,
+          123
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "sidecar/startup_checks.mjs",
+      "sha256": "cd202fbca2c8c8df1fe835cb4870ab02991b614b039ec7a74d5bd28c02684002",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": [
+          15,
+          23
+        ]
+      }
+    },
+    {
+      "path": "src/activation/index.mjs",
+      "sha256": "eae5ee0896ad985a9fd35aad9680356973b3ca43ceab67a686b09ff1eddb8c6d",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          3,
+          118,
+          119,
+          132,
+          133,
+          136,
+          140,
+          162,
+          165
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/authority-checkpoint/checkpoint.mjs",
+      "sha256": "4306550c82ae5d06a5a899867e09100631bc21762d682f7f112d91fa9e30df93",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          9
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/authority-signing/index.mjs",
+      "sha256": "e9d390b13e6dc0532d8167c5322773164d6ef6deff3bb756722a5eaecbe05d49",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          32,
+          34,
+          80,
+          81,
+          96,
+          98,
+          100,
+          103,
+          105,
+          120,
+          121,
+          122,
+          125,
+          127,
+          132,
+          144,
+          145,
+          151,
+          153,
+          154,
+          156,
+          159,
+          161,
+          169,
+          170,
+          190,
+          196,
+          227,
+          228,
+          231,
+          239,
+          240,
+          243,
+          244,
+          245,
+          254,
+          259,
+          260,
+          263,
+          388,
+          389,
+          398,
+          406,
+          409,
+          412,
+          413,
+          414,
+          418,
+          425,
+          430
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/authority-signing/preflight.mjs",
+      "sha256": "fa4890b25981f6e68cca697c2b8de1dcd788c350f7614309433174cea64a88cc",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          18,
+          32,
+          45,
+          52,
+          53,
+          71,
+          94,
+          96,
+          99,
+          104,
+          122,
+          135,
+          137,
+          142,
+          143,
+          159,
+          161,
+          167,
+          168,
+          182,
+          183
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/authority-signing/repo-containment.mjs",
+      "sha256": "6eafa5afbbd3570ca8cb882152cf6e4d93da76b3702f0753cbfa7ec293460dfb",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/crypto/node-provider.mjs",
+      "sha256": "9a739a2bc0623769fd454cf8f2f9042b9fc7a9ad1c4bc2f276cd607f92ece7fe",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          14,
+          44,
+          48,
+          51,
+          53,
+          58,
+          59,
+          60,
+          80,
+          83
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/crypto/provider.mjs",
+      "sha256": "f0981845a084fef3385110585ddb06dd5068f004329923668d3966d20be79d1e",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          25,
+          45
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/custody/bundle.mjs",
+      "sha256": "269dcb73e68bf4e306263d58601b7882b0c5faf088c0ed39febca2efa7284c2b",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          16,
+          34,
+          35,
+          97,
+          99,
+          102,
+          104
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/custody/executor-credential.mjs",
+      "sha256": "bdd23bc888031f7055c193dc48fefbe5e3d91a5f2b9e388f1331ccc1aa56111e",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          4,
+          13,
+          16,
+          21,
+          22,
+          33,
+          35,
+          37,
+          41,
+          43,
+          44,
+          45,
+          46,
+          53,
+          55,
+          57,
+          89,
+          91,
+          95,
+          96,
+          99,
+          100,
+          104,
+          108,
+          109,
+          116,
+          119,
+          131,
+          133,
+          134,
+          135,
+          136,
+          138,
+          141,
+          144,
+          148,
+          162,
+          163,
+          169,
+          171,
+          174,
+          176,
+          184,
+          185,
+          193,
+          195,
+          196,
+          197,
+          199,
+          202,
+          203,
+          205,
+          206,
+          207,
+          210,
+          211,
+          214,
+          215,
+          216,
+          217,
+          218,
+          219,
+          220,
+          221,
+          223,
+          225,
+          226,
+          228,
+          229,
+          236,
+          242,
+          244,
+          245,
+          246,
+          248,
+          249,
+          253,
+          254,
+          256,
+          257,
+          261,
+          262,
+          268,
+          270,
+          272,
+          273,
+          276,
+          277,
+          278,
+          282,
+          283,
+          286,
+          288,
+          289,
+          291,
+          292,
+          296,
+          297,
+          300,
+          302,
+          303,
+          306,
+          310,
+          311,
+          312,
+          313,
+          314,
+          315,
+          316
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/custody/executor-identity.mjs",
+      "sha256": "7d32c9f07656dbb42b743f3caf681e0706015fca322cfde55a543076600fcf5c",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          10,
+          19,
+          21,
+          35,
+          44,
+          95,
+          96,
+          103,
+          151,
+          167,
+          173,
+          174,
+          176,
+          182,
+          185,
+          186,
+          197,
+          200,
+          201,
+          204,
+          206,
+          207,
+          217,
+          221,
+          223,
+          232,
+          235,
+          237,
+          249,
+          250,
+          251
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/custody/executor-readiness.mjs",
+      "sha256": "eff7faae98ca61f0ae31a23b7e74c72ff16051ae15f609dbe56729ff7436a55b",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          5,
+          7,
+          11,
+          15,
+          18,
+          23,
+          36,
+          43,
+          45,
+          46,
+          49,
+          57,
+          58,
+          64,
+          66,
+          68,
+          84,
+          86,
+          87,
+          94,
+          95,
+          101,
+          102,
+          103,
+          105,
+          106
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/custody/external-signer.mjs",
+      "sha256": "e7f68fb480af7dcf38c9749ec9cbdd7f8273665b80853bf3260ff3cc94a0292e",
+      "matches": {
+        "egress": [
+          19,
+          89
+        ],
+        "execution": [],
+        "authority": [
+          1,
+          8,
+          20,
+          27,
+          53,
+          59,
+          62,
+          84,
+          91,
+          94,
+          98,
+          101,
+          109,
+          110,
+          111,
+          112,
+          116,
+          117,
+          118,
+          119,
+          122,
+          125,
+          133,
+          134
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/custody/index.mjs",
+      "sha256": "a5cd1523f4ebd3a56aaa56c42918de0eebc717978ff6249c13629ba18d5fd53f",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          34,
+          36,
+          44,
+          45,
+          47,
+          112,
+          145,
+          146,
+          147,
+          152,
+          185,
+          187,
+          208,
+          220,
+          222,
+          229,
+          230,
+          231,
+          232,
+          233,
+          234,
+          240
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/custody/lifecycle.mjs",
+      "sha256": "2b5220bd152757422bb380709536447097cccd603589403dab298d7bda226284",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          20,
+          43,
+          45,
+          52,
+          59,
+          60,
+          61,
+          64,
+          72,
+          77,
+          96,
+          97,
+          100,
+          101,
+          102,
+          112,
+          122,
+          125,
+          126,
+          127,
+          134
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/custody/root-signer.mjs",
+      "sha256": "11924631de48f2eb28d72ce517786f502c68ea248cb647bab69f1a4d68fd291d",
+      "matches": {
+        "egress": [
+          9,
+          152
+        ],
+        "execution": [],
+        "authority": [
+          10,
+          17,
+          18,
+          19,
+          20,
+          21,
+          25,
+          28,
+          34,
+          42,
+          46,
+          48,
+          56,
+          59,
+          60,
+          63,
+          71,
+          75,
+          77,
+          82,
+          84,
+          85,
+          87,
+          88,
+          90,
+          91,
+          92,
+          94,
+          95,
+          96,
+          98,
+          100,
+          111,
+          116,
+          120,
+          122,
+          124,
+          127,
+          129,
+          130,
+          136,
+          137,
+          139,
+          140,
+          142,
+          144,
+          148,
+          151,
+          157,
+          159,
+          168,
+          170,
+          172,
+          173,
+          174,
+          176,
+          178,
+          179,
+          180,
+          181,
+          183,
+          186,
+          187,
+          189,
+          191,
+          192
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/discovery/index.mjs",
+      "sha256": "5a083dd35dc89b588416d7e8c98454d34a7eb34d81dfb9bc273e29490270f702",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          7,
+          94
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/equivocation/equivocation.mjs",
+      "sha256": "291f7021ce5bef510eb740b0845dc3077e2bfc87a6af4a57cbf2549264043027",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/event-import/index.mjs",
+      "sha256": "7308c84e4948385e297bdae6319d2578006b418123ccab195bb90c2d54fdb6e5",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-gate/index.mjs",
+      "sha256": "d9213aa863c94bd3c496cc0a8d8894a30785cbdeed9e7261f647a5f65e9eb92d",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          79,
+          80,
+          94,
+          95,
+          100,
+          106,
+          107,
+          115,
+          116
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-gate/policy-attributes.mjs",
+      "sha256": "4e7f3f8dc0365de6e45a47c52059ace9f27a0c61daa1aafe067016f2c872b23c",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-gate/receipt.mjs",
+      "sha256": "95c6bfc0d2709ce21826e1385e5cc7eaed5249053bd45e03615930aa5efe2a57",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-gate/result.mjs",
+      "sha256": "803ba7d15cac9ed108b0f95a5a1666e32267bdc9ed6241acbe031b3a0b73503f",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          44,
+          46,
+          47
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-gate/schema.mjs",
+      "sha256": "7aefe271d33afdc8a182807d36f27214f00aa251e06f9f8d96fa8c4964992f9c",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-gate/signed-receipt.mjs",
+      "sha256": "0d554dcb55c26d8108641c351ffdc3a5237f121bd7069c7a4234360bff5263b4",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          34,
+          35,
+          42,
+          43,
+          50,
+          51,
+          60,
+          108,
+          116,
+          117,
+          121,
+          145,
+          152
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-gate/signed-result.mjs",
+      "sha256": "067c3177ba3b073f1360f8c04a35cd305b0073df11561f62dfba5fa50378e243",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          53,
+          54,
+          67,
+          68,
+          75,
+          76,
+          136,
+          143,
+          161,
+          162,
+          182,
+          189
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-gate/verify-layered-receipt.mjs",
+      "sha256": "487f507694edfba8f9e8b1ccc471275c5625c70522c72c40ecf5a448eec8f661",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          6,
+          23,
+          80,
+          81,
+          91,
+          107,
+          120,
+          152,
+          153,
+          155,
+          161,
+          167,
+          170
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-gate/verify-result.mjs",
+      "sha256": "72e0eded223e3c89ff6f233a26739c353747b0139bee7a15bfedb394b5c88aa0",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          157
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-gate/verify-signed-receipt.mjs",
+      "sha256": "74129664a73c9a029a6920b21f080411d411771282be81c36f7c201cb3f9c549",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-gate/verify-signed-result.mjs",
+      "sha256": "d75583ba4fef66efb40e2adbd304f0b6d095e0b2d56384fec5eb266662267b6a",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-ledger/anchor.mjs",
+      "sha256": "fe2248c42d72b15474075a2dec3369ea32882758cfaa6e697f03be8e39c0cdb8",
+      "matches": {
+        "egress": [],
+        "execution": [
+          32,
+          33,
+          167,
+          169
+        ],
+        "authority": [
+          9,
+          46,
+          96,
+          100,
+          157,
+          186,
+          218
+        ],
+        "localMutation": [
+          9,
+          171,
+          176
+        ]
+      }
+    },
+    {
+      "path": "src/execution-ledger/append.mjs",
+      "sha256": "bd9ee04ee2482d4fefd24433fa135f9384b41ab1d50896107978301401188f99",
+      "matches": {
+        "egress": [],
+        "execution": [
+          13,
+          32,
+          34,
+          117,
+          173
+        ],
+        "authority": [
+          10,
+          16,
+          40,
+          42,
+          45,
+          78,
+          151,
+          156
+        ],
+        "localMutation": [
+          16,
+          105,
+          125,
+          159,
+          161
+        ]
+      }
+    },
+    {
+      "path": "src/execution-ledger/index.mjs",
+      "sha256": "e08c20a1597caadce1cc8e9cfca82a8a072623c24ce681962537aed7127d3590",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          65
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-ledger/merkle.mjs",
+      "sha256": "aecb718d812288b675224d613ec4b6b20873b3e57120d41031c01d85b379f2d2",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-ledger/paths.mjs",
+      "sha256": "272917af77af41edaab3a2103bde4a42b2c2ecc5e65e4746aae13ec7667d1bd7",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          16,
+          24,
+          30,
+          36
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-ledger/proof.mjs",
+      "sha256": "65e627bec7803f78228b208fb02e374269c4767e36a162b1784e482fbd1f6368",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-ledger/sidecar.mjs",
+      "sha256": "93f9e205c75420109e02f7a8685aa5372e71d57e3ca7b73e79db82edee9bc57b",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          12,
+          65,
+          131
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/execution-ledger/verify.mjs",
+      "sha256": "66ce2a1d598242157f9708544bbdb01a3887bc70c3983902ae27e6000ec9bc93",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          13,
+          36,
+          81
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/freshness/postgres_claim.mjs",
+      "sha256": "a25a48ba44cd0962adbcea04fa363af42e553dcb1d33191bfc2d5771e42a1c38",
+      "matches": {
+        "egress": [],
+        "execution": [
+          38,
+          44,
+          58
+        ],
+        "authority": [
+          4,
+          8,
+          10,
+          24,
+          25,
+          33
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/grants/grant.mjs",
+      "sha256": "72d4121dd474fd4ae05d1bc1ceaff0f38b46d3a2f11549a8140fd5162b4e5304",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          3,
+          15,
+          19,
+          20,
+          23,
+          31,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          55,
+          56,
+          57,
+          60,
+          65,
+          71,
+          74,
+          75,
+          76,
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          87,
+          89,
+          90,
+          91,
+          92,
+          93,
+          98,
+          100,
+          101,
+          102,
+          103,
+          105,
+          106,
+          107,
+          113,
+          115,
+          116,
+          117,
+          119,
+          121,
+          122,
+          123,
+          125,
+          129,
+          133,
+          134,
+          135,
+          139,
+          210,
+          215,
+          220,
+          221,
+          222,
+          223,
+          227,
+          228,
+          230,
+          231
+        ],
+        "localMutation": [
+          65
+        ]
+      }
+    },
+    {
+      "path": "src/grants/issue.mjs",
+      "sha256": "68c96ba57396bf6c1f56486c21ce88fb875a788e04ae92952a92ee6276e841b1",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          4,
+          14,
+          15,
+          16,
+          21,
+          23,
+          27,
+          29,
+          30,
+          31,
+          39,
+          41,
+          42,
+          44,
+          45,
+          48,
+          63,
+          66,
+          70,
+          72,
+          75,
+          79,
+          94,
+          95,
+          105,
+          108,
+          110,
+          113,
+          119,
+          121,
+          131
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/grants/verify.mjs",
+      "sha256": "39447fbf7e9fc85f2f6fa1a162b8742c65136b3e9648b7e6d79ab0af274d0737",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          6,
+          7,
+          15,
+          16,
+          20,
+          23,
+          29,
+          36,
+          38,
+          43,
+          45,
+          49,
+          51,
+          53,
+          57,
+          62,
+          64,
+          66,
+          68,
+          69,
+          70,
+          72,
+          77,
+          79,
+          81,
+          82,
+          84,
+          86,
+          101,
+          104,
+          109,
+          110,
+          111,
+          112,
+          114,
+          121,
+          122,
+          123,
+          124,
+          125
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/identity/adapters/github-actions.mjs",
+      "sha256": "8948e2872b28685f3195ebe3d7cdbbad656c9a1b6bb920178970dc9bf2b4e547",
+      "matches": {
+        "egress": [
+          30
+        ],
+        "execution": [],
+        "authority": [
+          12,
+          14,
+          30,
+          34,
+          107,
+          129,
+          140,
+          192,
+          194,
+          199,
+          201,
+          214,
+          215,
+          241,
+          249,
+          253,
+          255,
+          257,
+          258,
+          264,
+          270,
+          277,
+          287
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/identity/assertion.mjs",
+      "sha256": "3de28f952cf208a44f66ede8e9a63dcbefa0c609bb532fd97a41596f7891266d",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          8,
+          58,
+          59,
+          86
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/identity/passport.mjs",
+      "sha256": "6ef89186c7459d7346a496256b59f7d8f0c53651d22260cf4a5ed0ebb7f9fdb7",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          34
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/identity/verifier-policy.mjs",
+      "sha256": "dbd0a84654031d7a82e99660af63b5c9c5965e9c465dd5f0a5db848d58b4cdf0",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          41,
+          42,
+          74,
+          80,
+          87,
+          282,
+          284,
+          300,
+          301,
+          303,
+          306,
+          308
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/identity/verify-assertion.mjs",
+      "sha256": "1a5ec830a60a24f8db4d9320d2b129af665ea82f5c93ba6aa9599fc3657fcf5f",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          6,
+          7
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/onboarding/context.mjs",
+      "sha256": "940821f3eadbb360edade38e5aaa0c741a727718a151680030e2f5aa6e2633f8",
+      "matches": {
+        "egress": [
+          22
+        ],
+        "execution": [],
+        "authority": [
+          16
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/onboarding/index.mjs",
+      "sha256": "adf6b1ea4e71dc872cd5c9d10ca7eec37dbd3da53a3b0ce1374e908e8b81896d",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": [
+          8,
+          52
+        ]
+      }
+    },
+    {
+      "path": "src/policy-bundles/index.mjs",
+      "sha256": "bba4b6abfa32be7ba853a021d19c126d75ccce2b0561a609b28967d3f377c3b1",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          8,
+          71,
+          110,
+          111,
+          114,
+          117,
+          118,
+          123,
+          125,
+          127,
+          130,
+          133,
+          150,
+          161,
+          173,
+          176,
+          187,
+          242,
+          259,
+          260
+        ],
+        "localMutation": [
+          8,
+          92,
+          94,
+          95,
+          99,
+          100
+        ]
+      }
+    },
+    {
+      "path": "src/policy-drafting/index.mjs",
+      "sha256": "192472d93eeed9ecc2f6c35cc56af654926911d7c7e34cbd0788cad26bba51e3",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": [
+          9,
+          10
+        ]
+      }
+    },
+    {
+      "path": "src/policy-engine/authenticated-approvals.mjs",
+      "sha256": "8423ad47f8c513b3a07dff9790c909ac914cb00cda5c40d18dfb0841c005861a",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          23,
+          110,
+          112
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/policy-engine/authority-grants.mjs",
+      "sha256": "72c763d7f7e2d41b4e4aa1c3ef88224882cdeaaec122f00170ff0022c7da686f",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          3,
+          5,
+          7,
+          11,
+          14,
+          21,
+          23,
+          25,
+          27,
+          36,
+          37,
+          54,
+          62,
+          64,
+          65,
+          67,
+          75,
+          77,
+          78,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          90,
+          95,
+          96,
+          113,
+          132,
+          133,
+          148,
+          162,
+          169,
+          171,
+          176,
+          178,
+          179,
+          180,
+          185,
+          186,
+          189,
+          193,
+          195,
+          196,
+          197,
+          198,
+          199,
+          200,
+          201,
+          202,
+          203,
+          204,
+          212,
+          213,
+          214,
+          215,
+          218,
+          221,
+          223,
+          224,
+          225,
+          226,
+          235,
+          237,
+          239,
+          240,
+          246,
+          247,
+          248,
+          251,
+          252,
+          257,
+          262,
+          263,
+          265,
+          268,
+          269,
+          273,
+          277,
+          280,
+          283,
+          285,
+          287,
+          288,
+          290,
+          294,
+          295,
+          296,
+          306,
+          307,
+          308,
+          309,
+          310,
+          311,
+          312,
+          313,
+          314,
+          315,
+          316,
+          317
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/policy-engine/default-deny.mjs",
+      "sha256": "be1f905db43d89e355dda4688a0e9738713f199c473ad56187d6b02ef84792bc",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/policy-engine/grant-nonce-store.mjs",
+      "sha256": "941be257eb326353d0036ca13c17b94d0390ecdc7036bb83fe1dd5028b249f52",
+      "matches": {
+        "egress": [],
+        "execution": [
+          17,
+          26,
+          159
+        ],
+        "authority": [
+          1,
+          2,
+          8,
+          10,
+          12,
+          13,
+          14,
+          15,
+          16,
+          24,
+          27,
+          30,
+          40,
+          45,
+          46,
+          69,
+          108,
+          111,
+          116,
+          117,
+          118,
+          119,
+          120,
+          121,
+          122,
+          125,
+          128,
+          130,
+          131,
+          133,
+          134,
+          137,
+          140,
+          143,
+          146,
+          147,
+          148,
+          149,
+          152,
+          158,
+          159,
+          160,
+          162,
+          163,
+          166,
+          168,
+          179,
+          189,
+          190,
+          207,
+          226,
+          227
+        ],
+        "localMutation": [
+          30,
+          137,
+          138,
+          215
+        ]
+      }
+    },
+    {
+      "path": "src/policy-engine/index.mjs",
+      "sha256": "7d1afba45c4f06080aceb91d037f684c9cab8888c43d3019a8251c4c893b3c4f",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          6,
+          8,
+          105,
+          107,
+          108,
+          109,
+          276,
+          277,
+          280,
+          281,
+          295,
+          299,
+          300,
+          301,
+          302,
+          303,
+          304,
+          305,
+          306,
+          307,
+          309,
+          311,
+          351,
+          353,
+          358,
+          360,
+          364,
+          365,
+          371,
+          372,
+          381,
+          382,
+          383,
+          387,
+          388,
+          390,
+          391,
+          392,
+          396,
+          400,
+          403,
+          404,
+          405,
+          407,
+          408
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/policy-engine/receipt.mjs",
+      "sha256": "08801dbd2d9d98cac606bd7063ca61d1351b9c4be61dd267f2e55ce40414e027",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          27,
+          28,
+          56,
+          108,
+          173,
+          176,
+          191,
+          212,
+          215,
+          216
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/policy-engine/sidecar-adapter.mjs",
+      "sha256": "53b9e237703dd89b6551bb5d9cae7f23c15bbf926af632f924bb23f36a76e695",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          8,
+          11,
+          19,
+          120,
+          135
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/policy-engine/trust.mjs",
+      "sha256": "1731d84b2ceb7a935741aab27e20d0c3b5b006c1a6ca179689a0527905aeff48",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          3,
+          15,
+          43,
+          44,
+          61,
+          70,
+          71,
+          73,
+          74,
+          76,
+          77
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/production-posture-preflight.mjs",
+      "sha256": "d003e556f5050ab9d39bd3d4eefdc7c7dd274d87e8fe397999cc54ce4e0a5724",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          30,
+          33,
+          38
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/receipt-index/cli.mjs",
+      "sha256": "9da47935f7e6290707ef49f9f782a60bd5fb74772a244f223bd9b35f9df00abd",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          16,
+          73,
+          135
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/receipt-index/db.mjs",
+      "sha256": "eb6fbb396398b47d1201cb9aacb5b8f79b7e7aa7a0e97865be1d1cee9107139c",
+      "matches": {
+        "egress": [
+          194,
+          195,
+          201,
+          203,
+          237
+        ],
+        "execution": [
+          205,
+          211
+        ],
+        "authority": [],
+        "localMutation": [
+          8,
+          54,
+          59,
+          192,
+          204,
+          205,
+          211,
+          237
+        ]
+      }
+    },
+    {
+      "path": "src/receipt-index/extract.mjs",
+      "sha256": "ab3967cb7fc6742983d69e7cf26f45ab3c9d5e5cbe2e5840cfd725f9f9f0bd29",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/receipt-index/find.mjs",
+      "sha256": "79cd40367b33b86837a3d30ee50c8576a2c982431900d7741b3c2cb475fc434d",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          12,
+          25
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/receipt-index/scan.mjs",
+      "sha256": "3904ac12f2c07252bac4c5ef03f91cb47a2c86028e2f042df27aebde2e6de7a9",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          11,
+          39,
+          52
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/release/identity.mjs",
+      "sha256": "44d0a6d036ec053add778e9c60e9f368575b40052a2178741159461a50c2cc87",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          15,
+          34,
+          48
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/sidecar-auth/index.mjs",
+      "sha256": "b3ada466d8b6bfb58c16ef9914fa5e82a735bfac04a698e7abfe72df61d3fff8",
+      "matches": {
+        "egress": [
+          73
+        ],
+        "execution": [],
+        "authority": [
+          3,
+          4,
+          6,
+          9,
+          17,
+          18,
+          20,
+          21,
+          23,
+          24,
+          26,
+          28,
+          31,
+          37,
+          40,
+          43,
+          44,
+          45,
+          46,
+          49,
+          50,
+          53,
+          55,
+          58,
+          59,
+          60,
+          73,
+          75,
+          76,
+          77,
+          78
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "src/wiring/index.mjs",
+      "sha256": "a8b3a75a5e700a1b59de8b13cdb0acc42125daf34044f06310a6025745a60c3c",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          9,
+          45,
+          118,
+          169,
+          190
+        ],
+        "localMutation": [
+          9,
+          27,
+          28,
+          38,
+          53,
+          140,
+          141,
+          168,
+          171,
+          190
+        ]
+      }
+    },
+    {
+      "path": "src/witness/witness.mjs",
+      "sha256": "bec43fe9ed48953a2d07ee5b55f24c948a4ed7b690bee58a0804d21509d186b4",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/fixtures/mock-ed25519-signer.mjs",
+      "sha256": "183b8bfde589b34d7951af48a1edcc49136064b4fd9a4cf33f31e6b5d9325b9c",
+      "matches": {
+        "egress": [],
+        "execution": [
+          20
+        ],
+        "authority": [
+          2,
+          3,
+          6,
+          7,
+          11,
+          12,
+          14,
+          19,
+          24,
+          28
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/run-freshness-boundary.mjs",
+      "sha256": "b27684e98f470a57d15c1f040af6d266f51d265b0a65d5ac5f470395f00fea50",
+      "matches": {
+        "egress": [
+          1,
+          9
+        ],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/support/disabled_executor_worker.mjs",
+      "sha256": "8bd3282a3a31a6de105bee0bdaffe0140287dff1504d84dc386e3bca6e071a0c",
+      "matches": {
+        "egress": [],
+        "execution": [
+          15,
+          19
+        ],
+        "authority": [
+          1,
+          7
+        ],
+        "localMutation": [
+          1,
+          8,
+          16,
+          17,
+          19
+        ]
+      }
+    },
+    {
+      "path": "tests/support/freshness_worker.mjs",
+      "sha256": "16c0f4bba49486532095c6a71eac34d37e03ba825b86a17789b33833344bff30",
+      "matches": {
+        "egress": [],
+        "execution": [
+          29
+        ],
+        "authority": [
+          2,
+          7
+        ],
+        "localMutation": [
+          2,
+          11
+        ]
+      }
+    },
+    {
+      "path": "tests/support/offline_freshness_adapter.mjs",
+      "sha256": "6fe487f87f7e33af0c2f7ec3c4e5bc809ac1a7e866f030736d49d249e9baa641",
+      "matches": {
+        "egress": [],
+        "execution": [
+          4,
+          57,
+          83,
+          92,
+          99
+        ],
+        "authority": [
+          1,
+          7,
+          8,
+          20,
+          25,
+          36,
+          49
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/support/recording_upstream.mjs",
+      "sha256": "114293b3c21c64cd70157e3e5acfafffe7fc725163658de75c798063e58284d7",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          4
+        ],
+        "localMutation": [
+          2,
+          7
+        ]
+      }
+    },
+    {
+      "path": "tests/test_activation.mjs",
+      "sha256": "8d9b8c78583545d2e590c9b8fcb2d716010d73757f1e63094d771da7d1ec301c",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          91,
+          92,
+          177
+        ],
+        "localMutation": [
+          15,
+          349,
+          358,
+          368,
+          373,
+          383,
+          384,
+          385,
+          398,
+          410,
+          411,
+          412,
+          413,
+          428,
+          444,
+          456,
+          457,
+          458,
+          459,
+          474,
+          485,
+          486,
+          487,
+          488,
+          503
+        ]
+      }
+    },
+    {
+      "path": "tests/test_audit_remediation.mjs",
+      "sha256": "c25c044a3d40bd9f8ef84e5357d4a29f68a96bd900f33eae8265075f23641f7a",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          86
+        ],
+        "localMutation": [
+          17,
+          144,
+          172,
+          185,
+          195,
+          211
+        ]
+      }
+    },
+    {
+      "path": "tests/test_authenticated_approvals.mjs",
+      "sha256": "d90acf42a4d59aea5f7c40616519f7a3b5182a565855aa8bffd9c943014004f5",
+      "matches": {
+        "egress": [],
+        "execution": [
+          47,
+          76,
+          126,
+          132,
+          140,
+          145
+        ],
+        "authority": [
+          38,
+          39,
+          73,
+          99,
+          116
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_authority_grants.mjs",
+      "sha256": "38b662843e7f7fc439a90bcbba7df61c2ed367195fb02d873b66f2d7aeb3e35a",
+      "matches": {
+        "egress": [
+          11,
+          58,
+          59
+        ],
+        "execution": [
+          536,
+          538,
+          539
+        ],
+        "authority": [
+          1,
+          3,
+          12,
+          13,
+          27,
+          28,
+          32,
+          34,
+          35,
+          36,
+          37,
+          43,
+          44,
+          51,
+          68,
+          70,
+          71,
+          73,
+          82,
+          84,
+          85,
+          108,
+          111,
+          155,
+          156,
+          157,
+          164,
+          171,
+          172,
+          180,
+          187,
+          189,
+          193,
+          198,
+          202,
+          204,
+          208,
+          209,
+          213,
+          214,
+          216,
+          218,
+          221,
+          222,
+          225,
+          229,
+          231,
+          239,
+          240,
+          241,
+          244,
+          245,
+          246,
+          249,
+          250,
+          251,
+          254,
+          255,
+          256,
+          259,
+          260,
+          261,
+          264,
+          265,
+          266,
+          270,
+          271,
+          275,
+          276,
+          280,
+          281,
+          282,
+          283,
+          286,
+          287,
+          289,
+          296,
+          297,
+          302,
+          303,
+          304,
+          305,
+          309,
+          310,
+          311,
+          313,
+          315,
+          316,
+          317,
+          331,
+          332,
+          334,
+          337,
+          339,
+          341,
+          344,
+          346,
+          347,
+          348,
+          351,
+          354,
+          355,
+          356,
+          357,
+          360,
+          361,
+          363,
+          366,
+          367,
+          370,
+          373,
+          374,
+          377,
+          380,
+          381,
+          384,
+          387,
+          388,
+          393,
+          396,
+          397,
+          399,
+          402,
+          403,
+          405,
+          412,
+          420,
+          421,
+          422,
+          424,
+          425,
+          428,
+          437,
+          438,
+          439,
+          441,
+          444,
+          456,
+          457,
+          458,
+          461,
+          462,
+          465,
+          475,
+          476,
+          477,
+          480,
+          481,
+          484,
+          493,
+          494,
+          495,
+          497,
+          498,
+          501,
+          510,
+          511,
+          512,
+          515,
+          516,
+          523,
+          524,
+          528,
+          531,
+          532,
+          539,
+          542,
+          543,
+          546,
+          549,
+          550,
+          553,
+          556,
+          558,
+          560,
+          562,
+          565,
+          566,
+          567,
+          569,
+          571,
+          575,
+          577,
+          579,
+          593,
+          594,
+          595,
+          601,
+          602,
+          603,
+          604,
+          607,
+          614,
+          617,
+          619,
+          620,
+          623,
+          628,
+          631,
+          633,
+          634,
+          638,
+          639,
+          641,
+          645,
+          657,
+          658,
+          676,
+          677,
+          679,
+          683,
+          684,
+          687,
+          688,
+          694,
+          697,
+          700,
+          718,
+          724,
+          727
+        ],
+        "localMutation": [
+          13,
+          135,
+          136,
+          137,
+          718,
+          719
+        ]
+      }
+    },
+    {
+      "path": "tests/test_authority_init.mjs",
+      "sha256": "7b28c4ca576b04e2aca443fdc53b707f2ee91dae24c0e1234470222cc4781851",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          11,
+          40
+        ],
+        "localMutation": [
+          11,
+          96
+        ]
+      }
+    },
+    {
+      "path": "tests/test_authority_key_validation_migration.mjs",
+      "sha256": "9f74066ef10f84b7fa4a569a9c3444da2dd9c94b5a91dc3335d78877a40613aa",
+      "matches": {
+        "egress": [],
+        "execution": [
+          46,
+          61,
+          71,
+          81,
+          93,
+          104,
+          211,
+          241,
+          271,
+          277
+        ],
+        "authority": [
+          15,
+          158,
+          194,
+          197,
+          223,
+          226,
+          253,
+          256
+        ],
+        "localMutation": [
+          5,
+          15,
+          171,
+          186,
+          187,
+          208,
+          209,
+          238,
+          239,
+          267,
+          268
+        ]
+      }
+    },
+    {
+      "path": "tests/test_budget_hold_lifecycle.mjs",
+      "sha256": "0af20fa4c795b09161b1386c162d352c33e8393b212dcbe9257d56fd081f7059",
+      "matches": {
+        "egress": [],
+        "execution": [
+          68,
+          71,
+          94,
+          104,
+          117,
+          130
+        ],
+        "authority": [
+          2,
+          8,
+          18,
+          28,
+          29,
+          30,
+          35,
+          36,
+          46,
+          51,
+          56,
+          59,
+          61,
+          64,
+          79,
+          80,
+          81,
+          89,
+          94,
+          97,
+          104,
+          106,
+          115,
+          117,
+          119,
+          130,
+          132,
+          133
+        ],
+        "localMutation": [
+          18,
+          33,
+          36,
+          37,
+          146
+        ]
+      }
+    },
+    {
+      "path": "tests/test_ci_contract.mjs",
+      "sha256": "391888b3c1a600fe021dbd5a350cc749a8b74e46b6d11be74a052340a09bbdbe",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          3,
+          8,
+          29,
+          39,
+          81,
+          99,
+          113,
+          137
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_conformance_installed_artifact.mjs",
+      "sha256": "3c80491b796c8bea9efa7b9c3616aff3cd201f9444b3ebfa563286fdf7ccae25",
+      "matches": {
+        "egress": [
+          17,
+          40
+        ],
+        "execution": [
+          39,
+          46,
+          104
+        ],
+        "authority": [
+          18,
+          77,
+          104,
+          120,
+          125,
+          126,
+          129
+        ],
+        "localMutation": [
+          18,
+          134,
+          135
+        ]
+      }
+    },
+    {
+      "path": "tests/test_conformance_vectors.mjs",
+      "sha256": "d2253f0c3f7d986f7dd274f326cd8c1ecce898f5d7eaff8fcd4167060402e230",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          3,
+          33,
+          37,
+          46,
+          73
+        ],
+        "localMutation": [
+          3,
+          113
+        ]
+      }
+    },
+    {
+      "path": "tests/test_correctness_fixes.mjs",
+      "sha256": "0e9eb993c81926c5b9b134c5e4c884b1714c2d9c8596026e312332a38412d988",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          3,
+          22,
+          47,
+          48,
+          49,
+          55
+        ],
+        "localMutation": [
+          3,
+          42,
+          58
+        ]
+      }
+    },
+    {
+      "path": "tests/test_cross_platform_reviewer.mjs",
+      "sha256": "67b0ed4677bdee0c246cf21545f29d520581174d1080497da23dda8a88f6a0e5",
+      "matches": {
+        "egress": [
+          2,
+          18,
+          21,
+          47
+        ],
+        "execution": [
+          20,
+          29,
+          30
+        ],
+        "authority": [
+          18,
+          24,
+          29
+        ],
+        "localMutation": [
+          3,
+          65,
+          68
+        ]
+      }
+    },
+    {
+      "path": "tests/test_crypto_provider.mjs",
+      "sha256": "62b233c07ecdf03bc15711f7ae65d60029a29c9712951a3f1f2e6915ff597f20",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          5,
+          12,
+          31,
+          34,
+          35,
+          43,
+          50,
+          57,
+          62,
+          67,
+          75,
+          89,
+          90
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_custody.mjs",
+      "sha256": "f4f205dca5725a58c76c65b369c9955b5ec7de5face726515e18437bd03a1e6b",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          12,
+          44,
+          541
+        ],
+        "localMutation": [
+          13,
+          245,
+          246,
+          261,
+          284,
+          285,
+          297,
+          308,
+          311,
+          332,
+          360,
+          361,
+          381,
+          397,
+          416,
+          434,
+          459,
+          460,
+          484,
+          499,
+          521,
+          537,
+          558,
+          588
+        ]
+      }
+    },
+    {
+      "path": "tests/test_custody_lifecycle.mjs",
+      "sha256": "5a4ed3b5406338d771f7f6b51dc536e90aa801111b538edce59d4f1540ba169f",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          22,
+          59,
+          70,
+          79,
+          88,
+          97,
+          110,
+          111,
+          117,
+          118,
+          119,
+          120,
+          126,
+          136
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_dashboard.mjs",
+      "sha256": "b103ad313d117ee2b2fabd1eb2b78b716d5340a17cc0d6623cb2c66964c886e9",
+      "matches": {
+        "egress": [
+          137,
+          353,
+          358,
+          370,
+          401,
+          413,
+          418,
+          430,
+          433,
+          435,
+          440,
+          454,
+          467,
+          475,
+          488,
+          500
+        ],
+        "execution": [],
+        "authority": [
+          13,
+          82,
+          88,
+          89,
+          99,
+          117,
+          342,
+          450,
+          478,
+          487,
+          497,
+          498,
+          499,
+          503
+        ],
+        "localMutation": [
+          13,
+          54,
+          55,
+          56,
+          85,
+          86,
+          507
+        ]
+      }
+    },
+    {
+      "path": "tests/test_data_root_receipt_verification.mjs",
+      "sha256": "eeab0a6300e5b58aac7747b01ad0c845bffe7d68b5d8e672a0d84e54d3f45686",
+      "matches": {
+        "egress": [
+          8,
+          16
+        ],
+        "execution": [],
+        "authority": [
+          4,
+          20,
+          30,
+          35,
+          38,
+          46,
+          48,
+          61
+        ],
+        "localMutation": [
+          4,
+          51,
+          62,
+          63
+        ]
+      }
+    },
+    {
+      "path": "tests/test_engine_default.mjs",
+      "sha256": "be47bcd635d0093c1d0a66c8aad5e361a557c4f89c445aa0dd4d891afa429ea6",
+      "matches": {
+        "egress": [
+          11,
+          45,
+          52,
+          104
+        ],
+        "execution": [
+          54,
+          58
+        ],
+        "authority": [
+          12,
+          33,
+          81
+        ],
+        "localMutation": [
+          12
+        ]
+      }
+    },
+    {
+      "path": "tests/test_event_import_foundation.mjs",
+      "sha256": "e650b22cf007f910f7ac676690f9388c18e58e63f8d82d606afcea2910b16a55",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          81,
+          88
+        ],
+        "localMutation": [
+          4,
+          90
+        ]
+      }
+    },
+    {
+      "path": "tests/test_execution_gate.mjs",
+      "sha256": "b898d77044109c9aa718f494b985c2bfbcbdabbd33463c1040ec3945af8e83fc",
+      "matches": {
+        "egress": [
+          8,
+          46,
+          240,
+          251
+        ],
+        "execution": [
+          203
+        ],
+        "authority": [
+          46
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_execution_gate_signing.mjs",
+      "sha256": "77beec900a7c6cb374bbeb59ce2d205a789d94ab4ea445e326ace907cbcf1482",
+      "matches": {
+        "egress": [
+          7,
+          75,
+          443,
+          452,
+          461
+        ],
+        "execution": [],
+        "authority": [
+          75,
+          100,
+          101,
+          157,
+          158,
+          190,
+          191,
+          265,
+          266,
+          285,
+          286,
+          302,
+          308,
+          309,
+          319,
+          333,
+          338,
+          348,
+          349,
+          361,
+          362,
+          385,
+          386,
+          401,
+          402,
+          419,
+          420,
+          435,
+          436
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_execution_grant.mjs",
+      "sha256": "907eda1a7a0523c5ae684560a04e4e2a3fd8c3f08fc9e3625408bedd0871e871",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          3,
+          9,
+          12,
+          21,
+          22,
+          23,
+          43,
+          46,
+          74,
+          76,
+          84,
+          87,
+          91,
+          96,
+          97,
+          99,
+          100,
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          111,
+          112,
+          115,
+          120,
+          124,
+          125,
+          129,
+          131,
+          134,
+          137,
+          139,
+          142,
+          143,
+          145,
+          148,
+          149,
+          150,
+          151,
+          153,
+          156,
+          157,
+          158,
+          160,
+          163,
+          164,
+          165,
+          167,
+          170,
+          171,
+          172,
+          173,
+          175,
+          178,
+          179,
+          180,
+          181,
+          188,
+          190,
+          192,
+          196,
+          198,
+          200,
+          204,
+          206,
+          208,
+          212,
+          214,
+          216,
+          219,
+          220,
+          221,
+          226,
+          227,
+          228,
+          229,
+          232,
+          234,
+          237,
+          238,
+          239,
+          241,
+          243,
+          248,
+          250,
+          253,
+          254,
+          256,
+          257,
+          260,
+          262,
+          267,
+          269,
+          273,
+          275,
+          278,
+          280,
+          282,
+          286,
+          288,
+          290,
+          294,
+          295,
+          297,
+          301,
+          302,
+          304,
+          309,
+          310,
+          312,
+          313,
+          318,
+          321
+        ],
+        "localMutation": [
+          52,
+          77,
+          104,
+          149,
+          157,
+          164,
+          189
+        ]
+      }
+    },
+    {
+      "path": "tests/test_execution_id_dedup.mjs",
+      "sha256": "34e8dade41b9571f2fb5a522638a3bb2898aaf2eeac3de8e1ce92f28453535b0",
+      "matches": {
+        "egress": [
+          12,
+          47,
+          48,
+          127
+        ],
+        "execution": [],
+        "authority": [
+          40,
+          61,
+          77,
+          129,
+          174
+        ],
+        "localMutation": [
+          9,
+          154,
+          175
+        ]
+      }
+    },
+    {
+      "path": "tests/test_execution_ledger.mjs",
+      "sha256": "35997b5cdaa9e2175afba6fae68e9bba50925ac4b563bdb3577ac41d4c2e5a28",
+      "matches": {
+        "egress": [
+          15,
+          257,
+          498,
+          502,
+          508,
+          514,
+          515
+        ],
+        "execution": [],
+        "authority": [
+          16,
+          97,
+          138,
+          144,
+          460
+        ],
+        "localMutation": [
+          16,
+          74,
+          112,
+          113,
+          118,
+          125,
+          135,
+          141,
+          145,
+          154,
+          162,
+          172,
+          182,
+          192,
+          196,
+          203,
+          204,
+          206,
+          214,
+          223,
+          224,
+          226,
+          246,
+          254,
+          256,
+          267,
+          278,
+          282,
+          305,
+          306,
+          311,
+          319,
+          323,
+          329,
+          333,
+          344,
+          348,
+          355,
+          359,
+          366,
+          370,
+          377,
+          381,
+          390,
+          394,
+          400,
+          404,
+          408,
+          415,
+          419,
+          433,
+          440,
+          446,
+          455,
+          466,
+          469,
+          481,
+          487,
+          519
+        ]
+      }
+    },
+    {
+      "path": "tests/test_execution_result.mjs",
+      "sha256": "db99e22476866538598699b82ede19e259aa2b575f87833c38a33537a2e8254e",
+      "matches": {
+        "egress": [
+          54,
+          187,
+          283
+        ],
+        "execution": [],
+        "authority": [
+          54,
+          93,
+          94,
+          98,
+          100,
+          407,
+          408,
+          418,
+          419
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_executor.mjs",
+      "sha256": "c778ec9f950340cb9ef347f2317ca2d19629ca482f37cc081647c4eb95ab0c11",
+      "matches": {
+        "egress": [
+          19,
+          96,
+          112
+        ],
+        "execution": [
+          46,
+          55,
+          67,
+          82,
+          83,
+          98,
+          114,
+          126
+        ],
+        "authority": [],
+        "localMutation": [
+          10,
+          22
+        ]
+      }
+    },
+    {
+      "path": "tests/test_executor_credential.mjs",
+      "sha256": "8eeafbb439084e2566c835c45c56b7dd743e6ada5146e189bcbf15c5505a2188",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          5,
+          13,
+          16,
+          17,
+          18,
+          62,
+          86,
+          92,
+          94,
+          96,
+          102,
+          106,
+          110,
+          111,
+          112,
+          115,
+          117,
+          118,
+          121,
+          123,
+          124,
+          129,
+          135,
+          141,
+          148,
+          149,
+          152,
+          155,
+          156,
+          158,
+          164,
+          171,
+          172,
+          175,
+          177,
+          178,
+          179,
+          182,
+          185,
+          186,
+          193,
+          205,
+          210
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_executor_custody_binding.mjs",
+      "sha256": "43d19b2c9090ebc23488ec0d9a85a1a1f6f6536b24af77c263174c9e4e7f72fc",
+      "matches": {
+        "egress": [
+          83
+        ],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_executor_fail_closed.mjs",
+      "sha256": "1adfdbac28cbd3217059e40667f61a19e92f2310ddcfbe5d691f9aa44e8cff64",
+      "matches": {
+        "egress": [
+          23,
+          25,
+          289
+        ],
+        "execution": [
+          72,
+          102,
+          113,
+          298,
+          315
+        ],
+        "authority": [
+          18,
+          179
+        ],
+        "localMutation": [
+          18,
+          29
+        ]
+      }
+    },
+    {
+      "path": "tests/test_executor_identity_hostile.mjs",
+      "sha256": "b5b97aa7511628ad5e4cb4db45bdde3045f242c5d975f9952dd558b27d6c9021",
+      "matches": {
+        "egress": [
+          91
+        ],
+        "execution": [],
+        "authority": [
+          7,
+          13,
+          14,
+          25,
+          79,
+          84,
+          100,
+          101,
+          106,
+          110,
+          173,
+          179,
+          181,
+          186,
+          188,
+          190,
+          193,
+          195,
+          197,
+          199,
+          202,
+          204,
+          205,
+          206,
+          208,
+          211,
+          218
+        ],
+        "localMutation": [
+          19,
+          235,
+          238,
+          259,
+          279,
+          294
+        ]
+      }
+    },
+    {
+      "path": "tests/test_executor_identity_signing.mjs",
+      "sha256": "1c2d2e9316012606b6d9d7a9098e852e2830b19fb9358c1621514cf9099f0389",
+      "matches": {
+        "egress": [
+          7,
+          60,
+          123,
+          228
+        ],
+        "execution": [],
+        "authority": [
+          11,
+          27,
+          60,
+          89,
+          102,
+          103,
+          110,
+          111,
+          112,
+          141,
+          142,
+          143,
+          144,
+          150,
+          151,
+          162,
+          163,
+          198,
+          216,
+          218
+        ],
+        "localMutation": [
+          13,
+          15,
+          203,
+          204,
+          226,
+          227,
+          244,
+          245,
+          262,
+          273,
+          274,
+          290,
+          301,
+          302,
+          317
+        ]
+      }
+    },
+    {
+      "path": "tests/test_executor_key_path_security.mjs",
+      "sha256": "fa59d27ee25684a61573cfe12261b5f9b3f96181fe64470a4315ce6d3c19548e",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          6,
+          47,
+          53,
+          65,
+          70,
+          76,
+          82,
+          91,
+          103,
+          116,
+          126,
+          137
+        ],
+        "localMutation": [
+          2,
+          11,
+          12,
+          36,
+          64,
+          147
+        ]
+      }
+    },
+    {
+      "path": "tests/test_executor_lifecycle.mjs",
+      "sha256": "b1e9450b94761eddd9de3eb836a6df503a5e6478a5d941f6f1c3015d94ebc617",
+      "matches": {
+        "egress": [
+          125,
+          339
+        ],
+        "execution": [],
+        "authority": [
+          108,
+          109,
+          126,
+          168,
+          169
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_executor_live_sidecar.mjs",
+      "sha256": "f43f5c63f50bf07549c70e63ed62c09de830d2231d62d35e1eec61eae9ecc612",
+      "matches": {
+        "egress": [
+          2,
+          127,
+          145,
+          151,
+          247,
+          252,
+          287,
+          292,
+          419,
+          423,
+          435
+        ],
+        "execution": [
+          199,
+          221
+        ],
+        "authority": [
+          13,
+          60,
+          76,
+          82,
+          83,
+          107,
+          161,
+          297,
+          312,
+          313,
+          315,
+          316,
+          326,
+          328,
+          352,
+          353,
+          355,
+          356,
+          365,
+          370,
+          371,
+          392,
+          393,
+          395,
+          396
+        ],
+        "localMutation": [
+          3,
+          78,
+          79,
+          80,
+          81,
+          82,
+          171,
+          239,
+          282,
+          294,
+          434,
+          456
+        ]
+      }
+    },
+    {
+      "path": "tests/test_executor_readiness.mjs",
+      "sha256": "f649484c8b00bbd567b5e7d10221550bff36464b3c6324b9da1f0fee1ab632ec",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          13,
+          54,
+          66,
+          74,
+          105,
+          108,
+          124,
+          125,
+          127
+        ],
+        "localMutation": [
+          7,
+          67,
+          68
+        ]
+      }
+    },
+    {
+      "path": "tests/test_executor_signer_load.mjs",
+      "sha256": "3383f44e02f96ee698772b2eae69658f2f951af983b8fd2deb4969a7f1304a1d",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          2,
+          12,
+          13,
+          51,
+          64,
+          83,
+          90,
+          91,
+          95,
+          96,
+          100,
+          103,
+          108,
+          110,
+          112,
+          116,
+          122,
+          128,
+          136,
+          141,
+          145
+        ],
+        "localMutation": [
+          6,
+          67
+        ]
+      }
+    },
+    {
+      "path": "tests/test_external_signer.mjs",
+      "sha256": "44b0da9dd28db05a75419124a733653d584ded81f43b10b935c07e178ef0c49b",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          1,
+          3,
+          5,
+          7,
+          22,
+          31,
+          58,
+          59,
+          62,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          77,
+          78,
+          79,
+          80,
+          81,
+          83,
+          84,
+          91,
+          92,
+          96,
+          98,
+          101,
+          110,
+          113,
+          114,
+          131,
+          133,
+          141,
+          143,
+          152,
+          161,
+          169,
+          186,
+          188,
+          193,
+          195,
+          198,
+          201,
+          203,
+          205,
+          208,
+          209,
+          211,
+          212,
+          214,
+          215,
+          225,
+          226
+        ],
+        "localMutation": [
+          11,
+          50,
+          51,
+          52,
+          53,
+          54,
+          112,
+          124,
+          176,
+          220
+        ]
+      }
+    },
+    {
+      "path": "tests/test_feline_input.mjs",
+      "sha256": "8ce7fc577f189ea7d247dee041102c2bb35ad04d25505d1f4fca26ece12feb7a",
+      "matches": {
+        "egress": [
+          35
+        ],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_freshness_boundary.mjs",
+      "sha256": "1393ade5f293e2878eee62a6871b4f29b1c83d0813a74fe48d3043adb7bce81d",
+      "matches": {
+        "egress": [
+          6,
+          30
+        ],
+        "execution": [
+          48,
+          89,
+          94,
+          97,
+          106,
+          110,
+          133,
+          135,
+          136
+        ],
+        "authority": [
+          3,
+          27,
+          55,
+          57,
+          59,
+          61,
+          69,
+          74,
+          75,
+          77,
+          80,
+          84,
+          92,
+          94,
+          95,
+          96,
+          143,
+          145,
+          146
+        ],
+        "localMutation": [
+          3,
+          38,
+          59,
+          120
+        ]
+      }
+    },
+    {
+      "path": "tests/test_graceful_shutdown.mjs",
+      "sha256": "c4d96dd6c4eb32e4065b964522990d448b70188d4baad4e56b98ccfca34314bc",
+      "matches": {
+        "egress": [],
+        "execution": [
+          121
+        ],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_historical_policy_bundle_verification.mjs",
+      "sha256": "88f8760f293fae6f0e2d0e85033df4906efc24021433c0f9b5bf5ec9d589ee03",
+      "matches": {
+        "egress": [
+          5,
+          169
+        ],
+        "execution": [
+          39,
+          86
+        ],
+        "authority": [
+          64,
+          149
+        ],
+        "localMutation": [
+          6,
+          98,
+          108,
+          118,
+          129,
+          138,
+          155,
+          166,
+          167,
+          168,
+          177
+        ]
+      }
+    },
+    {
+      "path": "tests/test_identity_assertion.mjs",
+      "sha256": "5b4b1b03fc4ccbadc413c7ec337b030bb4ff237c75e89d7204c8db589569985e",
+      "matches": {
+        "egress": [
+          69,
+          81,
+          133,
+          523,
+          534,
+          573,
+          584,
+          637,
+          736,
+          737,
+          791,
+          817
+        ],
+        "execution": [],
+        "authority": [
+          53,
+          72,
+          88,
+          99,
+          100,
+          101,
+          105,
+          109,
+          110,
+          111,
+          114,
+          117,
+          134,
+          191,
+          192,
+          226,
+          227,
+          289,
+          290,
+          294,
+          360,
+          361,
+          365,
+          513,
+          517,
+          521,
+          528,
+          532,
+          539,
+          549,
+          553,
+          563,
+          567,
+          571,
+          578,
+          582,
+          589,
+          593,
+          598,
+          636,
+          644,
+          707,
+          708,
+          721,
+          722,
+          794,
+          795,
+          796,
+          822,
+          829,
+          834,
+          836
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_layered_receipt_verification.mjs",
+      "sha256": "c892533ce1683bb288deffd47a9e554fc1cdf6106ca6a9f570a54b1a85bda782",
+      "matches": {
+        "egress": [
+          49
+        ],
+        "execution": [],
+        "authority": [
+          15,
+          49,
+          77,
+          88,
+          96,
+          111,
+          112,
+          118,
+          119,
+          120,
+          173,
+          175,
+          179,
+          184,
+          252
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_ledger_anchor.mjs",
+      "sha256": "ae36f5f02b29d8bffa589c7a468ead870316284589b8df0cad4b1dc80a062097",
+      "matches": {
+        "egress": [
+          297,
+          304,
+          312,
+          316,
+          319
+        ],
+        "execution": [],
+        "authority": [
+          13,
+          184,
+          209,
+          281,
+          342,
+          343,
+          344
+        ],
+        "localMutation": [
+          13,
+          80,
+          119,
+          129,
+          138,
+          147,
+          183,
+          187,
+          188,
+          199,
+          200,
+          209,
+          215,
+          222,
+          229,
+          282,
+          290,
+          327,
+          335,
+          336,
+          337,
+          338,
+          339
+        ]
+      }
+    },
+    {
+      "path": "tests/test_ledger_auth.mjs",
+      "sha256": "9fb8400a31f7c0a6e7cbc1b411d9d44cf08e341d2cbb4566869f43efd37574c9",
+      "matches": {
+        "egress": [
+          302,
+          330,
+          338,
+          343,
+          344,
+          345,
+          350,
+          352,
+          354,
+          356,
+          360,
+          361,
+          363,
+          368,
+          371,
+          374,
+          379,
+          380,
+          381,
+          393,
+          401,
+          421,
+          423,
+          424,
+          425,
+          430,
+          436,
+          443,
+          451,
+          452,
+          456,
+          458
+        ],
+        "execution": [
+          388
+        ],
+        "authority": [
+          28,
+          107,
+          113,
+          114,
+          126,
+          144,
+          219,
+          221,
+          222,
+          224,
+          225,
+          229,
+          230,
+          240,
+          241,
+          257,
+          259,
+          260,
+          262,
+          263,
+          266,
+          272,
+          278,
+          280,
+          283,
+          284,
+          298,
+          326,
+          327,
+          328,
+          332,
+          352,
+          354,
+          355,
+          356,
+          400,
+          403,
+          462
+        ],
+        "localMutation": [
+          28,
+          82,
+          83,
+          84,
+          110,
+          111,
+          242,
+          285,
+          471
+        ]
+      }
+    },
+    {
+      "path": "tests/test_ledger_merkle.mjs",
+      "sha256": "d9fd46e5a73a29edd2c1477785f4700fb5584aefce4690f03bc3bfd179eaf91d",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_live_verification.mjs",
+      "sha256": "582bf0663c82ae0d63b3197ab5d3484097c7e6eb7bc92b7797cb4320fdf864d1",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_mcp_freshness_boundary.mjs",
+      "sha256": "a790776df83c9505f6339d44de699388ef56679a4a8a7c9f1a30da6518b9a5c4",
+      "matches": {
+        "egress": [
+          17
+        ],
+        "execution": [
+          21,
+          22,
+          23,
+          25,
+          26,
+          27,
+          28
+        ],
+        "authority": [
+          4,
+          32
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_mcp_proxy.mjs",
+      "sha256": "463ce7820d5e73da50dda240bc8d8b6d5fdc72e920e56a3f844718a257a56629",
+      "matches": {
+        "egress": [
+          18
+        ],
+        "execution": [
+          62,
+          63,
+          75,
+          82,
+          110,
+          122,
+          129,
+          150,
+          164
+        ],
+        "authority": [],
+        "localMutation": [
+          9,
+          22,
+          23
+        ]
+      }
+    },
+    {
+      "path": "tests/test_mcp_server.mjs",
+      "sha256": "2a0c42921545993968be9e5f39358e5de0a0c20928bf5aeb763a3ea62a5438de",
+      "matches": {
+        "egress": [
+          18
+        ],
+        "execution": [
+          61,
+          66,
+          72,
+          80,
+          89,
+          103,
+          110
+        ],
+        "authority": [],
+        "localMutation": [
+          9,
+          22,
+          23
+        ]
+      }
+    },
+    {
+      "path": "tests/test_nonce_replay.mjs",
+      "sha256": "5827a0b8e5047b8fb110a1dac9a6adc9c17567fe6f4be1d37aa0f16c7ebcef15",
+      "matches": {
+        "egress": [
+          13,
+          34,
+          35,
+          104
+        ],
+        "execution": [],
+        "authority": [
+          5,
+          27,
+          48,
+          76,
+          106,
+          209
+        ],
+        "localMutation": [
+          10,
+          143,
+          185,
+          210
+        ]
+      }
+    },
+    {
+      "path": "tests/test_number_model.mjs",
+      "sha256": "7f90b8bf9608932afce1b154af5bd6919dd7c38fa010f679fc8340a949150777",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_onboarding.mjs",
+      "sha256": "1b72fadcd5f416d85f0feaf359838f8de02afa9b9dc36c35964f982b8c7952cb",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          11,
+          95,
+          99,
+          101,
+          106,
+          127,
+          129,
+          132
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_pack_no_private_keys.mjs",
+      "sha256": "c8623e021794e6f51bafd08ba8f76e8e768994cb78f368c12ca92464c440027e",
+      "matches": {
+        "egress": [
+          11,
+          33
+        ],
+        "execution": [
+          32,
+          38,
+          73
+        ],
+        "authority": [
+          17,
+          75
+        ],
+        "localMutation": [
+          12,
+          80,
+          81
+        ]
+      }
+    },
+    {
+      "path": "tests/test_packaged_onboarding_proxy.mjs",
+      "sha256": "accc98959c7cf52109f2a4f2de4b113beea6607196b00c23112b29d595e4edf6",
+      "matches": {
+        "egress": [
+          4,
+          23,
+          39,
+          45
+        ],
+        "execution": [
+          22,
+          29,
+          30,
+          51,
+          115
+        ],
+        "authority": [
+          5,
+          42,
+          117,
+          121
+        ],
+        "localMutation": [
+          5,
+          109,
+          137,
+          138
+        ]
+      }
+    },
+    {
+      "path": "tests/test_partial_keypair_recovery.mjs",
+      "sha256": "7e4f7bedb285d12e1ea5b41440675204919470b6d9a1c91e526282d9963e0aee",
+      "matches": {
+        "egress": [],
+        "execution": [
+          2,
+          24,
+          130,
+          133
+        ],
+        "authority": [
+          17,
+          28,
+          49,
+          52,
+          57,
+          59,
+          60,
+          63,
+          64,
+          68,
+          70,
+          73,
+          78,
+          80,
+          81,
+          83,
+          84,
+          88,
+          90,
+          91,
+          93,
+          94,
+          98,
+          100,
+          103,
+          104,
+          108,
+          110,
+          115,
+          116,
+          120,
+          122,
+          125
+        ],
+        "localMutation": [
+          17,
+          44,
+          71,
+          81,
+          91,
+          101,
+          113
+        ]
+      }
+    },
+    {
+      "path": "tests/test_passport_subject.mjs",
+      "sha256": "8c71760b4ec805a64a0e3de0f2e7ab8f0f8a1623e813f0862c3e9c801f8d5018",
+      "matches": {
+        "egress": [
+          61,
+          166
+        ],
+        "execution": [],
+        "authority": [
+          62
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_pe_receipt_v2.mjs",
+      "sha256": "0032674139f15476d43ef810ac42768b64f738668ae3c2c645ed0a57ca8d2213",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          8,
+          21
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_phase1_trust_chain.mjs",
+      "sha256": "53f1431dbb6ad22deef720f936b507a654e5904821b206ca759618e06df03e64",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          19,
+          93,
+          94,
+          227
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_policy_bundle_evidence_export.mjs",
+      "sha256": "92e8b1bc3dfcf9c8aee6b6f272495ec93accb3f81ddd08ad2ec887b995fa9e68",
+      "matches": {
+        "egress": [
+          5,
+          66,
+          84,
+          97,
+          142,
+          180
+        ],
+        "execution": [],
+        "authority": [
+          6,
+          42,
+          79,
+          80,
+          81,
+          88,
+          107,
+          113,
+          117,
+          118,
+          123,
+          135,
+          167,
+          184
+        ],
+        "localMutation": [
+          6,
+          54,
+          55,
+          56,
+          92,
+          110,
+          120,
+          129,
+          140,
+          150,
+          178,
+          186
+        ]
+      }
+    },
+    {
+      "path": "tests/test_policy_bundle_provenance.mjs",
+      "sha256": "1b377f32bd0bae6c936c8d70c4c97041bfed7437b3637ffc934361beabbd4a6b",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          27
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_policy_engine.mjs",
+      "sha256": "b4e3daa46eac8ba1ed2edd28dbcd20baec52c80c9682c02aaf6341b092125515",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          3,
+          10
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_policy_receipt.mjs",
+      "sha256": "9ba2a882d00e8d033f995808a56324fb9286f237e3ceac247784afeb0b1599ee",
+      "matches": {
+        "egress": [],
+        "execution": [
+          41,
+          72,
+          104,
+          114,
+          124,
+          130,
+          136,
+          173,
+          182
+        ],
+        "authority": [],
+        "localMutation": [
+          11,
+          138
+        ]
+      }
+    },
+    {
+      "path": "tests/test_policy_trust.mjs",
+      "sha256": "2230acd054877b9d732071a1c4a166490ed71e57430101d32f9f1e1e69213cae",
+      "matches": {
+        "egress": [],
+        "execution": [
+          53,
+          71,
+          78,
+          85,
+          93,
+          101,
+          108,
+          117,
+          125
+        ],
+        "authority": [
+          6,
+          17,
+          39,
+          40,
+          63,
+          66,
+          67,
+          77,
+          82,
+          83,
+          84,
+          85,
+          90,
+          91,
+          92,
+          98,
+          99,
+          100,
+          106,
+          107,
+          108,
+          115,
+          116,
+          117,
+          123,
+          124,
+          125
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_private_key_scan_hostile.mjs",
+      "sha256": "27bd0d29c2396108061de7b7d123da34ff759e1e588d110d2c5ef4c9e597a95d",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          17,
+          19,
+          20,
+          48,
+          53
+        ],
+        "localMutation": [
+          13,
+          43,
+          58,
+          63,
+          68,
+          73,
+          78,
+          79,
+          85,
+          91,
+          96,
+          101
+        ]
+      }
+    },
+    {
+      "path": "tests/test_prod_trust_gate_hostile.mjs",
+      "sha256": "62feb3d2c988e4fa88b6d8f662b8aea0d2f2c1c70c39487bfa83861a20914849",
+      "matches": {
+        "egress": [
+          16,
+          67,
+          86
+        ],
+        "execution": [
+          77
+        ],
+        "authority": [
+          18,
+          163,
+          173,
+          195,
+          196,
+          201,
+          202,
+          213,
+          227,
+          301,
+          302
+        ],
+        "localMutation": [
+          18,
+          208,
+          210,
+          221,
+          223,
+          384
+        ]
+      }
+    },
+    {
+      "path": "tests/test_production_custody_passphrase.mjs",
+      "sha256": "e6baad4503696349aff3e40b31ba09b1b446c9c67d5df534dd801b2c21f07dab",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          13,
+          47
+        ],
+        "localMutation": [
+          14,
+          74,
+          75,
+          76,
+          90,
+          124,
+          147,
+          165
+        ]
+      }
+    },
+    {
+      "path": "tests/test_production_posture.mjs",
+      "sha256": "12cd958bda7a9061c0d64fe1ce5bb0e27c1e5802b406a9f0588fab259310bc7e",
+      "matches": {
+        "egress": [
+          192,
+          204,
+          216,
+          217
+        ],
+        "execution": [],
+        "authority": [
+          45,
+          83,
+          150,
+          151
+        ],
+        "localMutation": [
+          11,
+          60,
+          61,
+          86,
+          87,
+          181,
+          194,
+          206,
+          222
+        ]
+      }
+    },
+    {
+      "path": "tests/test_production_signing.mjs",
+      "sha256": "8ee96e9217de52b81c72d3285d8df02edb2777d29872621a72ac83238da7cdfb",
+      "matches": {
+        "egress": [
+          306,
+          309,
+          336,
+          348,
+          367,
+          370
+        ],
+        "execution": [],
+        "authority": [
+          12,
+          78
+        ],
+        "localMutation": [
+          12,
+          248,
+          253,
+          293,
+          294,
+          321,
+          384
+        ]
+      }
+    },
+    {
+      "path": "tests/test_proxy_auth.mjs",
+      "sha256": "41c224c943e49a07712459ae33f343bd0d58548fe93be1703324e566d751c730",
+      "matches": {
+        "egress": [
+          62,
+          77,
+          113
+        ],
+        "execution": [
+          48,
+          49,
+          66,
+          81,
+          90,
+          98,
+          117
+        ],
+        "authority": [
+          5,
+          7,
+          11,
+          20,
+          21,
+          64,
+          76,
+          77,
+          79,
+          88,
+          89,
+          96,
+          97,
+          102,
+          104,
+          105,
+          112,
+          113,
+          115,
+          116
+        ],
+        "localMutation": [
+          11,
+          39
+        ]
+      }
+    },
+    {
+      "path": "tests/test_published_bundle_gate.mjs",
+      "sha256": "ad9f7305a55bdd3539c34775d1a16447606b7010f9d15e0a2fe8efed314be68d",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          51
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_receipt_index.mjs",
+      "sha256": "9d483881ff4f1ebec7b3cb7f33efc8ed2a817d9e79dd838a0f9a65a9b44211b7",
+      "matches": {
+        "egress": [],
+        "execution": [
+          192
+        ],
+        "authority": [],
+        "localMutation": [
+          11,
+          69,
+          70,
+          81,
+          82,
+          83,
+          84,
+          192,
+          213,
+          219,
+          278
+        ]
+      }
+    },
+    {
+      "path": "tests/test_receipt_index_pe_v2.mjs",
+      "sha256": "6ddc65a43bc84d6761f2456702f39fb13098eb863bdd1fad8a66cde6fd2f7dcc",
+      "matches": {
+        "egress": [
+          184
+        ],
+        "execution": [],
+        "authority": [
+          4,
+          15
+        ],
+        "localMutation": [
+          4,
+          51,
+          52,
+          53,
+          54,
+          182,
+          186,
+          210,
+          239
+        ]
+      }
+    },
+    {
+      "path": "tests/test_receipt_signing_characterization.mjs",
+      "sha256": "24d0605bf2ac92415b0666d3a9e773a26d2f699f86edb45eadf837f6d000803e",
+      "matches": {
+        "egress": [
+          67
+        ],
+        "execution": [],
+        "authority": [
+          67,
+          81,
+          82,
+          91,
+          94,
+          117,
+          119,
+          125,
+          172,
+          209,
+          219,
+          220,
+          233,
+          234
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_receipt_signing_key_status.mjs",
+      "sha256": "118486acedfab84f44754930f40d9d7a6a8af72d748ffedb399612e5843e7ce3",
+      "matches": {
+        "egress": [
+          9,
+          44
+        ],
+        "execution": [],
+        "authority": [
+          12,
+          13,
+          19,
+          21,
+          46
+        ],
+        "localMutation": [
+          5,
+          37,
+          38,
+          39,
+          63,
+          76,
+          84,
+          92,
+          100,
+          108,
+          116
+        ]
+      }
+    },
+    {
+      "path": "tests/test_release_documentation_truth.mjs",
+      "sha256": "05a2877753a03fe7b7322dc8994c7c8b389f40fc68dcba54279ac426ac209c49",
+      "matches": {
+        "egress": [
+          25,
+          64
+        ],
+        "execution": [],
+        "authority": [
+          3,
+          8
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_release_identity.mjs",
+      "sha256": "2c98976a4d895cbbc68230c310d0560d7594f08b526810f057feab3d7b94300c",
+      "matches": {
+        "egress": [
+          12,
+          72,
+          78
+        ],
+        "execution": [],
+        "authority": [
+          13,
+          20
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_release_truth.mjs",
+      "sha256": "c9d9d4720191dd3eb8e545bcb7a61db64183a02a89e7a6a63fb6d055c1e36b4c",
+      "matches": {
+        "egress": [
+          15,
+          37,
+          51,
+          57,
+          81,
+          329,
+          374,
+          394,
+          406
+        ],
+        "execution": [
+          36,
+          42,
+          48,
+          212,
+          221,
+          348,
+          366,
+          382
+        ],
+        "authority": [
+          17,
+          119,
+          120,
+          170,
+          174,
+          207,
+          208,
+          270,
+          284,
+          296,
+          299,
+          300,
+          303,
+          327,
+          346,
+          366,
+          376
+        ],
+        "localMutation": [
+          17,
+          450,
+          451
+        ]
+      }
+    },
+    {
+      "path": "tests/test_root_signer.mjs",
+      "sha256": "af9a93971bd4cea2c2281c06bf72939f2fefb1bb4ffb880892fed92bf7462d13",
+      "matches": {
+        "egress": [
+          4,
+          259,
+          272,
+          285,
+          299,
+          315,
+          358,
+          383,
+          398,
+          415,
+          436,
+          437
+        ],
+        "execution": [],
+        "authority": [
+          1,
+          5,
+          17,
+          18,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          30,
+          49,
+          54,
+          62,
+          63,
+          64,
+          70,
+          74,
+          75,
+          76,
+          77,
+          78,
+          83,
+          84,
+          85,
+          98,
+          101,
+          105,
+          106,
+          107,
+          111,
+          112,
+          117,
+          118,
+          123,
+          124,
+          128,
+          129,
+          130,
+          131,
+          137,
+          138,
+          139,
+          143,
+          144,
+          145,
+          149,
+          150,
+          151,
+          155,
+          156,
+          160,
+          161,
+          162,
+          164,
+          165,
+          170,
+          171,
+          177,
+          178,
+          184,
+          185,
+          191,
+          192,
+          197,
+          198,
+          202,
+          203,
+          207,
+          212,
+          213,
+          219,
+          220,
+          226,
+          236,
+          237,
+          238,
+          246,
+          247,
+          268,
+          280,
+          309,
+          322,
+          327,
+          337,
+          338,
+          339,
+          340,
+          343,
+          344,
+          345,
+          349,
+          360,
+          369,
+          370,
+          374,
+          385,
+          408,
+          409,
+          413,
+          422,
+          436,
+          445,
+          450,
+          454,
+          455,
+          462,
+          465
+        ],
+        "localMutation": [
+          5,
+          94,
+          95,
+          96,
+          254,
+          255,
+          456
+        ]
+      }
+    },
+    {
+      "path": "tests/test_shell_policy.mjs",
+      "sha256": "99a809f4cb5941b65be8d9fd78e3e3c27fb1e68d4b6118b54c4c988495c41c4c",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_sidecar_auth.mjs",
+      "sha256": "fa8a2ac2b066de4c689e3970f53a14c252af87185054a8942c6a90c0fd11bde0",
+      "matches": {
+        "egress": [
+          39,
+          125,
+          137,
+          164,
+          207,
+          228,
+          241,
+          244
+        ],
+        "execution": [
+          191,
+          192,
+          193
+        ],
+        "authority": [
+          1,
+          5,
+          6,
+          24,
+          25,
+          89,
+          136,
+          137,
+          139,
+          146,
+          147,
+          150,
+          151,
+          154,
+          155,
+          163,
+          164,
+          166,
+          167,
+          170,
+          174,
+          180,
+          206,
+          207,
+          210,
+          215,
+          230,
+          236,
+          237,
+          239,
+          240,
+          242,
+          244,
+          249,
+          255,
+          256
+        ],
+        "localMutation": [
+          11,
+          61,
+          62,
+          63,
+          92,
+          93,
+          182,
+          233,
+          256
+        ]
+      }
+    },
+    {
+      "path": "tests/test_sidecar_cli_hostile.mjs",
+      "sha256": "64874301dc5ee40f9f10ef303309e2cda3f777c727520581fac388b653a75090",
+      "matches": {
+        "egress": [
+          16,
+          33,
+          47,
+          217
+        ],
+        "execution": [
+          222,
+          224
+        ],
+        "authority": [
+          19,
+          36,
+          144,
+          219
+        ],
+        "localMutation": [
+          19,
+          99,
+          109,
+          124,
+          134,
+          144,
+          155,
+          178,
+          192,
+          201,
+          233
+        ]
+      }
+    },
+    {
+      "path": "tests/test_sidecar_launcher.mjs",
+      "sha256": "5f9e1ffa110ec6557b8026319e4572ad75daad9607a9d834028e62e820128d0d",
+      "matches": {
+        "egress": [
+          12,
+          35,
+          131
+        ],
+        "execution": [
+          50,
+          65
+        ],
+        "authority": [
+          37
+        ],
+        "localMutation": [
+          13,
+          83,
+          106,
+          112,
+          115,
+          123
+        ]
+      }
+    },
+    {
+      "path": "tests/test_sidecar_pe_mode.mjs",
+      "sha256": "18d7cf6a5e55aa0ec6bb30451109140c6c016c1de7ebe8b231383cba475696df",
+      "matches": {
+        "egress": [
+          40,
+          57,
+          121,
+          144
+        ],
+        "execution": [
+          87,
+          88,
+          89,
+          95
+        ],
+        "authority": [
+          13,
+          92,
+          109,
+          113,
+          114,
+          117,
+          118
+        ],
+        "localMutation": [
+          13,
+          67,
+          79,
+          112,
+          140
+        ]
+      }
+    },
+    {
+      "path": "tests/test_sidecar_shutdown.mjs",
+      "sha256": "8ea78216c442746277cf0fa268ce9458a0febc2832fda0c7e6cbf1861092c23c",
+      "matches": {
+        "egress": [
+          26,
+          76,
+          91,
+          151,
+          164
+        ],
+        "execution": [
+          51,
+          133
+        ],
+        "authority": [
+          28,
+          55,
+          140
+        ],
+        "localMutation": [
+          28
+        ]
+      }
+    },
+    {
+      "path": "tests/test_sidecar_startup_race.mjs",
+      "sha256": "300f3bbaa59c7607a35ddfb841d1d05b15dc08aaf8dc1d60bd1ecbdf06f59d2b",
+      "matches": {
+        "egress": [
+          16,
+          96,
+          115
+        ],
+        "execution": [
+          168
+        ],
+        "authority": [
+          49,
+          59,
+          78,
+          79,
+          106,
+          109,
+          117,
+          127
+        ],
+        "localMutation": [
+          18,
+          45,
+          46,
+          47,
+          62,
+          63,
+          125,
+          169
+        ]
+      }
+    },
+    {
+      "path": "tests/test_sign_policy_bundle_cli.mjs",
+      "sha256": "e876e10af68136c3e3b45e50911bbf987b749f5c101b73ad3f67e50a8d840386",
+      "matches": {
+        "egress": [
+          4,
+          73,
+          187
+        ],
+        "execution": [
+          21,
+          24
+        ],
+        "authority": [
+          5,
+          83
+        ],
+        "localMutation": [
+          5,
+          18,
+          24,
+          65,
+          72,
+          138,
+          186
+        ]
+      }
+    },
+    {
+      "path": "tests/test_signed_execution_result.mjs",
+      "sha256": "5295cd0ec8469f50e3f3ec2098947fe876d20286962c3263fc995c22587cedfd",
+      "matches": {
+        "egress": [
+          100,
+          145,
+          1238
+        ],
+        "execution": [
+          93
+        ],
+        "authority": [
+          100,
+          114,
+          115,
+          145,
+          169,
+          170,
+          265,
+          266,
+          281,
+          282,
+          297,
+          298,
+          342,
+          343,
+          377,
+          378,
+          620,
+          621,
+          636,
+          637,
+          783,
+          793,
+          794,
+          882,
+          883,
+          902,
+          903,
+          946,
+          947,
+          957,
+          958,
+          1012,
+          1030,
+          1199,
+          1200,
+          1209,
+          1211,
+          1220,
+          1323,
+          1324,
+          1422,
+          1423,
+          1449,
+          1450,
+          1475,
+          1476,
+          1502,
+          1503,
+          1581,
+          1582
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_signed_policy_bundle.mjs",
+      "sha256": "264bee3356c2e81724a2685e160c3896d3adaeff0ad0076df26f430f118852db",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          7,
+          24,
+          25,
+          34,
+          83,
+          114,
+          132,
+          133,
+          137,
+          160,
+          174,
+          209,
+          216,
+          220,
+          271,
+          272,
+          273,
+          274,
+          275,
+          277,
+          278,
+          291,
+          297,
+          313,
+          314,
+          315,
+          316,
+          324,
+          328,
+          329,
+          334,
+          395,
+          397,
+          401,
+          403,
+          405,
+          408,
+          410,
+          424,
+          426,
+          430,
+          431,
+          433
+        ],
+        "localMutation": [
+          7,
+          90,
+          91,
+          163,
+          175,
+          186,
+          198,
+          224,
+          231,
+          236,
+          243,
+          247,
+          268,
+          282,
+          294,
+          301,
+          335,
+          343,
+          344,
+          363,
+          377,
+          383,
+          387,
+          413,
+          420,
+          435,
+          442,
+          452
+        ]
+      }
+    },
+    {
+      "path": "tests/test_signed_result_codes.mjs",
+      "sha256": "998a0f5909b4b20f4a983fd51dcfda25484f2da64da6d109b23f9d47a69eb42b",
+      "matches": {
+        "egress": [
+          103
+        ],
+        "execution": [],
+        "authority": [
+          99
+        ],
+        "localMutation": [
+          6
+        ]
+      }
+    },
+    {
+      "path": "tests/test_stage1_freshness_boundary.mjs",
+      "sha256": "f8bed69232b97371038192c2b2808c5eae8adbd64372e634c915d693702b9f7e",
+      "matches": {
+        "egress": [
+          7,
+          14,
+          24,
+          29,
+          35,
+          47
+        ],
+        "execution": [
+          33
+        ],
+        "authority": [
+          17,
+          18
+        ],
+        "localMutation": [
+          4,
+          22,
+          44
+        ]
+      }
+    },
+    {
+      "path": "tests/test_startup_checks.mjs",
+      "sha256": "2da1c3a7fb3743808762a6bd9dbbaecb761c0552e176945ef86ff792d428e407",
+      "matches": {
+        "egress": [
+          120
+        ],
+        "execution": [],
+        "authority": [],
+        "localMutation": [
+          13,
+          50,
+          63,
+          72,
+          81,
+          94,
+          102
+        ]
+      }
+    },
+    {
+      "path": "tests/test_trust_anchor.mjs",
+      "sha256": "9d4a9a953d3585cb0368f6b8b05e45928552574d3a46b2ecf0b6ff0ac7f41b61",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          3,
+          32,
+          35,
+          38,
+          52
+        ],
+        "localMutation": [
+          3,
+          16,
+          20,
+          66,
+          69
+        ]
+      }
+    },
+    {
+      "path": "tests/test_trust_root_preflight.mjs",
+      "sha256": "c31c07e6a6cb33bc1b6ced6908882a002528a19881768d3600ddc7fd830fe9b9",
+      "matches": {
+        "egress": [
+          218,
+          238,
+          239
+        ],
+        "execution": [],
+        "authority": [
+          70,
+          81,
+          87,
+          88,
+          202,
+          203,
+          240
+        ],
+        "localMutation": [
+          11,
+          52,
+          53,
+          54,
+          84,
+          85,
+          173,
+          180,
+          191,
+          204,
+          247
+        ]
+      }
+    },
+    {
+      "path": "tests/test_verifier_policy.mjs",
+      "sha256": "2243fd14f3db8b64dad883021855015ae69db1c9323d929c864ea6e2a6345f8e",
+      "matches": {
+        "egress": [
+          51,
+          52
+        ],
+        "execution": [],
+        "authority": [
+          51
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tests/test_witnessed_authority_hostile.mjs",
+      "sha256": "2f851eeda4a6e0a8d8ed36677b44ae9e8b259f17b6d54f7d5fafe6a921456337",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          295
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tools/export-policy-bundle-evidence.mjs",
+      "sha256": "c6c20d5ff61b1881334d71af773ca42bb9dcc026f1598a868edde04f98860b92",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          6,
+          21,
+          31,
+          42,
+          104
+        ],
+        "localMutation": [
+          6,
+          88,
+          111,
+          120
+        ]
+      }
+    },
+    {
+      "path": "tools/reviewer-kit.mjs",
+      "sha256": "e4e8a4d392d7d725cc3f3c3667798378556034729db86f5361aff0baf38502cb",
+      "matches": {
+        "egress": [
+          2,
+          16,
+          54,
+          199
+        ],
+        "execution": [
+          94,
+          162,
+          220,
+          229,
+          240
+        ],
+        "authority": [
+          3,
+          16,
+          17,
+          18,
+          25,
+          135,
+          176,
+          190,
+          193
+        ],
+        "localMutation": [
+          3,
+          39,
+          44,
+          49,
+          50,
+          149,
+          167,
+          207,
+          209,
+          210,
+          213,
+          242,
+          344,
+          345,
+          350,
+          351
+        ]
+      }
+    },
+    {
+      "path": "tools/sign-policy-bundle.mjs",
+      "sha256": "096249f39c8945212e61f3d5be92b2a18da2e4d8650c80f8f01d62f72f923340",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          31,
+          67,
+          70,
+          79,
+          87,
+          89,
+          114
+        ],
+        "localMutation": [
+          31,
+          122
+        ]
+      }
+    },
+    {
+      "path": "tools/verify-receipt.mjs",
+      "sha256": "93cea02767ceaeedbfc87e6ced18ee339f00790c9f3df5b6457a57475018407c",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          2,
+          35
+        ],
+        "localMutation": []
+      }
+    },
+    {
+      "path": "tools/verify.mjs",
+      "sha256": "e77badd4cf5ca8c50bdc2ccbc9a2e73a3ea08e8d527ff9b751a9b8ce314220a5",
+      "matches": {
+        "egress": [],
+        "execution": [],
+        "authority": [
+          30,
+          115,
+          143,
+          144,
+          145,
+          146,
+          147
+        ],
+        "localMutation": [
+          30,
+          62,
+          66
+        ]
+      }
+    }
+  ]
+}

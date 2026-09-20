@@ -93,7 +93,14 @@ function keyCode(reason) {
 
 // Resolve signing configuration. Default legacy; custody is opt-in and fails
 // closed — a misconfiguration never silently downgrades to legacy.
-export async function loadSigningConfig(env = process.env) {
+//
+// `options.now` is the evaluation instant for the bundle's validity window.
+// Omitted (every production caller) it means "right now", which is the only
+// answer a live process may use. It exists so a caller that already reasons at
+// a fixed instant — assertTrustRoot with an injected clock, offline
+// verification of historical evidence — evaluates every step at that same
+// instant instead of half at the fixture's time and half at the wall clock.
+export async function loadSigningConfig(env = process.env, options = {}) {
   const requested = env.MNDE_RECEIPT_SIGNING_MODE;
   // Both "custody" (local-demo / file-backed-production) and "external-signer"
   // engage custody signing. Anything else is legacy pass-through.
@@ -114,7 +121,9 @@ export async function loadSigningConfig(env = process.env) {
   }
 
   const bundle = provider.getPublicBundle();
-  const check = await verifyAuthorityBundle(bundle, { trustedRootFingerprint: provider.trustedRootFingerprint });
+  // `now: undefined` is identical to omitting it — verifyAuthorityBundle
+  // resolves `options.now ?? new Date().toISOString()`.
+  const check = await verifyAuthorityBundle(bundle, { trustedRootFingerprint: provider.trustedRootFingerprint, now: options.now });
   if (!check.ok) return { ok: false, mode: "custody", reason_code: bundleCode(check.reason), detail: check.reason };
 
   // mode is normalized to "custody" so signReceiptForDelivery engages; signer_mode

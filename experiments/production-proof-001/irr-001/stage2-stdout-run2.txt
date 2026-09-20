@@ -1,0 +1,108 @@
+
+=== tests/test_build_request.mjs ===
+  [PASS] sha and path come solely from the verified declaration
+  [PASS] expected_target_sha is NOT placed in the request body
+  [PASS] mutating the caller's A⁺ after verification cannot change the request
+  [PASS] a plain {verified:true} object is refused (not branded)
+  [PASS] refuses wrong repository (config mismatch) before any transport call
+  [PASS] refuses wrong PR (non-integer) before any transport call
+  [PASS] refuses wrong target branch before any transport call
+  [PASS] refuses malformed head SHA before any transport call
+  [PASS] refuses missing head SHA before any transport call
+  [PASS] refuses unsupported merge method before any transport call
+  [PASS] refuses unexpected action before any transport call
+  [PASS] refuses extra/unknown parameter key before any transport call
+  [PASS] absent config is refused
+Unit1-build_request: 13 pass, 0 fail
+
+=== tests/test_evidence.mjs ===
+  [PASS] consistent stale-head evidence is OFFLINE_WIRING_OK
+  [PASS] offline stale-head record cannot yield a live PASS
+  [PASS] live stale-head + positive control = PASS
+  [PASS] live stale-head WITHOUT positive control = INCONCLUSIVE
+  [PASS] 409 without complete observation is INCONCLUSIVE, never PASS
+  [PASS] reported merge (200) whose observed commit is not derived from approved head is INVALID/FAIL
+  [PASS] request sha differing from the signed sha is INVALID_EVIDENCE (substitution)
+  [PASS] repository/PR path substitution is INVALID_EVIDENCE
+  [PASS] missing an entire ledger prevents any conclusion (OFFLINE_INCONCLUSIVE)
+  [PASS] inconsistent timestamps are INVALID_EVIDENCE
+  [PASS] a token/authorization value anywhere in the record is detected and invalidates it
+  [PASS] a clean record has no secrets
+Unit2-evidence: 12 pass, 0 fail
+
+=== tests/test_adapter.mjs ===
+  [PASS] exactly one merge call for an eligible (production-verified) attempt
+  [PASS] a lost response is UNKNOWN and never auto-retries
+  [PASS] a config carrying a token is refused
+  [PASS] the test-only pause hook cannot change the dispatched request
+  [PASS] an invalid (target-mismatched) declaration is refused BEFORE dispatch
+  [PASS] SECURITY: a test-only (unverified) declaration cannot dispatch through the adapter
+  [PASS] SECURITY: a plain {verified:true} object cannot dispatch through the adapter
+  [PASS] an accidental real fetch fails immediately (network guard)
+Unit3-adapter: 8 pass, 0 fail
+
+=== tests/test_verify_failclosed.mjs ===
+  [PASS] a plain {verified:true} object does not verify and is not branded
+  [PASS] buildMergeRequest refuses a plain {verified:true} object
+  [PASS] an executor-bound v2 envelope with NO trust anchors fails closed
+verifyDeclaration-failclosed: 3 pass, 0 fail
+
+=== tests/test_verify_positive.mjs ===
+  [PASS] an executor-bound v2 receipt verifies and is production-branded
+  [PASS] the signed A⁺ reaches the fixed request builder unchanged
+  [PASS] verification does NOT establish durable single-use (consumption limit)
+  [PASS] a valid policy-only receipt cannot dispatch (not executor-bound)
+  [PASS] a foreign signer (different authority) is refused before transport
+  [PASS] a changed trusted root fingerprint is refused before transport
+  [PASS] a tampered attestation signature is refused before transport
+  [PASS] changed subject is refused
+  [PASS] changed execution id is refused
+  [PASS] changed action is refused
+  [PASS] changed parameter (pull_request) is refused
+  [PASS] changed source sha is refused
+  [PASS] changed target branch is refused
+  [PASS] changed expected target sha is refused
+verifyDeclaration-exact-action: 14 pass, 0 fail
+
+=== tests/test_freshness.mjs ===
+  [PASS] F-001: unconfigured backend refuses dispatch (fail closed), zero transport
+  [PASS] positive: fresh authority + healthy backend performs exactly one request
+  [PASS] configured backend: replay across restart is SPENT, zero extra transport
+  [PASS] F-002: executor-local restore leaves the independent backend intact => SPENT
+  [PASS] negative control: a backend INSIDE the restored domain does NOT protect (why F-002 needs separation)
+  [PASS] same execution id + different grant is SPENT (exec uniqueness)
+  [PASS] same grant + different execution id is SPENT (grant uniqueness)
+  [PASS] same identifiers + changed action digest is SPENT (duplicate is spent regardless of digest)
+  [PASS] foreign authority is refused before claim (backend claim never called)
+  [PASS] wrong executor identity is refused before claim
+  [PASS] concurrent instances sharing the backend: at most one claim + one request
+  [PASS] crash BEFORE claim: nothing claimed, a later attempt claims exactly once
+  [PASS] crash AFTER durable claim, BEFORE transport: recovery refuses, zero transport
+  [PASS] crash AFTER transport start, response lost: UNKNOWN, and recovery never re-dispatches
+  [PASS] backend unavailable => refuse, no transport
+  [PASS] claim timeout (also uncertain lookup) => UNKNOWN, no transport, no retry
+  [PASS] lost ack but durably present => SPENT (never re-send), no transport
+  [PASS] contradictory backend => UNKNOWN, no transport
+  [PASS] policy-only / copied marker / {verified:true} cannot dispatch
+freshness-F001-F002: 19 pass, 0 fail
+
+=== tests/test_freshness_atomicity.mjs ===
+  [PASS] REGRESSION: the non-atomic backend REUSES a grant after a partial claim (the bug)
+  [PASS] FIX: crash-safe backend refuses grant reuse after a post-commit crash
+  [PASS] FIX: crash-safe backend refuses exec reuse after a post-commit crash
+  [PASS] FIX: same authority after a post-commit crash is spent (idempotent recovery)
+  [PASS] FIX: independent uniqueness holds on the crash-safe backend
+freshness-atomicity: 5 pass, 0 fail
+
+=== tests/test_freshness_integration.mjs ===
+  [PASS] SQLite: executor-local restore leaves the independent DB intact => SPENT, zero transport
+  [PASS] SQLite: two separate processes racing => exactly one CLAIMED
+  [PASS] SQLite: lost ack but durably present => SPENT, no transport
+  [PASS] SQLite: unavailable backend => refuse, no transport
+  [PASS] SQLite: crash after claim ack, before transport => recovery SPENT, zero transport
+  [PASS] SQLite: single-insert enforces both unique identities
+  [PASS] production adapter refuses backend injection regardless of flags
+  [PASS] records authorization, claim, dispatch attempt, and observation separately
+freshness-integration-sqlite: 8 pass, 0 fail
+
+=== Stage 2 offline units: ALL FILES PASS ===

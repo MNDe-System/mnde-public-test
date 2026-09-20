@@ -76,12 +76,19 @@ async function main() {
       for (const tool of list.tools) assert.equal(tool.inputSchema.type, "object");
     });
 
-    await test("ALLOW tool call executes and returns a verifiable receipt", async () => {
+    // Live dispatch is disabled at the frozen source (commit 7de0163). A
+    // policy-allowable tool is therefore refused fail-closed, is never executed,
+    // and still produces a verifiable refusal receipt. This replaces the earlier
+    // "ALLOW executes" assertion, which encoded a contract that stopped being
+    // true when dispatch was disabled.
+    await test("a policy-allowable tool is refused under disabled dispatch, never executes, and its receipt verifies", async () => {
       const call = await client.request("tools/call", { name: "read_status", arguments: { service: "billing" } });
-      assert.equal(call.isError, false);
+      assert.equal(call.isError, true);
       const env = envelopeOf(call);
-      assert.equal(env.decision, "ALLOW");
-      assert.equal(env.executed, true);
+      assert.equal(env.decision, "REFUSE");
+      assert.equal(env.reason, "ERR_FRESHNESS_DEPLOYMENT_DISABLED");
+      assert.equal(env.executed, false, "no tool may execute while dispatch is disabled");
+      assert.equal(existsSync(MARKER), false);
       assert.equal(verificationPassed(verifyReceiptFile(env.receiptPath)), true);
     });
 

@@ -1,0 +1,9 @@
+✔ F-001: proxy exposes only truthful local status and refuses alternate calls (78.9024ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 181.2378

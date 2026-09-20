@@ -1,5 +1,13 @@
 # MNDe MCP Server
 
+> Current Phase 2 safety hold (2026-09-18): the proxy does **not** start its
+> configured upstream or forward any messages. Discovery exposes only the local
+> `mnde_proxy_status` tool. Protected tool calls refuse locally without a signed
+> receipt; resource/prompt inspection is disabled. The earlier enabled-proxy
+> examples below are historical, not the current execution contract. See the
+> [F-001 audit and evidence](../experiments/production-proof-001/f001/AUDIT.md).
+> F-001 remains open pending a mandatory production authority boundary.
+
 An [MCP](https://modelcontextprotocol.io) server that puts MNDe between an agent and its tools.
 
 Every `tools/call` is routed through MNDe first: ALLOW runs the tool, REFUSE does not, and the response carries a signed receipt that can be verified offline. It speaks newline-delimited JSON-RPC over stdio with no third-party dependencies, so it works with MCP clients such as Claude Desktop, Cursor, and MCP Inspector.

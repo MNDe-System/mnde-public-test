@@ -97,14 +97,31 @@ async function main() {
   let capturedReceipt = null;
   let capturedRefuseReceipt = null;
   try {
-    await test("positive: a valid, request-bound ALLOW receipt DOES execute", async () => {
+    // THE CONTRACT: a valid, request-bound ALLOW receipt is evidence of a policy
+    // decision. It is NOT permission to execute, and it never was — the executor
+    // is the enforcement point and it refuses while execution is disabled.
+    //
+    // Both halves matter. The receipt must still be genuine and verifiable (that
+    // is the product), and nothing must run (that is the safety property). A test
+    // asserting that an ALLOW executes would be asserting the bug F-001 describes:
+    // a signature can be presented twice, so treating one as a grant makes every
+    // effect replayable.
+    await test("positive: a valid, request-bound ALLOW receipt is evidence, not permission", async () => {
       let executorCallCount = 0;
       const r = await real.execute({ action: "read_status", input: { service: "billing" }, executionId: REAL_ID, run: async () => { executorCallCount += 1; return "ok"; } });
-      assert.equal(r.decision, "ALLOW");
-      assert.equal(r.executed, true, "a valid bound receipt must execute");
-      assert.equal(executorCallCount, 1, "valid authorization must execute exactly once");
-      assert.equal(r.verified, true, "the receipt must verify offline");
+
+      // The evidence half: policy approved, and the receipt verifies offline.
       assert.ok(r.receipt, "receipt must be present");
+      assert.equal(r.verified, true, "the receipt must verify offline");
+      const inner = r.receipt.receipt ?? r.receipt;
+      assert.equal(inner.decision_output?.decision, "ALLOW", "policy must still decide ALLOW and say so in the signed body");
+
+      // The enforcement half: nothing ran.
+      assert.equal(r.decision, "REFUSE", "an ALLOW receipt must not become an execution");
+      assert.equal(r.executed, false, "no protected effect may run while execution is disabled");
+      assert.equal(executorCallCount, 0, "the callback must never be entered");
+      assert.equal(r.failClosed, true);
+
       capturedReceipt = r.receipt;
     });
 
@@ -292,13 +309,18 @@ async function main() {
   let peReceipt = null;
   const PE_ID = "fc-pe-allow-001";
   try {
-    await test("(e) policy-engine: a valid, request-bound ALLOW receipt DOES execute", async () => {
+    // Same contract as the legacy-engine case above, on the canonical
+    // policy-engine path: the receipt is genuine and verified, and it still is not
+    // permission. The receipt is captured for the replay attack in (f), which is
+    // the whole reason this ALLOW needs to be real.
+    await test("(e) policy-engine: a valid, request-bound ALLOW receipt is evidence, not permission", async () => {
       const exec = createMndeExecutor({ sidecarUrl: PE_URL, receiptsDir: RECEIPTS_DIR });
       let executorCallCount = 0;
       const r = await exec.execute({ action: "read_status", input: {}, executionId: PE_ID, run: async () => { executorCallCount += 1; return "ok"; } });
-      assert.equal(r.executed, true, "a valid PE receipt must execute");
-      assert.equal(executorCallCount, 1);
       assert.equal(r.verified, true);
+      assert.ok(r.receipt, "receipt must be present");
+      assert.equal(r.executed, false, "a valid PE receipt must not execute while execution is disabled");
+      assert.equal(executorCallCount, 0);
       peReceipt = r.receipt;
     });
   } finally {

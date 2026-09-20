@@ -1,27 +1,30 @@
-// @mnde/executor — authorize a function call through MNDe before running it.
-//
-// A developer wraps a risky action. MNDe is asked first. ALLOW runs it once;
-// REFUSE (or anything ambiguous) never runs it.
+// @mnde/executor — the enforcement point. Authorize a call through MNDe, then
+// decide whether MNDe may actually perform it.
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// SAFETY INVARIANT (this is the product claim):
+// ALLOW MEANS "POLICY APPROVED THIS REQUEST."
+// ALLOW DOES NOT MEAN "EXECUTION HAPPENED" OR "EXECUTION IS PERMITTED NOW."
 //
-//   There is exactly ONE call site for the wrapped function in this file, and it
-//   is reachable ONLY after the sidecar returned a decision that clears the
-//   strict execution gate. A bare `ALLOW` string is NOT sufficient. Execution
-//   requires a receipt that:
-//     1. is present,
-//     2. verifies offline (signature + authority),
-//     3. carries an `ALLOW` decision in its OWN signed body,
-//     4. is bound to THIS exact request — the execution id we generated and the
-//        exact action + parameters we sent, and
-//     5. matches the expected policy hash/version when the caller declares one.
-//   Any gap fails closed. Every other path — REFUSE, unreachable sidecar,
-//   malformed decision, timeout, missing/unverifiable/mismatched receipt —
-//   returns without calling `run()`.
+// The sidecar evaluates policy, signs a receipt, and appends it to the execution
+// ledger. That receipt is real, verifiable evidence of a decision. It is not an
+// execution grant, and a consumer that reads ALLOW from /v1/decisions and acts on
+// it has not been authorized by MNDe — it has bypassed the enforcement point,
+// which is this file.
 //
-//   If a tool is wrapped with MNDe, there is no code path where a REFUSE, or an
-//   ALLOW not backed by a verified request-bound receipt, executes.
+// Protected execution is currently DISABLED. execute() and wrapTool() never
+// invoke the supplied callback, even after an authentic, request-bound ALLOW that
+// clears the strict gate. Offline verification remains fully available. No caller
+// flag, backend, or environment variable enables dispatch.
+//
+// Why: a verified receipt is a signature, and a signature can be presented twice.
+// After a crash, a restart, or a restore of executor-local files, the same
+// authentic ALLOW authorizes the same effect again (finding F-001). Closing that
+// needs durable single-use redemption in a store the executor operator cannot roll
+// back. See src/execution-availability/index.mjs and docs/FRESHNESS-BOUNDARY-AUDIT.md.
+//
+// The strict gate below is still enforced and still meaningful: it is what makes
+// a receipt binding evidence rather than a decoration, and it is what a future
+// typed effect will sit behind.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -31,6 +34,7 @@ import { reviewerRequest } from "../scripts/reviewer-request.mjs";
 import { verifyReceiptFile, verificationPassed } from "../tools/verify-receipt.mjs";
 import { verifyAnyReceiptFile } from "../tools/verify.mjs";
 import { isSignedReceiptEnvelope, SIGNED_RECEIPT_SCHEMA } from "../src/authority-signing/index.mjs";
+import { ERR_EXECUTION_DISABLED } from "../src/execution-availability/index.mjs";
 import { canonicalizeJson, parseStrictJson } from "../shared/json.ts";
 import { resolveBearerToken, bearerAuthHeader } from "./bearer.mjs";
 
@@ -232,7 +236,7 @@ export function createMndeExecutor(config = {}) {
 
   // The strict execution gate. Runs ONLY when the sidecar's HTTP decision was
   // ALLOW; returns { ok, reason } and never has a side effect. `ok:true` is the
-  // sole condition under which the wrapped function may run.
+  // historical authorization check; dispatch is separately disabled below.
   function authorizeExecution({ receipt, action, input, executionId, verified }) {
     if (!isPlainObject(receipt)) return { ok: false, reason: "ERR_NO_RECEIPT" };
     if (verified !== true) return { ok: false, reason: "ERR_RECEIPT_UNVERIFIED" };
@@ -370,27 +374,25 @@ export function createMndeExecutor(config = {}) {
       return buildResult({ decision: "REFUSE", executed: false, reason: authz.reason, receipt: decision.receipt ?? null, receiptPath: failPath, verified: verified ?? false, failClosed: true });
     }
 
-    // ALLOW + verified, request-bound receipt — the one and only place run() runs.
-    let runResult;
-    let runError;
-    let executed = false;
-    try {
-      executed = true;
-      runResult = await run();
-    } catch (error) {
-      runError = String(error?.message ?? error);
-    }
-    return buildResult({
-      decision: "ALLOW",
-      executed,
-      reason: decision.reason,
-      result: runResult,
-      error: runError,
-      receipt: decision.receipt,
-      receiptPath,
-      verified,
-      failClosed: false
-    });
+    // THE ENFORCEMENT POINT. Control reaches here only with an authentic,
+    // request-bound ALLOW that cleared the strict gate above — and it still does
+    // not execute. A verified receipt is a signature, and a signature can be
+    // presented twice; nothing in it makes it single-use. Until durable single-use
+    // redemption is wired and proven, every protected effect is refused.
+    //
+    // This is what separates the two facts: the receipt above is genuine evidence
+    // that policy approved the request. It is not, and never was, permission to
+    // act. No caller flag, backend, or environment variable reaches this branch.
+    // There is deliberately no generic run() call site below, and flipping the
+    // flag in src/execution-availability/index.mjs would not create one. Arbitrary
+    // JavaScript cannot be shown to be idempotent, single-effect, or free of a
+    // second egress path, so enabling dispatch means building a narrow typed
+    // effect that derives its request from signed fields — not restoring a
+    // callback. Deleting this return does not give you an executor; it gives you
+    // an undefined result and a failing freshness suite.
+    return buildResult({ decision: "REFUSE", executed: false,
+      reason: ERR_EXECUTION_DISABLED, receipt: decision.receipt,
+      receiptPath, verified, failClosed: true });
   }
 
   // Turn a raw function into an MNDe-guarded tool. Callers must not retain or

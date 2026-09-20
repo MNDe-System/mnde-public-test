@@ -8,7 +8,7 @@
 // appears in the receipt, the proxy logs, or the result.
 
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -65,8 +65,10 @@ async function main() {
       await withProxy(open.url, {}, async (client) => {
         const call = await client.request("tools/call", { name: "read_status", arguments: {} });
         const env = envelopeOf(call);
-        assert.equal(env.decision, "ALLOW");
-        assert.equal(env.forwarded, true);
+        // The shipped proxy forwards nothing while execution is disabled, so a
+        // policy-ALLOW tool name is still refused and no upstream is started.
+        assert.equal(env.decision, "REFUSE");
+        assert.equal(env.forwarded, false);
       });
     });
   } finally {
@@ -97,12 +99,19 @@ async function main() {
       await withProxy(pe.url, { MNDE_SIDECAR_BEARER_TOKEN: TOKEN }, async (client) => {
         const call = await client.request("tools/call", { name: "read_status", arguments: {} });
         const env = envelopeOf(call);
-        assert.equal(env.decision, "ALLOW");
-        assert.equal(env.forwarded, true);
-        const receipt = readFileSync(env.receiptPath, "utf8");
-        assert.equal(JSON.parse(JSON.parse(receipt).canonical_request).principal.id, "svc-caller");
-        assert.ok(!receipt.includes(TOKEN), "token must not appear in the receipt");
+        assert.equal(env.decision, "REFUSE");
+        assert.equal(env.forwarded, false);
+        // The token-leak guarantee is what still matters here and is still
+        // checkable: whatever the proxy does, the outbound bearer token must
+        // never surface in its output.
+        //
+        // COVERAGE NOTE: the receipt-side half of this check (caller identity
+        // mapped into principal.id, token absent from the receipt) cannot run
+        // through the proxy any more, because the shipped proxy holds no executor
+        // and produces no receipt. That path is covered at the sidecar level by
+        // test:auth and test:sidecar-auth.
         assert.ok(!client.getStderr().includes(TOKEN), "token must not appear in proxy logs");
+        assert.ok(!JSON.stringify(env).includes(TOKEN), "token must not appear in the proxy envelope");
       });
     });
   } finally {
@@ -116,8 +125,9 @@ async function main() {
       await withProxy(legacy.url, { MNDE_SIDECAR_BEARER_TOKEN: TOKEN }, async (client) => {
         const call = await client.request("tools/call", { name: "read_status", arguments: {} });
         const env = envelopeOf(call);
-        assert.equal(env.decision, "ALLOW");
-        assert.equal(env.forwarded, true);
+        assert.equal(env.decision, "REFUSE");
+        assert.equal(env.forwarded, false);
+        assert.ok(!client.getStderr().includes(TOKEN), "token must not appear in proxy logs");
       });
     });
   } finally {

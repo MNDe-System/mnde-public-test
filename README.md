@@ -1,3 +1,16 @@
+> **Execution hold.** MNDe currently decides but does not act. Policy evaluation,
+> signed receipts and the execution ledger all work normally; **protected execution
+> is disabled** in the executor and the MCP proxy, pending durable single-use
+> redemption in an independently administered claim backend.
+>
+> An `ALLOW` therefore means *policy approved this request* — never *this ran* or
+> *this may run*. Decision receipts say so in their own signed body
+> (`execution_status: "DISABLED"`). Reading `ALLOW` from `/v1/decisions` and acting
+> on it is not authorization by MNDe; it is bypassing the enforcement point.
+>
+> See [a decision is not an execution grant](docs/EXECUTION-AUTHORITY.md) for the
+> contract, and [the freshness audit](docs/FRESHNESS-BOUNDARY-AUDIT.md) for why.
+
 <p align="left"><img src="brand/mnde-wordmark.svg" alt="MNDe" height="80"></p>
 
 # MNDe Public Test

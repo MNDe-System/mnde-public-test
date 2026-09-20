@@ -1,0 +1,67 @@
+{
+  "group": "crypto-custody-selfcheck",
+  "total": 5,
+  "fail": 0,
+  "results": [
+    {
+      "id": "CS1",
+      "conjunct": "crypto",
+      "verdict": "PASS",
+      "expected": "valid custody-signed receipt verifies",
+      "observed": {
+        "verified": true,
+        "reason": null
+      },
+      "detail": {},
+      "at": "2026-09-16T02:35:48.782Z"
+    },
+    {
+      "id": "CS2",
+      "conjunct": "crypto",
+      "verdict": "PASS",
+      "expected": "inner-receipt tamper is detected (verify fails)",
+      "observed": {
+        "verified": false,
+        "reason": "receipt hash mismatch"
+      },
+      "detail": {},
+      "at": "2026-09-16T02:35:48.783Z"
+    },
+    {
+      "id": "CS3",
+      "conjunct": "crypto",
+      "verdict": "PASS",
+      "expected": "attestation signature tamper is detected",
+      "observed": {
+        "verified": false,
+        "reason": "SIGNATURE_INVALID"
+      },
+      "detail": {},
+      "at": "2026-09-16T02:35:48.784Z"
+    },
+    {
+      "id": "CS4",
+      "conjunct": "crypto",
+      "verdict": "PASS",
+      "expected": "foreign-authority (untrusted signer) receipt is rejected",
+      "observed": {
+        "verified": false,
+        "reason": "authority fingerprint mismatch"
+      },
+      "detail": {},
+      "at": "2026-09-16T02:35:48.786Z"
+    },
+    {
+      "id": "CS5",
+      "conjunct": "crypto",
+      "verdict": "PASS",
+      "expected": "wrong pinned root fingerprint is rejected",
+      "observed": {
+        "verified": false,
+        "reason": "bundle: UNTRUSTED_ROOT"
+      },
+      "detail": {},
+      "at": "2026-09-16T02:35:48.786Z"
+    }
+  ]
+}

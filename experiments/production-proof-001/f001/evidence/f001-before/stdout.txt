@@ -1,0 +1,90 @@
+{"evidence":"local-upstream-events","events":[{"event":"startup","syntheticAuthority":true},{"event":"initialize","syntheticAuthority":true},{"event":"ping","syntheticAuthority":true}]}
+✖ F-001: disabled proxy never starts an authority-bearing upstream (284.6153ms)
+{"evidence":"local-upstream-events","events":[{"event":"startup","syntheticAuthority":true},{"event":"initialize","syntheticAuthority":true},{"event":"tools/list","syntheticAuthority":true},{"event":"ping","syntheticAuthority":true}]}
+✖ F-001: discovery never transfers inherited authority (267.8369ms)
+{"evidence":"local-upstream-events","events":[{"event":"startup","syntheticAuthority":true},{"event":"initialize","syntheticAuthority":true},{"event":"resources/read","syntheticAuthority":true},{"event":"prompts/get","syntheticAuthority":true},{"event":"resources/list","syntheticAuthority":true},{"event":"resources/templates/list","syntheticAuthority":true},{"event":"prompts/list","syntheticAuthority":true},{"event":"notifications/initialized","syntheticAuthority":true},{"event":"notifications/cancelled","syntheticAuthority":true},{"event":"ping","syntheticAuthority":true}]}
+✖ F-001: inspection and lifecycle methods cannot reach an authority-bearing handler (291.9995ms)
+{"evidence":"local-upstream-events","events":[{"event":"startup","syntheticAuthority":true},{"event":"initialize","syntheticAuthority":true},{"event":"ping","syntheticAuthority":true}]}
+✖ F-001: tools, custom requests, notifications and restarts never reach upstream (334.9134ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1276.1779
+
+✖ failing tests:
+
+test at experiments\production-proof-001\f001\test_f001_proxy.mjs:26:1
+✖ F-001: disabled proxy never starts an authority-bearing upstream (284.6153ms)
+  AssertionError [ERR_ASSERTION]: upstream started before any authorization or atomic claim
+  
+  3 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/Shadow/Downloads/INsol/mnde-public-test/experiments/production-proof-001/f001/test_f001_proxy.mjs:28:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 3,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at experiments\production-proof-001\f001\test_f001_proxy.mjs:30:1
+✖ F-001: discovery never transfers inherited authority (267.8369ms)
+  AssertionError [ERR_ASSERTION]: synthetic credential reached upstream without a claim
+  
+  4 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/Shadow/Downloads/INsol/mnde-public-test/experiments/production-proof-001/f001/test_f001_proxy.mjs:32:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at experiments\production-proof-001\f001\test_f001_proxy.mjs:34:1
+✖ F-001: inspection and lifecycle methods cannot reach an authority-bearing handler (291.9995ms)
+  AssertionError [ERR_ASSERTION]: protocol names are not a claim boundary
+  
+  10 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/Shadow/Downloads/INsol/mnde-public-test/experiments/production-proof-001/f001/test_f001_proxy.mjs:42:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 10,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at experiments\production-proof-001\f001\test_f001_proxy.mjs:44:1
+✖ F-001: tools, custom requests, notifications and restarts never reach upstream (334.9134ms)
+  AssertionError [ERR_ASSERTION]: disabled proxy must not acquire upstream capability, even on restart
+  
+  3 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/Shadow/Downloads/INsol/mnde-public-test/experiments/production-proof-001/f001/test_f001_proxy.mjs:53:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 3,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

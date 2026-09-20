@@ -68,6 +68,8 @@
     "test:policy-trust": "node ./tests/test_policy_trust.mjs",
     "test:approvals": "node ./tests/test_authenticated_approvals.mjs",
     "test:sidecar-pe": "node ./tests/test_sidecar_pe_mode.mjs",
+    "test:sidecar-shutdown": "node ./tests/test_sidecar_shutdown.mjs",
+    "test:graceful-shutdown": "node ./tests/test_graceful_shutdown.mjs",
     "test:sidecar-startup-race": "node ./tests/test_sidecar_startup_race.mjs",
     "test:auth": "node ./tests/test_sidecar_auth.mjs",
     "test:proxy-auth": "node ./tests/test_proxy_auth.mjs",
@@ -134,6 +136,7 @@
     "shell-mcp-server": "node ./mcp/shell-mcp-server.mjs",
     "shell-demo": "node ./scripts/shell-demo.mjs",
     "test:shell": "node ./tests/test_shell_policy.mjs",
+    "test:shipped-surface-bypass": "node ./tests/test_shipped_surface_bypass.mjs",
     "receipts:refresh": "node ./scripts/refresh-demo-receipts.mjs",
     "test:receipt-verifier": "node ./scripts/test-receipt-verifier.mjs",
     "test:correctness": "node ./tests/test_correctness_fixes.mjs",
@@ -146,7 +149,9 @@
     "test:passport-subject": "node ./tests/test_passport_subject.mjs",
     "test:executor-lifecycle": "node ./tests/test_executor_lifecycle.mjs",
     "test:executor-signer-load": "node ./tests/test_executor_signer_load.mjs",
-    "test:executor-readiness": "node ./tests/test_executor_readiness.mjs"
+    "test:executor-readiness": "node ./tests/test_executor_readiness.mjs",
+    "test:freshness-boundary": "node ./tests/run-freshness-boundary.mjs",
+    "test:decision-not-execution": "node ./tests/test_decision_not_execution.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
