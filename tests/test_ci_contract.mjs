@@ -52,6 +52,134 @@ for (const snippet of [
   assert.match(workflow, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 }
 
+// --- Release workflow contract ------------------------------------------------
+// The release workflow can tag, publish, and attest. Those powers are only safe
+// because they sit behind a GitHub Environment approval gate, so the shape that
+// makes them safe is asserted here rather than left to review memory. See
+// docs/release-automation.md for the environment configuration this assumes.
+const releaseWorkflowPath = join(repoRoot, ".github", "workflows", "release.yml");
+assert.equal(existsSync(releaseWorkflowPath), true, `${releaseWorkflowPath} is missing`);
+const releaseWorkflow = readFileSync(releaseWorkflowPath, "utf8");
+
+for (const scriptName of ["release:gate", "release:notes", "release:verify-published", "release:verify-approval-gate"]) {
+  assert.equal(
+    typeof packageJson.scripts[scriptName],
+    "string",
+    `package.json must define the ${scriptName} script the release workflow calls`
+  );
+}
+assert.equal(existsSync(join(repoRoot, "build", "release-publication.mjs")), true, "build/release-publication.mjs is missing");
+
+// Every action in every workflow is pinned to a full commit SHA. A floating tag
+// is a supply-chain hole in the one workflow that holds write credentials.
+for (const [path, text] of [["ci.yml", workflow], ["release.yml", releaseWorkflow]]) {
+  for (const match of text.matchAll(/^\s*uses:\s*(\S+)\s*$/gm)) {
+    assert.match(match[1], /^[\w.-]+\/[\w.-]+@[a-f0-9]{40}$/, `${path} uses an unpinned action: ${match[1]}`);
+  }
+}
+
+// Manual dispatch only: a release never starts because something was pushed.
+assert.match(releaseWorkflow, /^on:\n  workflow_dispatch:/m, "release.yml must trigger only on workflow_dispatch");
+for (const forbidden of ["push", "pull_request", "schedule", "release"]) {
+  assert.doesNotMatch(
+    releaseWorkflow,
+    new RegExp(`^  ${forbidden}:`, "m"),
+    `release.yml must not add the ${forbidden} trigger`
+  );
+}
+assert.match(releaseWorkflow, /^permissions:\n  contents: read$/m, "release.yml must default to read-only permissions");
+
+// Both workflows run the one verified runtime; a release built on a different
+// Node than CI proves nothing CI proved.
+const ciNode = /node-version:\s*"([^"]+)"/.exec(workflow)?.[1];
+assert.ok(ciNode, "ci.yml must pin node-version");
+for (const match of releaseWorkflow.matchAll(/node-version:\s*"([^"]+)"/g)) {
+  assert.equal(match[1], ciNode, "release.yml must pin the same Node version as ci.yml");
+}
+
+// Split the workflow into its jobs so the assertions below can talk about which
+// job holds which power, not merely whether a string appears somewhere.
+function splitJobs(text) {
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((line) => line === "jobs:");
+  assert.ok(start >= 0, "workflow has no jobs: block");
+  const jobs = new Map();
+  let current = null;
+  for (const line of lines.slice(start + 1)) {
+    const header = /^ {2}([A-Za-z][\w-]*):\s*$/.exec(line);
+    if (header) {
+      current = header[1];
+      jobs.set(current, []);
+      continue;
+    }
+    if (current) jobs.get(current).push(line);
+  }
+  return new Map([...jobs].map(([name, body]) => [name, body.join("\n")]));
+}
+
+const releaseJobs = splitJobs(releaseWorkflow);
+assert.ok(releaseJobs.has("build"), "release.yml must have a build job");
+assert.ok(releaseJobs.has("publish"), "release.yml must have a publish job");
+
+const gatedJobs = [...releaseJobs].filter(([, body]) => /^\s{4}environment:/m.test(body)).map(([name]) => name);
+assert.deepEqual(gatedJobs, ["publish"], "exactly one job — publish — may sit behind the approval environment");
+assert.match(releaseJobs.get("publish"), /^\s{6}name: release$/m, "the publish job must use the `release` environment");
+
+// No write permission anywhere except behind the gate.
+const writeJobs = [...releaseJobs]
+  .filter(([, body]) => /^\s{6}(contents|packages|id-token|attestations|actions|deployments|issues|pull-requests|security-events):\s*write/m.test(body))
+  .map(([name]) => name);
+assert.deepEqual(writeJobs, ["publish"], "only the approval-gated publish job may hold write permissions");
+assert.match(releaseJobs.get("build"), /^\s{6}contents: read$/m, "the build job must be read-only");
+
+// The outward-facing effects live in the gated job and nowhere else.
+for (const [effect, pattern] of [
+  ["tag/release creation", /gh release create/],
+  ["provenance attestation", /attest-build-provenance@[a-f0-9]{40}/]
+]) {
+  const jobsWithEffect = [...releaseJobs].filter(([, body]) => pattern.test(body)).map(([name]) => name);
+  assert.deepEqual(jobsWithEffect, ["publish"], `${effect} must happen only in the approval-gated job`);
+}
+assert.match(releaseJobs.get("publish"), /id-token: write/, "provenance attestation needs id-token: write");
+assert.match(releaseJobs.get("publish"), /attestations: write/, "provenance attestation needs attestations: write");
+
+// The approval is only meaningful if the post-approval job re-proves that every
+// artifact still hashes to what the approver was shown. Losing any one of these
+// re-opens artifact substitution while the run waits for a human.
+const publishJob = releaseJobs.get("publish");
+for (const flag of ["--expect-tarball-sha256", "--expect-sums-sha256", "--expect-manifest-sha256", "--expect-commit"]) {
+  assert.ok(publishJob.includes(flag), `the post-approval gate must re-check ${flag}`);
+}
+assert.match(publishJob, /needs\.build\.outputs\.tarball_sha256/, "the post-approval gate must consume the pre-approval digest");
+assert.match(publishJob, /ref: \$\{\{ needs\.build\.outputs\.commit \}\}/, "the publish job must check out the exact commit that was built");
+
+// Publication is verified from the outside, by a job that cannot write.
+assert.ok(releaseJobs.has("verify-published"), "release.yml must verify what it published");
+assert.match(releaseJobs.get("verify-published"), /release:verify-published/, "the verify job must run the published-digest check");
+assert.match(releaseJobs.get("verify-published"), /^\s{6}contents: read$/m, "the verify job must be read-only");
+
+// The runbook's validate-and-build block runs before anything is proposed for
+// approval; a release that skipped the suite would be approved on no evidence.
+const buildJob = releaseJobs.get("build");
+for (const snippet of [
+  "npm ci",
+  "npm test",
+  "npm run reviewer-kit",
+  "npm run check:whitespace",
+  "npm run test:replay",
+  "npm run test:conformance",
+  "npm run test:release-identity",
+  "npm run release",
+  "npm run release:verify"
+]) {
+  assert.ok(buildJob.includes(snippet), `the release build job must run ${snippet}`);
+}
+
+// The gate is only a gate if somebody has to approve it. The build job proves
+// that before it builds anything, so a release cannot be prepared against an
+// environment that would wave the publish job straight through.
+assert.match(buildJob, /release:verify-approval-gate/, "the build job must confirm the approval gate is configured");
+
 function walkFiles(entry) {
   const full = join(repoRoot, entry);
   if (!existsSync(full)) return [];

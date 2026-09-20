@@ -78,6 +78,7 @@
   "test:receipt-verifier",
   "test:release-documentation-truth",
   "test:release-identity",
+  "test:release-publication-gate",
   "test:replay",
   "test:reviewer-kit",
   "test:root-signer",

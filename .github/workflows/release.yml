@@ -1,0 +1,280 @@
+name: Release
+
+# Manual only. Nothing here runs on a push, a tag, or a schedule: a release
+# starts because a maintainer dispatched it and finishes because a maintainer
+# approved it. The runbook this automates is
+# docs/release-publication-runbook.md; docs/release-automation.md describes the
+# one-time GitHub Environment setup that makes the approval gate real.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version you intend to release (e.g. 0.1.1). Must equal package.json; a mismatch aborts before anything is built."
+        required: true
+        type: string
+
+# Read-only by default. Only the approval-gated job is granted write.
+permissions:
+  contents: read
+
+# One release at a time, and never cancelled mid-flight: a run that has already
+# created a tag must be allowed to finish verifying what it published.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Everything the runbook calls "validate and build", on the CI-verified
+  # platform and Node version. Read-only permissions: this job cannot tag,
+  # publish, or attest. It ends by recording the digests of what it built.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build and verify release candidate
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    outputs:
+      version: ${{ steps.gate.outputs.version }}
+      commit: ${{ steps.gate.outputs.commit }}
+      commit_short: ${{ steps.gate.outputs.commit_short }}
+      tag: ${{ steps.gate.outputs.tag }}
+      tarball: ${{ steps.gate.outputs.tarball }}
+      tarball_sha256: ${{ steps.gate.outputs.tarball_sha256 }}
+      sums_sha256: ${{ steps.gate.outputs.sums_sha256 }}
+      manifest_sha256: ${{ steps.gate.outputs.manifest_sha256 }}
+
+    steps:
+      - name: Checkout
+        # actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Node.js
+        # actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          # Same pin as ci.yml: the floating "24" ships an undici teardown
+          # regression that crashes every fetch-based suite. Keep the two
+          # workflows on one verified runtime.
+          node-version: "24.14.1"
+          cache: npm
+
+      # Fail in the first minute, not after an hour of tests, if the tag is
+      # already taken. Republishing a version under a used tag is the one thing
+      # the runbook's rollback section forbids outright.
+      - name: Refuse to reuse an existing tag
+        env:
+          TAG: v${{ inputs.version }}
+        run: |
+          if (-not ($env:TAG -match '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$')) {
+            Write-Error "refusing to release: '$env:TAG' is not a version tag"
+            exit 1
+          }
+          $existing = (git ls-remote --tags origin "refs/tags/$env:TAG" | Out-String).Trim()
+          # An unreachable remote must not read as "the tag is free".
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "refusing to release: could not list remote tags (git exit $LASTEXITCODE)"
+            exit 1
+          }
+          if ($existing.Length -gt 0) {
+            Write-Error "refusing to release: tag $env:TAG already exists on origin"
+            exit 1
+          }
+          Write-Host "tag $env:TAG is free"
+
+      # `environment: release` on the publish job is not a gate by itself: if
+      # nobody is listed as a required reviewer on that environment, the job
+      # simply runs. Confirmed here, before an hour of building, so the failure
+      # is "your gate is not configured" and not "we published unattended".
+      - name: Confirm the approval gate is configured
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npm run release:verify-approval-gate -- --repo "$env:GITHUB_REPOSITORY" --environment release
+
+      - name: Install
+        run: npm ci
+
+      - name: Existing test suites
+        run: npm test
+
+      - name: Reviewer kit
+        run: npm run reviewer-kit
+
+      - name: Whitespace
+        run: npm run check:whitespace
+
+      - name: Replay verification
+        run: npm run test:replay
+
+      - name: Conformance freeze
+        run: npm run test:conformance
+
+      - name: Release identity (version drift)
+        run: npm run test:release-identity
+
+      - name: Release build + checksums
+        run: npm run release
+
+      - name: Release truth (pack, install, run outside repo, fail-closed, uninstall)
+        run: npm run release:verify
+
+      # Re-derives every digest from the bytes on disk, proves the manifest is
+      # internally consistent, proves the build was not made from a dirty tree,
+      # and proves the built version is the one the dispatcher asked for. The
+      # digests it prints are what the approver is approving.
+      - name: Release gate (pre-approval)
+        id: gate
+        env:
+          EXPECT_VERSION: ${{ inputs.version }}
+          EXPECT_COMMIT: ${{ github.sha }}
+        run: npm run release:gate -- --release-dir release --expect-version $env:EXPECT_VERSION --expect-commit $env:EXPECT_COMMIT
+
+      - name: Upload release candidate
+        # actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-candidate
+          path: release/
+          if-no-files-found: error
+          retention-days: 90
+
+  # ---------------------------------------------------------------------------
+  # The approval gate. This job does not start until a reviewer on the `release`
+  # environment approves the run, so every write permission below is dormant
+  # until a human clicks. It re-proves the artifact's digests against the ones
+  # the approver saw before it touches anything outward-facing.
+  # ---------------------------------------------------------------------------
+  publish:
+    name: Publish (requires approval)
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    environment:
+      name: release
+      url: https://github.com/${{ github.repository }}/releases/tag/${{ needs.build.outputs.tag }}
+    permissions:
+      contents: write # create the tag and the release
+      id-token: write # provenance attestation
+      attestations: write # provenance attestation
+
+    steps:
+      # The publication tooling and package.json are read from the same commit
+      # that was built, not from a branch head that may have moved while the run
+      # waited for approval.
+      - name: Checkout the built commit
+        # actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+
+      - name: Set up Node.js
+        # actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.14.1"
+
+      - name: Download release candidate
+        # actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-candidate
+          path: release
+
+      # The check that makes the approval mean something: the tarball, the
+      # checksum file, and the manifest must each still hash to exactly what the
+      # pre-approval gate recorded. Anything substituted while the run was
+      # parked stops here.
+      - name: Release gate (post-approval, digests must be unchanged)
+        env:
+          EXPECT_VERSION: ${{ needs.build.outputs.version }}
+          EXPECT_COMMIT: ${{ needs.build.outputs.commit }}
+          EXPECT_TARBALL: ${{ needs.build.outputs.tarball_sha256 }}
+          EXPECT_SUMS: ${{ needs.build.outputs.sums_sha256 }}
+          EXPECT_MANIFEST: ${{ needs.build.outputs.manifest_sha256 }}
+        run: >-
+          npm run release:gate --
+          --release-dir release
+          --expect-version $env:EXPECT_VERSION
+          --expect-commit $env:EXPECT_COMMIT
+          --expect-tarball-sha256 $env:EXPECT_TARBALL
+          --expect-sums-sha256 $env:EXPECT_SUMS
+          --expect-manifest-sha256 $env:EXPECT_MANIFEST
+
+      # Attest before the artifact is reachable by anyone, so no published byte
+      # ever exists without provenance. SUPPLY_CHAIN_SECURITY.md listed this as
+      # not implemented; this step is the implementation.
+      - name: Attest build provenance
+        # actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be
+        with:
+          subject-path: release/${{ needs.build.outputs.tarball }}
+
+      # Rendered here, after the gate, so release/ stays exactly the three files
+      # the gate and SHA256SUMS.txt account for. The body is derived from the
+      # manifest, so rendering it on either side of the gate yields the same text.
+      - name: Render release notes
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+        run: npm run release:notes -- --release-dir release --tag $env:TAG --out release-notes.md
+
+      - name: Create tag and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+          VERSION: ${{ needs.build.outputs.version }}
+          COMMIT: ${{ needs.build.outputs.commit }}
+          TARBALL: ${{ needs.build.outputs.tarball }}
+        run: |
+          $assets = @(
+            "release/$env:TARBALL",
+            "release/SHA256SUMS.txt",
+            "release/release-manifest.json"
+          )
+          gh release create $env:TAG `
+            --repo "$env:GITHUB_REPOSITORY" `
+            --target $env:COMMIT `
+            --title "MNDe $env:VERSION" `
+            --notes-file release-notes.md `
+            $assets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  # ---------------------------------------------------------------------------
+  # Re-verification, deliberately in its own read-only job: the code that checks
+  # what was published cannot also fix it up. It downloads every asset through
+  # its public URL and re-derives the digest from the wire.
+  # ---------------------------------------------------------------------------
+  verify-published:
+    name: Verify published release
+    needs: [build, publish]
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout the built commit
+        # actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+
+      - name: Set up Node.js
+        # actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.14.1"
+
+      - name: Download release candidate
+        # actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-candidate
+          path: release
+
+      - name: Published digests must match the built ones
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: npm run release:verify-published -- --release-dir release --repo "$env:GITHUB_REPOSITORY" --tag $env:TAG
