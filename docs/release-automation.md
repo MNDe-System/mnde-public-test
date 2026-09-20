@@ -91,8 +91,11 @@ release identity (see [`RELEASE.md`](RELEASE.md)).
   can forbid self-review only where there is somebody else to approve; with a
   single maintainer the gate is a deliberate pause, not independent review. The
   precheck prints a note when self-review is permitted.
-- **An SBOM.** `SBOM.md` is still maintained by hand and is not generated,
-  checked, or attached by this workflow. It remains a listed supply-chain gap.
+- **A machine-readable SBOM.** `SBOM.md` is generated from the tree by `npm run
+  sbom` and re-derived by `npm run test:sbom`, which this workflow runs as part
+  of `npm test` - so a release cannot be built from a commit whose SBOM has
+  drifted. What is still missing is a CycloneDX or SPDX document, a signature
+  over it, and attaching it as a release asset.
 - **npm registry publication.** The package is `private` and is never pushed to
   a registry; the tarball asset is the only distribution.
 

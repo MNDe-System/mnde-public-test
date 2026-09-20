@@ -18,6 +18,7 @@
   "scripts": {
     "prepack": "node ./build/build-package.mjs",
     "release": "node ./build/release.mjs",
+    "sbom": "node ./build/sbom.mjs generate",
     "test": "node ./scripts/run-all-tests.mjs",
     "ci": "node ./scripts/run-ci.mjs",
     "check:whitespace": "node ./scripts/check-whitespace.mjs",
@@ -150,6 +151,7 @@
     "test:trust-anchor": "node ./tests/test_trust_anchor.mjs",
     "test:reviewer-kit": "node ./tests/test_cross_platform_reviewer.mjs",
     "test:root-signer": "node ./tests/test_root_signer.mjs",
+    "test:sbom": "node ./tests/test_sbom_contract.mjs",
     "test:audit-remediation": "node ./tests/test_audit_remediation.mjs",
     "test:passport-subject": "node ./tests/test_passport_subject.mjs",
     "test:executor-lifecycle": "node ./tests/test_executor_lifecycle.mjs",
