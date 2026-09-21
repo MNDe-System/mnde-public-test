@@ -1,7 +1,13 @@
 name: CI
 
 on:
+  # Branch pushes only build `main`. A push to a feature branch that has an open
+  # pull request used to start a second, identical run of the same commit; both
+  # wrote check runs to that head, so a failure in either one could block the
+  # pull request even when its own run was green. `pull_request` still covers
+  # every branch that is up for review, and `main` keeps a post-merge signal.
   push:
+    branches: [main]
   pull_request:
 
 permissions:
