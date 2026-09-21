@@ -7,6 +7,10 @@ why. If an entry cannot answer "why is this safe to defer" in terms of the
 security contract, it does not belong here — it belongs in
 [Unclassified](#unclassified--not-deferred) below, or in a fix.
 
+A finding that gets fixed is not deleted. It moves to
+[Resolved](#resolved) with the commit that closed it, so the record that the gap
+existed survives the fix.
+
 This file does not decide what MNDe claims. It records what MNDe does not do, so
 that a reader comparing the claims to the code finds the gap already named.
 
@@ -148,11 +152,50 @@ classification depends on a decision that has not been made, and each is listed
 here so that the decision is visible rather than implied by silence.
 
 Nothing may be moved from this section into the list above without the reason it
-is safe to defer written out.
+is safe to defer written out. A finding leaves this section in one of two ways:
+it is classified, with that reason written out, or it is fixed — and a fixed one
+moves to [Resolved](#resolved), not out of the file.
 
-### UC-001 — The executor has no production posture gate
+UC-001 left by the second route. See [Resolved](#resolved).
 
-**Recorded:** 2026-09-21 · **Component:** `executor/index.mjs`
+### UC-002 — `approval_required` is inert without configured trust anchors
+
+**Recorded:** 2026-09-21 · **Component:** `src/policy-engine/index.mjs`
+
+A rule's `approval_required` is enforced only when approval trust anchors are
+configured (`approvalEnforced = Boolean(approvalTrustAnchors)`), and anchors come
+from one place, `MNDE_PE_APPROVAL_TRUST_ANCHORS`. With that unset, every
+`approval_required` has no effect and the request is allowed, and the receipt
+carries no `approval_enforced` field to mark the omission.
+
+The source documents this as deliberate and a test asserts it as intended
+behaviour.
+
+**Why it is unclassified:** it is a configuration-dependent fail-open on the one
+field whose purpose is to hold an action until a human signs off, which is a
+Category A shape. It is also documented, tested and intentional, which is not.
+Whether v1.0 may ship a policy field that silently does nothing when
+unconfigured is a contract decision, not an engineering one.
+
+The fix, if it is wanted, fails closed at startup rather than per decision:
+refuse to load a policy that declares `approval_required` when no approval trust
+anchors are configured.
+
+---
+
+## Resolved
+
+A finding recorded here and later fixed stays in the file. Deleting it would
+remove the evidence that the gap existed, which is exactly what a reader
+auditing MNDe's claims needs to see. Each entry keeps the original finding
+word for word and adds what closed it.
+
+### UC-001 — The executor had no production posture gate
+
+**Recorded:** 2026-09-21 · **Resolved:** 2026-09-21 in `f50dd8f` (#43) ·
+**Component:** `executor/index.mjs`
+
+#### The finding, as recorded
 
 `assertTrustRoot` and `assertProductionPosture` are invoked from exactly one
 place, `mnde-local-sidecar.mjs`. Under `MNDE_PROFILE=production` the sidecar
@@ -183,25 +226,44 @@ a production execution path, and a deferrable gap for a v1.0 that claims
 decisions, receipts and offline verification with execution held closed. The
 scope decision has not been made.
 
-### UC-002 — `approval_required` is inert without configured trust anchors
+#### What closed it
 
-**Recorded:** 2026-09-21 · **Component:** `src/policy-engine/index.mjs`
+`src/executor-posture-preflight.mjs`, called from `createMndeExecutor`, is the
+consumer-side half of the discipline the sidecar already had. Under
+`MNDE_PROFILE=production` — read through `parseRuntimeProfile`, so a missing or
+unknown value never implies production — construction **throws** unless all of
+the following are true:
 
-A rule's `approval_required` is enforced only when approval trust anchors are
-configured (`approvalEnforced = Boolean(approvalTrustAnchors)`), and anchors come
-from one place, `MNDE_PE_APPROVAL_TRUST_ANCHORS`. With that unset, every
-`approval_required` has no effect and the request is allowed, and the receipt
-carries no `approval_enforced` field to mark the omission.
+- an authority bundle is explicitly configured, and
+- that bundle actually loaded (a configured-but-unreadable bundle is a
+  violation, not a silent fallback), and
+- the bundle is not dev or demo key material, and
+- a root fingerprint is pinned, and
+- an expected executor id is configured with executor binding required, and
+- an environment id is configured.
 
-The source documents this as deliberate and a test asserts it as intended
-behaviour.
+It refuses with `ERR_EXECUTOR_PRODUCTION_TRUST_ROOT_REQUIRED`,
+`ERR_EXECUTOR_PRODUCTION_DEMO_TRUST_ROOT` or
+`ERR_EXECUTOR_PRODUCTION_EXECUTOR_BINDING_REQUIRED`. Outside an explicit
+production profile it is inert, so development and test behaviour is unchanged.
 
-**Why it is unclassified:** it is a configuration-dependent fail-open on the one
-field whose purpose is to hold an action until a human signs off, which is a
-Category A shape. It is also documented, tested and intentional, which is not.
-Whether v1.0 may ship a policy field that silently does nothing when
-unconfigured is a contract decision, not an engineering one.
+The same change closed a second hole found while red-casing the first: a
+production-signed, executor-bound envelope could carry an **inner** decision
+signed by the repo-local demo authority and still report `verified: true` with
+an outer `ROOT_PINNED_AUTHORITY_BUNDLE` trust source. Under production posture
+the executor now refuses a verification result whose outer **or inner** layer
+rests on `REPO_LOCAL_AUTHORITY`, and `tools/verify.mjs` qualifies the CLI
+verdict on either layer. That required the production signing key, so it was
+trust-mixing and misconfiguration rather than remote forgery — but it was real,
+and the original entry did not know about it.
 
-The fix, if it is wanted, fails closed at startup rather than per decision:
-refuse to load a policy that declares `approval_required` when no approval trust
-anchors are configured.
+**What it does not do.** It does not enable execution. A fully verified,
+correctly bound ALLOW receipt still returns `REFUSE` with
+`ERR_FRESHNESS_DEPLOYMENT_DISABLED`. F-001 is untouched by this: the posture
+gate decides *whose* signature the executor will accept, not whether a
+signature may be presented twice.
+
+**Scope note.** The entry's "why it is unclassified" paragraph turned on a
+decision that has since been made: v1.0 will include a real production execution
+path, so the finding was Category A rather than deferrable, and it was built
+instead of classified.
