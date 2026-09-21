@@ -3,10 +3,15 @@
 What a human actually approves when MNDe maintains itself, and what the code
 enforces on its own.
 
-This describes the repository as it is at `main` (3d070a8), not as the README or
+This describes the repository as it is at `main` (fc46936), not as the README or
 the roadmap describes it. Every claim below names the file that backs it. Where
 the code does not enforce what a reader would expect, it says so under
 [What the code does not enforce](#what-the-code-does-not-enforce).
+
+Claims about repository settings — branch protection, required checks,
+environments — cannot be read from the repository. Those were read from the
+GitHub API on 2026-09-21 and are dated where they appear, because unlike
+everything else here they can change without a commit.
 
 ---
 
@@ -38,9 +43,11 @@ A branch and a draft pull request. That is the whole proposal surface.
 
 What the code allows it to be:
 
-- Work lands on a branch (`claude/*` by convention). `main` is marked protected
-  on GitHub, though which rules that protection actually applies could not be
-  confirmed — see [item 5](#5-the-branch-protection-rules-are-unverified).
+- Work lands on a branch (`claude/*` by convention). `main` carries a ruleset
+  that requires a passing `Guardrails` check and one approving review before a
+  merge — read from the API on 2026-09-21, and outside the repository, so see
+  [item 5](#5-the-merge-gate-lives-outside-the-repository) for what that does
+  and does not settle.
 - `.github/workflows/ci.yml` declares `permissions: contents: read`. No CI job
   in this repository can push a commit, move a tag, or publish anything.
 - The only job anywhere with write access is the `publish` job in
@@ -56,10 +63,17 @@ So the worst outcome of an unreviewed proposal is a branch nobody merged.
 Per pull request, CI runs two jobs on `windows-latest`
 (`.github/workflows/ci.yml`):
 
-| Job | What it proves |
-| --- | --- |
-| **Guardrails** | `npm test` runs *every* `test:*` script; the reviewer kit runs its ALLOW and REFUSE demos; whitespace, replay verification and the conformance freeze all pass |
-| **Release contract** | version drift, a real release build with checksums, then pack / install into a clean project / run outside the repository / prove fail-closed / uninstall |
+| Job | Required to merge? | What it proves |
+| --- | --- | --- |
+| **Guardrails** | Yes | `npm test` runs *every* `test:*` script; the reviewer kit runs its ALLOW and REFUSE demos; whitespace, replay verification and the conformance freeze all pass |
+| **Release contract** | No | version drift, a real release build with checksums, then pack / install into a clean project / run outside the repository / prove fail-closed / uninstall |
+
+The distinction is worth stating plainly, because the two ticks look identical
+in the pull request UI. As of 2026-09-21 the `main` ruleset names exactly one
+required check, `Guardrails`. **`Release contract` runs, reports, and does not
+block a merge.** A reviewer who merges on "CI is green" without looking at which
+job is red can merge a change that broke packaging, installation, or the
+fail-closed behaviour the release path depends on.
 
 Two things make that evidence harder to fake than a passing tick usually is:
 
@@ -228,25 +242,86 @@ honest is `tests/test_ci_contract.mjs`, which is a test in the same repository. 
 pull request that changed both would have to get past the human reviewer — which
 is the gate this document is about, and is the gate that has no code behind it.
 
-### 5. The branch protection rules are unverified
+### 5. The merge gate lives outside the repository
 
-The GitHub API confirms `main` is protected. The tooling available here cannot
-read *which* rules are set — whether reviews are required, whether the CI checks
-are required to pass before merge, or whether a direct push by an administrator
-is still possible. If required status checks are not enabled, a pull request can
-be merged with CI red, and nothing in this repository would notice.
+The rules themselves are now known. Read from the GitHub API on 2026-09-21, the
+`main protection` ruleset requires:
 
-This is worth confirming by hand, because it is the single control the entire
-merge half of this document rests on.
+- a passing check run named exactly **`Guardrails`**, from integration 15368;
+- **strict** status checks, so the branch must be up to date with `main` before
+  it merges;
+- **one approving review**;
+- **stale-review dismissal on push**, so a new commit drops the approval it was
+  not given for;
+- **all review threads resolved**.
 
-### 6. Green CI is not currently trustworthy
+It lists **no bypass actors**. `Release contract` runs but is not a required
+check.
 
-Several test suites start a real sidecar bound to a fixed port
-(`executor/sidecar-harness.mjs`, `127.0.0.1:8787`). On `windows-latest` a
-different sidecar suite has failed on repeated runs of the same commit. That
-means a red run may be noise and a green run is weaker evidence than it looks —
-which directly degrades the evidence a human approves on. The proposed fix
-(ephemeral ports plus a bind retry in the harness) has not been authorized.
+That is stronger than this document originally claimed, and it settles the
+question this item used to ask: a pull request cannot be merged here with
+`Guardrails` red, and an approval alone does not override it. Two of those rules
+were observed working rather than merely read — a stale failed `Guardrails` run
+on a green commit held a pull request at `blocked` until it was re-run, and a
+push to an approved branch dismissed its approval.
+
+**What remains is not that the rules are unknown. It is where they live.**
+
+- None of this is in the repository. It is account configuration, and no commit,
+  test or receipt in this tree attests to it. `tests/test_ci_contract.mjs` can
+  assert that the workflow still produces a check named `Guardrails`; it cannot
+  assert that `main` still requires one.
+- A reader verifying this document offline — the posture the rest of MNDe is
+  built for — cannot check any of it. They have to trust this paragraph, or hold
+  an account with access and read it themselves.
+- "No bypass actors" is a statement about the ruleset as it was read on
+  2026-09-21, not a claim that nobody can change it. Whoever administers the
+  repository can edit or delete the ruleset, and that edit leaves no trace in
+  the repository. The control is real; it is simply not the kind of control the
+  rest of MNDe is about.
+
+This is the same point the short version makes, now with the rules filled in:
+the loop that maintains MNDe is gated by GitHub settings, not by MNDe.
+
+### 6. Green CI is not fully trustworthy yet
+
+The evidence a human approves on is a tick. Three separate things have made that
+tick mean less than it looks. One is fixed; two are not.
+
+**Fixed.** `createSqliteClaimBackend`
+(`experiments/exp-001-stage2/src/claim_store.mjs`) installed
+`PRAGMA busy_timeout` *after* `PRAGMA journal_mode=WAL`. Changing the journal
+mode takes a brief exclusive lock, so when the freshness suite's deliberate
+two-executor race had both processes open the same file at once, the loser met
+that lock with the timeout still at SQLite's default of zero and failed
+instantly with `SQLITE_BUSY` instead of waiting. That is how a documentation-only
+commit produced a red `Guardrails` run. Merged 2026-09-21 with regression tests
+that drive the real factory from a second process against a held lock and assert
+the wait, the refusal when contention outlives the timeout, and that a failing
+cleanup never masks the original error.
+
+**Open — fixed sidecar ports.** Several suites start a real sidecar bound to
+`127.0.0.1:8787` (`executor/sidecar-harness.mjs`). Two suites that overlap on
+that port fail each other. The proposed fix — ephemeral ports plus a bind retry
+in the harness — has not been authorized.
+
+**Open, and worse than a flake — a vacuous assertion.** In
+`tests/test_sign_policy_bundle_cli.mjs`, the test that proves a tampered
+signature is rejected tampers by rewriting the signature's first character:
+`value[0] === "A" ? "B" : "A"`. Signatures are lowercase hex, so that expression
+always writes `"A"`; when a signature already begins with lowercase `a`, the
+rewrite changes `a` to `A`, hex decoding is case-insensitive, and the verifier
+receives **the untampered signature**. Roughly one run in sixteen (measured:
+6.29% over 16,000 random signatures; 2 failures in 40 consecutive suite runs)
+the assertion either fails for no reason or — the half that matters — the test
+passes while proving nothing. It has behaved that way for as long as the line
+has existed. A one-line fix (flip a bit of the first byte instead of rewriting a
+character) has been proposed and not authorized.
+
+The first two produce red runs a reviewer might wave through as noise. The third
+produces *green* runs that assert nothing, which is the failure mode this
+document cares about most: a human approving on evidence that was never
+collected.
 
 ### 7. The sample policies advertise an approval field nothing reads
 
@@ -266,7 +341,8 @@ ever enforce, reads as a shipped guarantee and is not one.
 
 | Claim | Enforced by | Status |
 | --- | --- | --- |
-| MNDe cannot merge its own changes | GitHub branch protection | Protected; specific rules unverified |
+| MNDe cannot merge its own changes | `main` ruleset: required `Guardrails`, one approving review | Enforced as of 2026-09-21; account setting, not in-repo |
+| A red required check blocks a merge | same ruleset, strict status checks | Enforced; `Release contract` is *not* a required check |
 | MNDe cannot publish without approval | `release` environment reviewer | Code ready, environment not created |
 | CI cannot write to the repository | `permissions: contents: read` | Enforced and contract-tested |
 | A test suite cannot be silently dropped | `tests/expected-test-scripts.json` | Enforced |
