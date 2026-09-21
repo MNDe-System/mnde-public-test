@@ -28,7 +28,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { reviewerRequest } from "../scripts/reviewer-request.mjs";
 import { verifyReceiptFile, verificationPassed } from "../tools/verify-receipt.mjs";
@@ -36,7 +37,16 @@ import { verifyAnyReceiptFile } from "../tools/verify.mjs";
 import { isSignedReceiptEnvelope, SIGNED_RECEIPT_SCHEMA } from "../src/authority-signing/index.mjs";
 import { ERR_EXECUTION_DISABLED } from "../src/execution-availability/index.mjs";
 import { canonicalizeJson, parseStrictJson } from "../shared/json.ts";
+import { assertExecutorPosture } from "../src/executor-posture-preflight.mjs";
+import { REPO_LOCAL_TRUST_SOURCE } from "../shared/authority-manifest.mjs";
 import { resolveBearerToken, bearerAuthHeader } from "./bearer.mjs";
+
+// The directory the receipt verifier searches for a repo-local authority bundle.
+// Same rule as src/policy-engine/receipt.mjs, so the posture gate judges the very
+// path that verification would fall back to.
+const VERIFIER_ROOT = process.env.MNDE_HOME
+  ? resolve(process.env.MNDE_HOME)
+  : resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const DEFAULT_SIDECAR_URL = "http://127.0.0.1:8787";
 const DEFAULT_RECEIPTS_DIR = "./mnde-receipts";
@@ -208,6 +218,29 @@ export function createMndeExecutor(config = {}) {
   const verifyExpectedExecutorId = config.verifyExpectedExecutorId ?? process.env.MNDE_VERIFY_EXPECTED_EXECUTOR_ID ?? undefined;
   const verifyRequireExecutor = config.verifyRequireExecutor === true || (typeof verifyExpectedExecutorId === "string" && verifyExpectedExecutorId.length > 0);
 
+  // Production posture. Inert unless MNDE_PROFILE=production, and then refuses
+  // to hand back an executor whose verification inputs were never configured.
+  // Thrown rather than returned: an executor that exists is an executor
+  // something will call, and a caller that ignores a return value would be
+  // running the fallback it was warned about.
+  const verifyAuthorityBundlePath = config.verifyAuthorityBundle ?? process.env.MNDE_VERIFY_AUTHORITY_BUNDLE ?? null;
+  const posture = assertExecutorPosture({
+    verifyAuthorityBundlePath,
+    verifyAuthorityBundleLoaded: verifyAuthorityBundle !== undefined,
+    verifyTrustedRootFingerprint,
+    verifyEnvironmentId,
+    verifyExpectedExecutorId,
+    verifyRequireExecutor,
+    repoRoot: VERIFIER_ROOT
+  });
+  if (!posture.ok) {
+    const error = new Error(`${posture.reason_code}: ${posture.detail}`);
+    error.code = posture.reason_code;
+    error.violations = posture.violations;
+    throw error;
+  }
+  const productionPosture = posture.enforced === true;
+
   mkdirSync(receiptsDir, { recursive: true });
 
   function persist(name, value) {
@@ -216,19 +249,40 @@ export function createMndeExecutor(config = {}) {
     return filePath;
   }
 
+  // True when ANY layer of a verification result rests on the authority bundle
+  // that ships in the package rather than one the operator configured.
+  function repoLocalTrust(result) {
+    return result?.trust_source === REPO_LOCAL_TRUST_SOURCE
+      || result?.inner?.trust_source === REPO_LOCAL_TRUST_SOURCE;
+  }
+
   async function offlineVerify(receiptPath) {
     try {
       // Unified verifier handles legacy pipeline, policy-engine, and custody-signed
       // receipts; legacy/PE receipts verify identically to before. A custody
       // envelope additionally needs the published authority bundle, the trusted
       // root fingerprint, and (for v2 executor-bound receipts) the environment id.
-      return (await verifyAnyReceiptFile(receiptPath, {
+      const result = await verifyAnyReceiptFile(receiptPath, {
         authorityBundle: verifyAuthorityBundle,
         trustedRootFingerprint: verifyTrustedRootFingerprint,
         environmentId: verifyEnvironmentId,
         expectedExecutorId: verifyExpectedExecutorId,
         requireExecutor: verifyRequireExecutor
-      })).verified === true;
+      });
+      if (result.verified !== true) return false;
+      // The construction gate demands a configured trust root, but the trust
+      // source is chosen per receipt inside the verifier, not per deployment —
+      // and a custody envelope chooses it TWICE. verifySignedEnvelope checks the
+      // attestation against the configured bundle, then drops that bundle for the
+      // inner receipt whenever the inner authority_id is not the configured one
+      // (innerEnvelopeOptions in tools/verify.mjs). The inner decision therefore
+      // falls back to the authority shipped in the package and the envelope still
+      // reports verified:true with an outer trust source of
+      // ROOT_PINNED_AUTHORITY_BUNDLE. That is a production executor vouching for a
+      // decision signed by demo key material. In production posture neither layer
+      // may rest on the fallback.
+      if (productionPosture && repoLocalTrust(result)) return false;
+      return true;
     } catch {
       return false;
     }
