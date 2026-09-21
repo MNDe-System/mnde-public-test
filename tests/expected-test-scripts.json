@@ -42,6 +42,7 @@
   "test:fresh-setup",
   "test:freshness-boundary",
   "test:git-push-effect",
+  "test:git-push-execution-evidence",
   "test:graceful-shutdown",
   "test:historical-policy-bundle",
   "test:identity-assertion",
