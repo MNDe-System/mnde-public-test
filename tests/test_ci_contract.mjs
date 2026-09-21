@@ -52,6 +52,64 @@ for (const snippet of [
   assert.match(workflow, new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 }
 
+// --- CI workflow trigger contract ---------------------------------------------
+// Which events start CI decides which check runs land on a commit, and the
+// `main` ruleset merges on a check run named exactly `Guardrails`. When an
+// unrestricted `push` trigger ran alongside `pull_request`, an open pull request
+// got two runs of the same commit and therefore two `Guardrails` check runs on
+// one head; a failure in the branch-push copy blocked the pull request even
+// though its own run was green. These assertions pin the narrowing that fixed
+// that, and pin that it was done by branch and by nothing else: a path filter or
+// a skip condition here would let a commit reach `main` with no run at all.
+const ciOnBlock = /^on:\n((?:[ \t].*\n|\n)*)/m.exec(workflow)?.[1];
+assert.ok(ciOnBlock, "ci.yml must declare an on: block");
+
+// Strip comments, then read the trigger block as `key: value` lines at their
+// indent. Two levels are all this workflow has, so a hand parse beats taking on
+// a YAML dependency for it.
+const ciOnLines = ciOnBlock.split(/\r?\n/).filter((line) => line.trim().length > 0 && !/^\s*#/.test(line));
+const ciTriggers = new Map();
+let currentTrigger = null;
+for (const line of ciOnLines) {
+  const top = /^ {2}([A-Za-z_][\w-]*):\s*(.*)$/.exec(line);
+  if (top) {
+    currentTrigger = top[1];
+    ciTriggers.set(currentTrigger, new Map());
+    if (top[2].length > 0) ciTriggers.get(currentTrigger).set("", top[2].trim());
+    continue;
+  }
+  const nested = /^ {4}([A-Za-z_][\w-]*):\s*(.*)$/.exec(line);
+  assert.ok(nested && currentTrigger, `ci.yml has an unparsed trigger line: ${JSON.stringify(line)}`);
+  ciTriggers.get(currentTrigger).set(nested[1], nested[2].trim());
+}
+
+assert.deepEqual([...ciTriggers.keys()].sort(), ["pull_request", "push"], "ci.yml must trigger on exactly push and pull_request");
+
+// Every branch under review still gets a run, and it is unfiltered: a pull
+// request is the one event a required check must never be able to skip.
+assert.equal(ciTriggers.get("pull_request").size, 0, "ci.yml must keep pull_request unfiltered");
+
+// Branch pushes build `main` and nothing else. `branches` is the only key
+// allowed here for the reason above.
+assert.ok(ciTriggers.get("push").has("branches"), "ci.yml must not run the branch-push job on every branch");
+assert.deepEqual([...ciTriggers.get("push").keys()], ["branches"], "ci.yml may narrow push by branches and by nothing else");
+assert.match(
+  ciTriggers.get("push").get("branches"),
+  /^\[\s*main\s*\]$|^\[\s*["']main["']\s*\]$/,
+  "ci.yml must restrict push to main"
+);
+
+// `pull_request_target` runs with the base repository's credentials against a
+// fork's code. It is never the fix for a missing run.
+assert.doesNotMatch(workflow, /^\s*pull_request_target:/m, "ci.yml must not use pull_request_target");
+
+// The ruleset requires this exact name. Renaming the job's display name would
+// leave `main` waiting on a check that no longer reports.
+assert.match(workflow, /^\s{4}name: Guardrails$/m, "ci.yml must keep the required check named exactly Guardrails");
+
+// CI holds no write credentials; only the approval-gated release workflow does.
+assert.match(workflow, /^permissions:\n  contents: read$/m, "ci.yml must default to read-only permissions");
+
 // --- Release workflow contract ------------------------------------------------
 // The release workflow can tag, publish, and attest. Those powers are only safe
 // because they sit behind a GitHub Environment approval gate, so the shape that
