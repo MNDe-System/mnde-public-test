@@ -123,7 +123,27 @@ await test("tampering the signature is rejected", async () => {
   const f = await fixture();
   try {
     const { bundle } = runCli(f);
-    bundle.signature.value = `${bundle.signature.value[0] === "A" ? "B" : "A"}${bundle.signature.value.slice(1)}`;
+    // Flip one bit of the first signature byte. A bit flip cannot be a no-op,
+    // and it does not depend on how the byte happens to be spelled.
+    //
+    // This mutation used to rewrite the first hex CHARACTER to "A". Signatures
+    // are lowercase hex and hex decoding is case-insensitive, so whenever a
+    // signature began with "a" the rewrite produced identical bytes, the
+    // verifier correctly accepted an untampered signature, and this test either
+    // failed for no reason or — the half that matters — asserted nothing at all.
+    // Measured at ~6.29% of signatures, i.e. roughly one run in sixteen.
+    const original = Buffer.from(bundle.signature.value, "hex");
+    const tampered = Buffer.from(original);
+    tampered[0] ^= 0x01;
+    bundle.signature.value = tampered.toString("hex");
+    // Assert on what the verifier will actually decode, not on what we meant to
+    // write. That distinction is precisely what the old mutation got wrong, so
+    // the guard has to re-parse the field rather than trust the buffer above.
+    assert.notDeepEqual(
+      Buffer.from(bundle.signature.value, "hex"),
+      original,
+      "the tampered signature must differ from the original at the decoded-byte level"
+    );
     const result = await activate(f, bundle);
     assert.equal(result.ok, false);
     assert.equal(result.reason, "POLICY_BUNDLE_SIGNATURE_INVALID");
