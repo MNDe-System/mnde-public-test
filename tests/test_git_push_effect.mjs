@@ -54,6 +54,26 @@ const NAMESPACE = "mnde-git-push-test-namespace";
 
 let passed = 0;
 let failed = 0;
+
+// Every case builds its own pair of real git repositories, which is what makes
+// the cases independent — but across 27 cases that is a few hundred short-lived
+// git processes and several thousand files. Left to the end, removing them all
+// at once is an I/O burst that lands on whatever suite runs next; on Windows it
+// was enough to push the sidecar's runtime watchdog over its 250 ms
+// event-loop-lag threshold, so a later suite refused with ERR_RUNTIME_DEGRADED
+// instead of the specific reason it was asserting. The sidecar was right to
+// refuse. This suite was wrong to leave the mess, so each case cleans up as it
+// finishes.
+const pendingCleanup = [];
+function cleanUp() {
+  while (pendingCleanup.length) {
+    const dir = pendingCleanup.pop();
+    // Cleanup failing must never fail a case, and on Windows a handle can still
+    // be closing, hence the retries.
+    try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* best effort */ }
+  }
+}
+
 async function test(name, fn) {
   try {
     await fn();
@@ -62,6 +82,8 @@ async function test(name, fn) {
   } catch (error) {
     failed += 1;
     console.error(`  [FAIL] ${name}: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    cleanUp();
   }
 }
 
@@ -89,6 +111,7 @@ async function main() {
   function fixture(startupOverrides = {}, backendOptions = {}) {
     caseIndex += 1;
     const caseDir = join(dir, `case-${caseIndex}`);
+    pendingCleanup.push(caseDir);
     const repos = makeRepositories(caseDir);
     const backend = inMemoryClaimBackend({ namespace: NAMESPACE, ...backendOptions });
     const executor = createGitPushExecutor({
@@ -208,7 +231,9 @@ async function main() {
     // Sign a push whose remote_url is a DIFFERENT repository. The request matches
     // the authorization exactly, so only the local repository's own configuration
     // can catch it.
-    const elsewhere = makeRepositories(join(dir, `elsewhere-${caseIndex}`));
+    const elsewhereDir = join(dir, `elsewhere-${caseIndex}`);
+    pendingCleanup.push(elsewhereDir);
+    const elsewhere = makeRepositories(elsewhereDir);
     const parameters = pushParameters(elsewhere, { from: elsewhere.commits[0], to: elsewhere.commits[1] });
     const authorization = await gitPushAuthorization(trust, parameters);
     const result = await withProfile("production", () => executor.executeGitPush(requestFor(parameters, authorization)));
