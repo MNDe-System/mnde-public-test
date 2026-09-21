@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import { canonicalizeJson, parseStrictJson } from "../../shared/json.ts";
 import { RECEIPT_SIGNATURE_ALGORITHM, signReceiptPayload, verifyReceiptPayloadSignature } from "../../shared/index.ts";
-import { findAuthorityReceiptKey, loadAuthorityBundle, loadAuthorityBundleForReceipt } from "../../shared/authority-manifest.mjs";
+import { findAuthorityReceiptKey, loadAuthorityBundle, loadAuthorityBundleForReceipt, REPO_LOCAL_TRUST_SOURCE } from "../../shared/authority-manifest.mjs";
 import { findBundleKey, fingerprintOf, verifyAuthorityBundle } from "../custody/index.mjs";
 import { evaluatePolicyRequest } from "./index.mjs";
 import { EXECUTION_STATUS_DISABLED, receiptExecutionStatus } from "../execution-availability/index.mjs";
@@ -289,7 +289,7 @@ export async function verifyPolicyReceipt(receipt, options = {}) {
     ? {
       verified: true,
       reason: null,
-      trust_source: "REPO_LOCAL_AUTHORITY",
+      trust_source: REPO_LOCAL_TRUST_SOURCE,
       decision: original.decision,
       reason_code: original.reason_code,
       ...(receipt.policy_bundle_provenance ? { policy_bundle_provenance: structuredClone(receipt.policy_bundle_provenance) } : {})

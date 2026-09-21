@@ -135,6 +135,14 @@ export function loadAuthorityBundles(repoRoot) {
   }));
 }
 
+// Trust source reported when a receipt verified against one of the bundles above
+// rather than against a trust root the operator configured and pinned. It is a
+// real signature check, but the root is whatever shipped in the tree, so it is
+// evidence of nothing an operator chose. Exported so the producers and the
+// consumers name the same string: a drifting spelling here would silently turn a
+// refusal into an acceptance.
+export const REPO_LOCAL_TRUST_SOURCE = "REPO_LOCAL_AUTHORITY";
+
 export function loadAuthorityBundleForReceipt(repoRoot, authorityId) {
   const bundles = loadAuthorityBundles(repoRoot);
   const bundle = bundles.find((candidate) => candidate.manifest.authority_id === authorityId);
