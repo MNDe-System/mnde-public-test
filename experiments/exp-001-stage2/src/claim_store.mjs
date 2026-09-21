@@ -51,41 +51,56 @@ export function createSqliteClaimBackend({ dbPath } = {}) {
   if (typeof dbPath !== "string" || dbPath.length === 0) throw new Error("sqlite claim backend requires { dbPath }");
   const { DatabaseSync } = loadSqlite();
   const db = new DatabaseSync(dbPath);
-  db.exec("PRAGMA journal_mode=WAL");
-  db.exec("PRAGMA synchronous=FULL");         // durable acknowledgement
-  db.exec("PRAGMA busy_timeout=3000");        // wait, don't fail, on a competing writer
-  db.exec("CREATE TABLE IF NOT EXISTS claims (namespace TEXT NOT NULL, exec_id TEXT NOT NULL, grant_id TEXT, subject TEXT, executor_id TEXT, receipt_hash TEXT, aplus_digest TEXT, record TEXT NOT NULL, claimed_at TEXT NOT NULL)");
-  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ux_exec ON claims(namespace, exec_id)");
-  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ux_grant ON claims(namespace, grant_id) WHERE grant_id IS NOT NULL");
-  const ins = db.prepare("INSERT INTO claims(namespace,exec_id,grant_id,subject,executor_id,receipt_hash,aplus_digest,record,claimed_at) VALUES(?,?,?,?,?,?,?,?,?)");
-  const selExec = db.prepare("SELECT record FROM claims WHERE namespace=? AND exec_id=?");
-  const selGrant = db.prepare("SELECT record FROM claims WHERE namespace=? AND grant_id=?");
+  try {
+    // The timeout goes FIRST, before any statement that can meet a competing
+    // writer. Setting the journal mode takes a brief exclusive lock, and a second
+    // executor opening the same file at the same moment runs into it. Installed
+    // after that statement, as it was, the timeout was still SQLite's default of
+    // zero when the only contended statement ran, so the loser failed instantly
+    // with SQLITE_BUSY instead of waiting. This is a bounded wait, not a retry
+    // loop: contention that outlives the timeout still refuses.
+    db.exec("PRAGMA busy_timeout=3000");        // wait, don't fail, on a competing writer
+    db.exec("PRAGMA journal_mode=WAL");
+    db.exec("PRAGMA synchronous=FULL");         // durable acknowledgement
+    db.exec("CREATE TABLE IF NOT EXISTS claims (namespace TEXT NOT NULL, exec_id TEXT NOT NULL, grant_id TEXT, subject TEXT, executor_id TEXT, receipt_hash TEXT, aplus_digest TEXT, record TEXT NOT NULL, claimed_at TEXT NOT NULL)");
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ux_exec ON claims(namespace, exec_id)");
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ux_grant ON claims(namespace, grant_id) WHERE grant_id IS NOT NULL");
+    const ins = db.prepare("INSERT INTO claims(namespace,exec_id,grant_id,subject,executor_id,receipt_hash,aplus_digest,record,claimed_at) VALUES(?,?,?,?,?,?,?,?,?)");
+    const selExec = db.prepare("SELECT record FROM claims WHERE namespace=? AND exec_id=?");
+    const selGrant = db.prepare("SELECT record FROM claims WHERE namespace=? AND grant_id=?");
 
-  return {
-    kind: "sqlite", production: false,
-    health() { try { db.prepare("SELECT 1 AS ok").get(); return { ok: true }; } catch (e) { return { ok: false, reason: String(e?.message ?? e) }; } },
-    async claim(record) {
-      const now = new Date().toISOString();
-      const full = JSON.stringify({ ...record, claimed_at: now });
-      try {
-        ins.run(record.namespace, record.execution_id, record.grant_id ?? null, record.subject ?? null, record.executor_id ?? null, record.receipt_hash ?? null, record.aplus_digest ?? null, full, now);
-        return { status: CLAIM.CLAIMED, record: JSON.parse(full) };
-      } catch (e) {
-        const msg = String(e?.message ?? e);
-        if (/UNIQUE|constraint/i.test(msg)) {
-          const collided = /exec_id/.test(msg) ? "execution_id" : (/grant_id/.test(msg) ? "grant_id" : null);
-          const prior = selExec.get(record.namespace, record.execution_id) ?? (record.grant_id != null ? selGrant.get(record.namespace, record.grant_id) : null);
-          return { status: CLAIM.ALREADY_SPENT, collided_on: collided, prior: prior?.record ? JSON.parse(prior.record) : null };
+    return {
+      kind: "sqlite", production: false,
+      health() { try { db.prepare("SELECT 1 AS ok").get(); return { ok: true }; } catch (e) { return { ok: false, reason: String(e?.message ?? e) }; } },
+      async claim(record) {
+        const now = new Date().toISOString();
+        const full = JSON.stringify({ ...record, claimed_at: now });
+        try {
+          ins.run(record.namespace, record.execution_id, record.grant_id ?? null, record.subject ?? null, record.executor_id ?? null, record.receipt_hash ?? null, record.aplus_digest ?? null, full, now);
+          return { status: CLAIM.CLAIMED, record: JSON.parse(full) };
+        } catch (e) {
+          const msg = String(e?.message ?? e);
+          if (/UNIQUE|constraint/i.test(msg)) {
+            const collided = /exec_id/.test(msg) ? "execution_id" : (/grant_id/.test(msg) ? "grant_id" : null);
+            const prior = selExec.get(record.namespace, record.execution_id) ?? (record.grant_id != null ? selGrant.get(record.namespace, record.grant_id) : null);
+            return { status: CLAIM.ALREADY_SPENT, collided_on: collided, prior: prior?.record ? JSON.parse(prior.record) : null };
+          }
+          throw e; // genuine backend error -> caller treats as unavailable/unknown
         }
-        throw e; // genuine backend error -> caller treats as unavailable/unknown
-      }
-    },
-    lookup(record) {
-      const r = selExec.get(record.namespace, record.execution_id) ?? (record.grant_id != null ? selGrant.get(record.namespace, record.grant_id) : null);
-      return r?.record ? { found: true, record: JSON.parse(r.record) } : { found: false };
-    },
-    close() { try { db.close(); } catch { /* already closed */ } }
-  };
+      },
+      lookup(record) {
+        const r = selExec.get(record.namespace, record.execution_id) ?? (record.grant_id != null ? selGrant.get(record.namespace, record.grant_id) : null);
+        return r?.record ? { found: true, record: JSON.parse(r.record) } : { found: false };
+      },
+      close() { try { db.close(); } catch { /* already closed */ } }
+    };
+  } catch (error) {
+    // Never leak the handle when initialization fails. The caller keeps dispatch
+    // disabled and may open again in the same process, and a failure to clean up
+    // must not replace the failure that actually matters.
+    try { db.close(); } catch { /* preserve the initialization failure */ }
+    throw error;
+  }
 }
 
 // ── CRASH-SAFE MODEL backend: one atomic commit record + reconciled index ────
