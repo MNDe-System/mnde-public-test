@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { createAdapter } from '../experiments/exp-001-stage2/src/adapter.mjs';
 import { createOfflineAdapter } from './support/offline_freshness_adapter.mjs';
@@ -110,10 +111,170 @@ test('F-001/F-002 model: faults, timeout, lost acknowledgement, inconsistent loo
   for(const b of faults){const t=spy();assert.equal((await createOfflineAdapter({config,transport:t.transport,claimBackend:b}).attemptMerge(d)).dispatched,false);assert.equal(t.calls.length,0);}
   good.close();
 });
+// ── SQLite startup-contention harness ────────────────────────────────────────
+// The claim factory is synchronous: once a worker calls it, that process is
+// blocked inside SQLite until it returns or throws. The competing writer must
+// therefore live in this process, which is the only one still able to release
+// it on a timer.
+const STARTUP_WORKER = fileURLToPath(new URL('./support/sqlite_claim_startup_worker.mjs', import.meta.url));
+const GUARD = new URL('../experiments/exp-001-stage2/tests/_guard.mjs', import.meta.url).href;
+const HANDSHAKE_MS = 10000;   // bounded handshake
+const WATCHDOG_MS = 20000;    // outer per-case bound
+const LOCK_HOLD_MS = 500;     // transient contention, comfortably under busy_timeout=3000
+const nowMs = () => Number(process.hrtime.bigint() / 1000000n);
+// Same lazy-require convention as claim_store.mjs.
+const sqlite = () => createRequire(import.meta.url)('node:sqlite');
+
+// WAL is a property of the file, unlike busy_timeout and synchronous, which are
+// per-connection and cannot be observed from a different one.
+function journalModeOf(dbPath) {
+  const { DatabaseSync } = sqlite();
+  const db = new DatabaseSync(dbPath);
+  try { return String(db.prepare('PRAGMA journal_mode').get()?.journal_mode ?? '').toLowerCase(); }
+  finally { try { db.close(); } catch { /* already closed */ } }
+}
+
+// A competing writer holding the exclusive lock the factory needs to switch the
+// journal mode. Always released in teardown, whether or not the case got there.
+function holdExclusiveLock(dbPath) {
+  const { DatabaseSync } = sqlite();
+  const db = new DatabaseSync(dbPath);
+  db.exec('PRAGMA journal_mode=DELETE');
+  db.exec('CREATE TABLE IF NOT EXISTS lock_probe(x)');
+  db.exec('BEGIN EXCLUSIVE');
+  db.exec('INSERT INTO lock_probe VALUES (1)');
+  let releasedAt = null;
+  return {
+    get releasedAt() { return releasedAt; },
+    release() {
+      if (releasedAt !== null) return releasedAt;
+      releasedAt = nowMs();
+      try { db.exec('ROLLBACK'); } catch { /* transaction already gone */ }
+      try { db.close(); } catch { /* already closed */ }
+      return releasedAt;
+    }
+  };
+}
+
+function startupWorker() {
+  const proc = spawn(process.execPath, ['--import', GUARD, STARTUP_WORKER], { windowsHide:true, stdio:['ignore','pipe','pipe','ipc'] });
+  const inbox=[], waiters=[]; let noise='', exit=null;
+  proc.stderr.on('data', b => { noise += b; });
+  proc.stdout.on('data', b => { noise += `[unexpected stdout] ${b}`; });   // the worker speaks over IPC only
+  proc.on('message', m => { inbox.push(m); pump(); });
+  proc.on('error', e => { exit = { spawnError: String(e?.message ?? e) }; pump(); });
+  proc.on('exit', (code,signal) => { exit = { code, signal }; pump(); });
+  const drop = w => { const i=waiters.indexOf(w); if(i>=0) waiters.splice(i,1); };
+  // The two open outcomes are mutually exclusive, so the wrong one is a result,
+  // not something to wait out until the watchdog fires.
+  const OPPOSITE = { opened:'open-error', 'open-error':'opened' };
+  function pump() {
+    for (const waiter of [...waiters]) {
+      const index = inbox.findIndex(m => m?.type === waiter.type);
+      if (index >= 0) { drop(waiter); waiter.settle(null, inbox.splice(index,1)[0]); continue; }
+      const contrary = OPPOSITE[waiter.type] ? inbox.find(m => m?.type === OPPOSITE[waiter.type]) : null;
+      if (contrary) { drop(waiter); waiter.settle(new Error(`awaiting ${waiter.type} but the worker reported ${JSON.stringify(contrary)}`)); continue; }
+      const failure = inbox.find(m => m?.type === 'worker-error');
+      if (failure) { drop(waiter); waiter.settle(new Error(`worker reported an error while awaiting ${waiter.type}: ${JSON.stringify(failure)}`)); continue; }
+      if (exit) { drop(waiter); waiter.settle(new Error(`worker exited ${JSON.stringify(exit)} before ${waiter.type}; stderr: ${noise}`)); }
+    }
+  }
+  function expect(type, timeoutMs = HANDSHAKE_MS) {
+    return new Promise((resolve, reject) => {
+      const waiter = { type, settle:(error,value) => { clearTimeout(waiter.timer); if(error) reject(error); else resolve(value); } };
+      waiter.timer = setTimeout(() => { drop(waiter); reject(new Error(`timed out after ${timeoutMs}ms awaiting ${type}; inbox ${JSON.stringify(inbox)}; stderr: ${noise}`)); }, timeoutMs);
+      waiters.push(waiter); pump();
+    });
+  }
+  return {
+    expect,
+    send(message) { proc.send(message); },
+    async stop() {
+      if (!exit) { try { proc.send({ cmd:'exit' }); } catch { /* channel already gone */ } }
+      const exited = exit ? Promise.resolve() : new Promise(resolve => proc.on('exit', () => resolve()));
+      const forced = setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* already gone */ } }, 2000);
+      await exited; clearTimeout(forced);
+      try { proc.disconnect(); } catch { /* already disconnected */ }
+    }
+  };
+}
+
+test('F-001 startup: an uncontended open yields a usable backend whose claim survives reopen',async()=>{
+  const dbPath=join(temp(),'startup-uncontended.sqlite');
+  const record=deriveClaimRecord(await declaration({executionId:'STARTUP-UNCONTENDED',grant_id:'G-STARTUP-UNCONTENDED'}),{namespace:NS}).record;
+  const worker=startupWorker();
+  try {
+    await worker.expect('ready');
+    worker.send({cmd:'open',dbPath});await worker.expect('opening');
+    const opened=await worker.expect('opened',WATCHDOG_MS);
+    assert.equal(opened.kind,'sqlite');assert.equal(opened.production,false);
+    worker.send({cmd:'claim',record});assert.equal((await worker.expect('claimed')).status,'CLAIMED');
+    worker.send({cmd:'close'});await worker.expect('closed');
+  } finally { await worker.stop(); }
+  assert.equal(journalModeOf(dbPath),'wal');
+  const reopened=createSqliteClaimBackend({dbPath});
+  try { assert.equal(reopened.lookup(record).found,true); } finally { reopened.close(); }
+});
+test('F-001 startup: a transient startup lock is waited out, not refused',async()=>{
+  const dbPath=join(temp(),'startup-transient.sqlite');
+  const record=deriveClaimRecord(await declaration({executionId:'STARTUP-TRANSIENT',grant_id:'G-STARTUP-TRANSIENT'}),{namespace:NS}).record;
+  const lock=holdExclusiveLock(dbPath);const worker=startupWorker();let timer=null;
+  try {
+    await worker.expect('ready');
+    worker.send({cmd:'open',dbPath});
+    const opening=await worker.expect('opening');
+    timer=setTimeout(()=>lock.release(),LOCK_HOLD_MS);   // released independently, while the child blocks
+    const opened=await worker.expect('opened',WATCHDOG_MS);
+    assert.notEqual(lock.releasedAt,null,'the competing writer was never released, so this run proves nothing');
+    // An open that returned before meeting the competing writer is not evidence
+    // of anything; reject the run rather than count it as a pass.
+    assert.ok(opened.durationMs>=LOCK_HOLD_MS/2,
+      `open finished in ${opened.durationMs}ms (opening at ${opening.at}, lock released at ${lock.releasedAt}) without waiting for the competing writer: this run did not establish contention`);
+    worker.send({cmd:'claim',record});assert.equal((await worker.expect('claimed')).status,'CLAIMED');
+    worker.send({cmd:'close'});await worker.expect('closed');
+  } finally { if(timer) clearTimeout(timer); lock.release(); await worker.stop(); }
+  const reopened=createSqliteClaimBackend({dbPath});
+  try { assert.equal(reopened.lookup(record).found,true); } finally { reopened.close(); }
+});
+test('F-001 startup: a persistent startup lock refuses with BUSY, cleans up, and leaves the process usable',async()=>{
+  const dbPath=join(temp(),'startup-persistent.sqlite');
+  const record=deriveClaimRecord(await declaration({executionId:'STARTUP-PERSISTENT',grant_id:'G-STARTUP-PERSISTENT'}),{namespace:NS}).record;
+  const lock=holdExclusiveLock(dbPath);const worker=startupWorker();
+  try {
+    await worker.expect('ready');
+    worker.send({cmd:'open',dbPath,probeClose:'observe'});await worker.expect('opening');
+    const failed=await worker.expect('open-error',WATCHDOG_MS);
+    assert.equal(failed.errcodeBase,5,`expected SQLITE_BUSY, got ${JSON.stringify(failed)}`);
+    assert.ok(failed.durationMs>=2000,`refused after only ${failed.durationMs}ms: the busy timeout was not in force at the contended statement`);
+    // Observed while the opener is still alive; process exit would release the
+    // handle regardless and so proves nothing about the factory.
+    assert.ok(failed.closes>=1,`the factory left its connection open after a failed initialization: ${JSON.stringify(failed)}`);
+    lock.release();
+    worker.send({cmd:'open',dbPath});await worker.expect('opening');
+    await worker.expect('opened',WATCHDOG_MS);
+    worker.send({cmd:'claim',record});assert.equal((await worker.expect('claimed')).status,'CLAIMED');
+    worker.send({cmd:'close'});await worker.expect('closed');
+  } finally { lock.release(); await worker.stop(); }
+});
+test('F-001 startup: a failing cleanup never masks the original initialization error',async()=>{
+  const dbPath=join(temp(),'startup-cleanup.sqlite');
+  const lock=holdExclusiveLock(dbPath);const worker=startupWorker();
+  try {
+    await worker.expect('ready');
+    worker.send({cmd:'open',dbPath,probeClose:'throw'});await worker.expect('opening');
+    const failed=await worker.expect('open-error',WATCHDOG_MS);
+    assert.ok(failed.closes>=1,'the factory did not attempt cleanup');
+    assert.equal(failed.errcodeBase,5,`the cleanup sentinel replaced the initialization error: ${JSON.stringify(failed)}`);
+    assert.ok(!/E_PROBE_CLOSE_SENTINEL/.test(failed.message),failed.message);
+  } finally { lock.release(); await worker.stop(); }
+});
 test('F-001/F-002 same-machine model: two OS executors race, one durable claim and fixed provider request',async()=>{
   const f=await setup();const results=await Promise.all([child([f.local,f.db,f.log,'normal']),child([f.local,f.db,f.log,'normal'])]);
   for(const r of results)assert.equal(r.code,0,r.err);
   assert.equal(results.filter(r=>r.result.dispatched).length,1);
+  const losers=results.filter(r=>!r.result.dispatched);
+  assert.equal(losers.length,1);
+  assert.equal(losers[0].result.error,'ERR_AUTHORITY_SPENT',JSON.stringify(losers[0].result));
   const attempts=eventsAt(f.log).filter(r=>r.type==='dispatch-attempt');assert.equal(attempts.length,1);
   assert.deepEqual(attempts[0].request,{method:'PUT',path:'/repos/mnde-labs/exp-001/pulls/17/merge',body:{sha:'a'.repeat(40),merge_method:'merge'}});
   const observedOutcome={type:'observed-outcome',source:'model-provider-state-read',merged:eventsAt(f.log).some(r=>r.type==='model-provider-effect')};
