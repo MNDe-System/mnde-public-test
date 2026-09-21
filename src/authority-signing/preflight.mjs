@@ -40,6 +40,25 @@ function readActivationRecord(path) {
   }
 }
 
+// Directories under a checkout or an install that hold development key material.
+function devKeyDirs(repoRoot) {
+  return repoRoot
+    ? [resolve(repoRoot, "shared", "receipt_keys"), resolve(repoRoot, ".mnde-test"), resolve(repoRoot, "authority")]
+    : [];
+}
+
+// Is this one path known development key material? Exported so every gate that
+// has to make this judgement asks the same question. A second, slightly
+// different definition living somewhere else is how a demo key eventually gets
+// accepted in production by a check that was written to reject it.
+export function isDevKeyMaterialPath(candidate, repoRoot) {
+  if (typeof candidate !== "string" || candidate.length === 0) return false;
+  const resolved = resolve(candidate);
+  if (devKeyDirs(repoRoot).some((dir) => resolved === dir || resolved.startsWith(dir + sep))) return true;
+  if (/receipt_signing_private\.pem$/.test(resolved)) return true;
+  return /(^|[\\/])(local-demo|demo)([\\/]|$)/i.test(resolved);
+}
+
 // True path (string) of the first env-configured key/bundle that points at known
 // development key material in the repository, else null.
 export function detectDevKeyPath(env = process.env, repoRoot) {
@@ -53,15 +72,8 @@ export function detectDevKeyPath(env = process.env, repoRoot) {
     env.MNDE_EXTERNAL_LEDGER_SIGNER_PUBLIC_KEY
   ].filter((p) => typeof p === "string" && p.length > 0);
 
-  const devDirs = repoRoot
-    ? [resolve(repoRoot, "shared", "receipt_keys"), resolve(repoRoot, ".mnde-test"), resolve(repoRoot, "authority")]
-    : [];
-
   for (const candidate of candidates) {
-    const resolved = resolve(candidate);
-    if (devDirs.some((dir) => resolved === dir || resolved.startsWith(dir + sep))) return candidate;
-    if (/receipt_signing_private\.pem$/.test(resolved)) return candidate;
-    if (/(^|[\\/])(local-demo|demo)([\\/]|$)/i.test(resolved)) return candidate;
+    if (isDevKeyMaterialPath(candidate, repoRoot)) return candidate;
   }
   return null;
 }

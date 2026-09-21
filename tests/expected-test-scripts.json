@@ -34,6 +34,7 @@
   "test:executor-key-path-security",
   "test:executor-lifecycle",
   "test:executor-live-sidecar",
+  "test:executor-posture",
   "test:executor-readiness",
   "test:executor-signer-load",
   "test:external-signer",
