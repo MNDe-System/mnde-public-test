@@ -8,7 +8,7 @@ Start here:
 - `execution-receipt-spec-v1.md`
 - `executor-bound-receipts.md`
 - `mnde-policy-engine-production-spec-v1.md`
-- `production-readiness.md` - includes current Policy Engine implementation slice coverage
+- `production-readiness.md` - includes current Policy Engine implementation slice coverage, and why a runtime-health refusal replaces a decision-specific one
 - `independent-verification.md`
 - `integration-guide.md`
 - `openclaw-integration-spec.md`
