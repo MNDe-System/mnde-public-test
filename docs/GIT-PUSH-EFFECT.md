@@ -145,11 +145,21 @@ Read this section before quoting the ones above.
 ## The transport environment
 
 Built from empty rather than filtered, so a variable that is not named does not
-exist in the subprocess. Git's own config is neutralized (`GIT_CONFIG_NOSYSTEM`,
-and global and system config pointed at the null device) so that an operator's
-`~/.gitconfig` cannot install an alias, a credential helper, or a
-`url.*.insteadOf` rewrite that changes where the push lands. Prompts are disabled,
-because a hung push is a push whose outcome is unknown.
+exist in the subprocess. Git's own config is neutralized — `GIT_CONFIG_NOSYSTEM`,
+and global and system config pointed at a path that is never created, which git
+reads as empty — so that an operator's `~/.gitconfig` cannot install an alias, a
+credential helper, or a `url.*.insteadOf` rewrite that changes where the push
+lands. Prompts are disabled, because a hung push is a push whose outcome is
+unknown.
+
+Two things are inherited, and they are plumbing rather than policy. `PATH`,
+because git resolves itself and its transport helpers through it and a hardcoded
+guess breaks every invocation on any non-standard install. On Windows, a short
+list of platform variables (`SystemRoot`, `TEMP`, `PATHEXT` and their kind)
+without which sockets, temporary files and executable resolution do not work at
+all. Neither changes what git executes or where it pushes, and an attacker who
+can set `PATH` in the executor's own environment can already replace the
+executor.
 
 The operator may set exactly five variables, each for a stated reason: `PATH`,
 `HOME`, `SSH_AUTH_SOCK`, `GIT_SSH_COMMAND`, `GIT_SSL_CAINFO`. Anything else is a

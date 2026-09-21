@@ -459,6 +459,12 @@ async function main() {
     assert.equal(built.env.GIT_CONFIG_NOSYSTEM, "1");
     assert.equal(built.env.GIT_TERMINAL_PROMPT, "0");
     assert.ok(Object.hasOwn(built.env, "GIT_CONFIG_GLOBAL"));
+    // Pointed at a path that is never created, which git reads as empty. The
+    // platform null device is not a config file Git for Windows will read.
+    assert.ok(!built.env.GIT_CONFIG_GLOBAL.includes("nul"), "the config path must be an ordinary path, not a device");
+    // PATH is inherited, deliberately and as the only inherited non-Windows
+    // variable, because git cannot be found without it.
+    assert.equal(built.env.PATH, process.env.PATH);
     // Execution-affecting variables are absent because nothing is inherited.
     for (const absent of ["GIT_PROXY_COMMAND", "GIT_EXTERNAL_DIFF", "GIT_DIR", "GIT_WORK_TREE", "LD_PRELOAD", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "http_proxy"]) {
       assert.ok(!Object.hasOwn(built.env, absent), `${absent} must not be present`);

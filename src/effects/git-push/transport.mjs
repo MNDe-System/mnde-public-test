@@ -20,7 +20,8 @@
 // there is no `sh -c`, no `cmd /c`, and nothing to quote wrongly.
 
 import { execFile } from "node:child_process";
-import { devNull } from "node:os";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 export const ERR_GIT_UNAVAILABLE = "ERR_GIT_UNAVAILABLE";
 export const ERR_GIT_TIMEOUT = "ERR_GIT_TIMEOUT";
@@ -41,16 +42,28 @@ export const ALLOWED_TRANSPORT_ENV = Object.freeze({
   GIT_SSL_CAINFO: "explicit CA bundle for https, when the deployment does not use the system store"
 });
 
-const DEFAULT_PATH = process.platform === "win32"
-  ? "C:\\Program Files\\Git\\cmd;C:\\Windows\\system32;C:\\Windows"
-  : "/usr/local/bin:/usr/bin:/bin";
+// A path that is deliberately never created. Git reads a configured-but-missing
+// config file as empty, which is exactly what is wanted, and unlike the
+// platform's null device it is an ordinary path on every OS — Git for Windows
+// does not read \\.\nul as a config file.
+const NO_CONFIG_FILE = join(tmpdir(), "mnde-git-push-no-config-this-file-is-never-created");
 
-// Windows needs these for sockets and temporary files to work at all. They are
-// platform plumbing, not policy, and none of them affects what git executes.
-const WINDOWS_PLUMBING = ["SystemRoot", "SystemDrive", "TEMP", "TMP", "windir"];
+// Windows needs these for sockets, temporary files and executable resolution to
+// work at all. They are platform plumbing, not policy, and none of them affects
+// what git executes or where it pushes.
+const WINDOWS_PLUMBING = ["SystemRoot", "SystemDrive", "TEMP", "TMP", "windir", "PATHEXT", "COMSPEC"];
 
 // Build the subprocess environment from EMPTY. Nothing is inherited implicitly:
 // if a variable is not named here, the subprocess does not see it.
+//
+// Two named exceptions, both plumbing rather than policy. PATH is inherited,
+// because git resolves itself and its transport helpers through it and a
+// hardcoded guess breaks every invocation on any non-standard install; it is on
+// the operator allowlist so a deployment that wants to pin it can. On Windows a
+// short list of platform variables is inherited too, without which sockets,
+// temporary files and executable resolution do not work at all. Neither changes
+// what git executes or where it pushes, and an attacker who can set PATH in the
+// executor's own environment can already replace the executor.
 export function buildTransportEnv(operatorEnv = {}, { platform = process.platform, inherit = process.env } = {}) {
   for (const key of Object.keys(operatorEnv)) {
     if (!Object.hasOwn(ALLOWED_TRANSPORT_ENV, key)) {
@@ -67,8 +80,8 @@ export function buildTransportEnv(operatorEnv = {}, { platform = process.platfor
     // empty, so an operator's ~/.gitconfig cannot install an alias, a credential
     // helper, or a url.*.insteadOf rewrite that changes where this push lands.
     GIT_CONFIG_NOSYSTEM: "1",
-    GIT_CONFIG_GLOBAL: devNull,
-    GIT_CONFIG_SYSTEM: devNull,
+    GIT_CONFIG_GLOBAL: NO_CONFIG_FILE,
+    GIT_CONFIG_SYSTEM: NO_CONFIG_FILE,
     // Never block on a prompt. A hung push is a push whose outcome is unknown,
     // and unknown is the most expensive state this effect has.
     GIT_TERMINAL_PROMPT: "0",
@@ -77,7 +90,12 @@ export function buildTransportEnv(operatorEnv = {}, { platform = process.platfor
     // Deterministic output, because ls-remote output is parsed.
     LC_ALL: "C",
     LANG: "C",
-    PATH: DEFAULT_PATH
+    // PATH is inherited unless the operator sets it. A hardcoded guess is worse
+    // than inheriting: git resolves its own transport helpers through PATH, and
+    // a wrong guess breaks every invocation on any non-standard install. It is
+    // on the operator allowlist precisely so a deployment that wants to pin it
+    // can.
+    PATH: typeof inherit?.PATH === "string" && inherit.PATH ? inherit.PATH : (typeof inherit?.Path === "string" ? inherit.Path : "")
   };
 
   if (platform === "win32") {
@@ -124,7 +142,7 @@ function runGit(args, { env, cwd, timeoutMs }) {
 export async function resolveLocalCommit(sha, context) {
   const result = await runGit(["-C", context.repoPath, "rev-parse", "--verify", "--quiet", "--end-of-options", `${sha}^{commit}`], context);
   if (result.spawnFailed) return { ok: false, reason: ERR_GIT_UNAVAILABLE, detail: result.message };
-  if (!result.ok) return { ok: false, reason: ERR_LOCAL_COMMIT_MISSING, detail: `${sha} is not a commit present in the local repository` };
+  if (!result.ok) return { ok: false, reason: ERR_LOCAL_COMMIT_MISSING, detail: `${sha} is not a commit present in the local repository${result.stderr.trim() ? `: ${result.stderr.trim()}` : ""}` };
   const resolved = result.stdout.trim();
   if (resolved !== sha) return { ok: false, reason: ERR_LOCAL_COMMIT_MISSING, detail: `${sha} resolved to ${resolved || "nothing"}` };
   return { ok: true, sha: resolved };
@@ -171,9 +189,17 @@ export async function readRemoteRef(remoteUrl, targetRef, context) {
 // `remote` and `remote_url` in the authorization can be required to agree with
 // the repository the executor is actually standing in.
 export async function readConfiguredRemoteUrl(remoteName, context) {
-  const result = await runGit(["-C", context.repoPath, "remote", "get-url", "--", remoteName], context);
+  const result = await runGit(["-C", context.repoPath, "remote", "get-url", remoteName], context);
   if (result.spawnFailed) return { ok: false, reason: ERR_GIT_UNAVAILABLE, detail: result.message };
-  if (!result.ok) return { ok: false, reason: ERR_REMOTE_READ_FAILED, detail: `remote '${remoteName}' is not configured in the local repository` };
+  if (!result.ok) {
+    return {
+      ok: false,
+      reason: ERR_REMOTE_READ_FAILED,
+      // git's own stderr, not a guess at what went wrong. Swallowing it turns
+      // every distinct failure into the same unhelpful sentence.
+      detail: `could not read the URL for remote '${remoteName}': ${result.stderr.trim() || result.message}`
+    };
+  }
   const url = result.stdout.trim();
   if (!url) return { ok: false, reason: ERR_REMOTE_READ_FAILED, detail: `remote '${remoteName}' has no URL` };
   return { ok: true, url };
