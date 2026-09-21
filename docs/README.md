@@ -19,6 +19,7 @@ Start here:
 Release and safety review:
 
 - `APPROVAL-GATE.md` - what a human approves in MNDe's self-maintenance loop, and what the code enforces without one
+- `F001-CLAIM-STORE-PROOF.md` - what the durable single-use claim store was proven to do against a real PostgreSQL primary, and what remains open on F-001
 - `KNOWN-ISSUES.md` - problems carried rather than fixed, each with why it is safe to defer, plus the findings whose classification is still open
 - `release-891ceda-onboarding.md`
 - `release-checklist.md`
