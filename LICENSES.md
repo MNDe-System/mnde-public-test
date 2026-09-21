@@ -16,7 +16,7 @@ The root [LICENSE](LICENSE) restricts use to evaluation and forbids sale, sublic
 
 | Package | Version | License | Supplier | Copyright owner | Attribution requirements | NOTICE requirements | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `mnde-public-test` | `0.1.1` | Custom MNDe Public Testing License | MNDe project | MNDe project | Preserve repository license | None identified | Known |
+| `mnde-public-test` | `0.1.2` | Custom MNDe Public Testing License | MNDe project | MNDe project | Preserve repository license | None identified | Known |
 | `@mnde/executor` | `0.1.0` | Custom MNDe Public Testing License via `../LICENSE` | MNDe project | MNDe project | Preserve repository license | None identified | Known |
 | `typescript` | `5.9.3` | Apache-2.0 | Microsoft (npm registry) | Microsoft Corporation | Apache-2.0 attribution applies on redistribution; not redistributed here | Apache-2.0 NOTICE obligation applies only on redistribution; not redistributed here | Known |
 
