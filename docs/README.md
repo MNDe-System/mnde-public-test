@@ -20,6 +20,7 @@ Release and safety review:
 
 - `APPROVAL-GATE.md` - what a human approves in MNDe's self-maintenance loop, and what the code enforces without one
 - `F001-CLAIM-STORE-PROOF.md` - what the durable single-use claim store was proven to do against a real PostgreSQL primary, and what remains open on F-001
+- `GIT-PUSH-EFFECT.md` - the first narrow typed production effect: what it does, the order it does it in, and what it does not establish
 - `release-891ceda-onboarding.md`
 - `release-checklist.md`
 - `security-review-checklist.md`

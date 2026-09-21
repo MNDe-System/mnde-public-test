@@ -41,6 +41,7 @@
   "test:feline",
   "test:fresh-setup",
   "test:freshness-boundary",
+  "test:git-push-effect",
   "test:graceful-shutdown",
   "test:historical-policy-bundle",
   "test:identity-assertion",
