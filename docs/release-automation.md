@@ -3,8 +3,11 @@
 [`.github/workflows/release.yml`](../.github/workflows/release.yml) performs the
 machine-checkable parts of
 [`release-publication-runbook.md`](release-publication-runbook.md) and then stops
-and waits for a human. It has never been executed; nothing has been published,
-tagged, or attested.
+and waits for a human. **This workflow has never been executed**, so nothing has
+been published, tagged, or attested *by it*, and no build provenance attestation
+exists. The repository does carry published releases — `v0.1.0` and `v0.1.1`,
+both tagged and published by hand before this workflow was written. See
+[`KNOWN-ISSUES.md`](KNOWN-ISSUES.md) (KI-004) for what still stops a run.
 
 The human's only job is the approval click. Everything either side of it is
 automated and re-proved by code.
