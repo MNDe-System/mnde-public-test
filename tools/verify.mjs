@@ -35,6 +35,7 @@ import { pathToFileURL } from "node:url";
 import { verifyReceiptFile, verificationPassed } from "./verify-receipt.mjs";
 import { verifyPolicyReceipt, POLICY_RECEIPT_SCHEMA, POLICY_RECEIPT_SCHEMA_V2 } from "../src/policy-engine/receipt.mjs";
 import { isSignedReceiptEnvelope, verifyCustodyAttestation } from "../src/authority-signing/index.mjs";
+import { REPO_LOCAL_TRUST_SOURCE } from "../shared/authority-manifest.mjs";
 
 // Verify a receipt object (legacy / policy-engine / custody-signed envelope).
 export async function verifyAnyReceiptObject(receipt, options = {}) {
@@ -61,7 +62,7 @@ export async function verifyAnyReceiptObject(receipt, options = {}) {
       const file = join(dir, "receipt.json");
       writeFileSync(file, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
       const report = verifyReceiptFile(file);
-      return { kind: "pipeline", verified: verificationPassed(report), report, trust_source: "REPO_LOCAL_AUTHORITY" };
+      return { kind: "pipeline", verified: verificationPassed(report), report, trust_source: REPO_LOCAL_TRUST_SOURCE };
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -176,7 +177,16 @@ async function main() {
   }
   if (result.inner?.trust_source) process.stdout.write(`Inner trust source: ${result.inner.trust_source}\n`);
   if (result.verified_at) process.stdout.write(`Verified at: ${result.verified_at}\n`);
-  const repoLocalQualifier = result.verified && result.trust_source === "REPO_LOCAL_AUTHORITY" ? " (REPO_LOCAL_TRUST_ONLY)" : "";
+  // A custody envelope carries two trust decisions, and the inner one can fall
+  // back to the authority shipped in the tree while the attestation verifies
+  // against a pinned root (innerEnvelopeOptions drops the configured bundle for
+  // an inner receipt signed by a different authority). Qualify on either layer,
+  // so this verdict cannot read cleaner than what an executor in production
+  // posture would accept.
+  const repoLocalQualifier = result.verified
+    && (result.trust_source === REPO_LOCAL_TRUST_SOURCE || result.inner?.trust_source === REPO_LOCAL_TRUST_SOURCE)
+    ? " (REPO_LOCAL_TRUST_ONLY)"
+    : "";
   process.stdout.write(`FINAL VERDICT: ${result.verified ? `VERIFIED${repoLocalQualifier}` : "FAILED"}${result.reason ? ` (${result.reason})` : ""}\n`);
   process.exit(result.verified ? 0 : 1);
 }

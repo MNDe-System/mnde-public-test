@@ -123,6 +123,7 @@
     "test:executor-identity-signing": "node ./tests/test_executor_identity_signing.mjs",
     "test:executor-key-path-security": "node ./tests/test_executor_key_path_security.mjs",
     "test:executor-live-sidecar": "node ./tests/test_executor_live_sidecar.mjs",
+    "test:executor-posture": "node ./tests/test_executor_production_posture.mjs",
     "mcp-server": "node ./mcp/mnde-mcp-server.mjs",
     "mcp-demo": "node ./scripts/mcp-demo.mjs",
     "test:mcp": "node ./tests/test_mcp_server.mjs",
