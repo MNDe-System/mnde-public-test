@@ -12,13 +12,14 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createPrivateKey, sign as nodeSign } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { buildAuthorityBundle, generateAuthorityKeyPair, signCanonical } from "../../src/custody/index.mjs";
 import { issueExecutorCredential } from "../../src/custody/executor-credential.mjs";
 import { EXECUTOR_RECEIPT_CAPABILITY } from "../../src/custody/executor-identity.mjs";
 import { LIVE_RECEIPT_SIGNING_MODES, signReceiptForDelivery } from "../../src/authority-signing/index.mjs";
 import { buildPolicyReceipt } from "../../src/policy-engine/receipt.mjs";
+import { canonicalRepositoryIdentity } from "../../src/effects/git-push/validate.mjs";
 import { canonicalizeJson } from "../../shared/json.ts";
 import { bootstrapReceiptKeys } from "../../scripts/bootstrap_dev_receipt_keys.mjs";
 
@@ -175,7 +176,11 @@ export function makeRepositories(dir) {
   git(["config", "user.name", "MNDe git.push test"], localPath);
   git(["config", "commit.gpgsign", "false"], localPath);
 
-  const remoteUrl = `file://${barePath.replace(/\\/g, "/")}`;
+  // pathToFileURL, not string concatenation: on Windows a bare path produces
+  // file://C:/... , whose drive letter parses as a host. The rest of this suite
+  // then compares two different spellings of the same repository and every case
+  // fails for the wrong reason.
+  const remoteUrl = pathToFileURL(barePath).href;
   git(["remote", "add", "origin", remoteUrl], localPath);
 
   const commits = [];
@@ -211,9 +216,11 @@ export function makeRepositories(dir) {
 
 // Build the six signed parameters for a push on these repositories.
 export function pushParameters(repos, { from, to, targetRef = "refs/heads/main", overrides = {} } = {}) {
-  const canonical = `file:${repos.barePath.replace(/\\/g, "/").replace(/\.git$/, "")}`;
+  // Derived with the production function rather than a second implementation of
+  // the same rule. A duplicate here would only ever test itself, and the rule
+  // that `repository` must agree with `remote_url` has its own unit case.
   return {
-    repository: canonical,
+    repository: canonicalRepositoryIdentity(repos.remoteUrl),
     remote: "origin",
     remote_url: repos.remoteUrl,
     source_commit: to,
