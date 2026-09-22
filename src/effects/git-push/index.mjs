@@ -28,10 +28,18 @@
 // identity, a local repository that agrees with the authorization, a remote
 // observed to be in the exact approved pre-state, and a fresh durable claim.
 //
-// WHAT IS NOT YET TRUE. The execution evidence written here is UNSIGNED. It is a
-// faithful record of what happened, but it is not offline-verifiable the way a
-// decision receipt is, and it must not be described as one. Signing it needs the
-// executor's receipt-signing key on the dispatch path, which is a separate change.
+// EXECUTION EVIDENCE IS SIGNED, AND IT IS NOT A RECEIPT. Every outcome that
+// names a verified authorization is recorded as a signed, offline-verifiable
+// record of what the executor OBSERVED — see ./evidence.mjs. It answers a
+// different question from the authorization it descends from: not "was this
+// authorized?" but "what actually happened?". The two carry different schema
+// strings and neither is accepted where the other is required.
+//
+// WHAT IS STILL NOT TRUE. Refusals that occur BEFORE an authorization verifies
+// have no execution id or approved effect to bind to, so they are recorded
+// locally and unsigned. The local record also keeps fields the signed one
+// deliberately omits, notably git's stderr, which can carry remote URLs and
+// credential-helper chatter and so stays out of the portable record.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -47,6 +55,7 @@ import {
   GIT_PUSH_ACTION,
   validateGitPushParameters
 } from "./validate.mjs";
+import { buildExecutionEvidenceBody, signExecutionEvidence } from "./evidence.mjs";
 import {
   buildPushArgv,
   buildTransportEnv,
@@ -185,6 +194,12 @@ export function createGitPushExecutor(startup = {}) {
     // in the evidence, so a non-durable backend is visible in the audit record
     // rather than indistinguishable from the real one.
     claimBackend = null,
+    // The executor's own signing identity, and a signer that keeps the private
+    // key to itself. Both are required: this effect exists to produce evidence
+    // of what it did, and evidence nobody signed is a log entry. There is no
+    // configuration in which the push runs and the evidence goes unsigned.
+    executorIdentity = null,
+    executorSigner = null,
     env = process.env
   } = startup;
 
@@ -192,6 +207,32 @@ export function createGitPushExecutor(startup = {}) {
     if (!nonEmptyString(value)) {
       throw Object.assign(new Error(`${ERR_STARTUP_CONFIG}: ${name} is required`), { code: ERR_STARTUP_CONFIG });
     }
+  }
+
+  if (!executorIdentity || typeof executorIdentity !== "object" || typeof executorSigner?.sign !== "function") {
+    throw Object.assign(
+      new Error(`${ERR_STARTUP_CONFIG}: executorIdentity and executorSigner are required so execution evidence can be signed`),
+      { code: ERR_STARTUP_CONFIG }
+    );
+  }
+  for (const field of ["executor_id", "key_id", "credential_id", "environment_id", "credential"]) {
+    if (executorIdentity[field] === undefined || executorIdentity[field] === null) {
+      throw Object.assign(new Error(`${ERR_STARTUP_CONFIG}: executorIdentity.${field} is required`), { code: ERR_STARTUP_CONFIG });
+    }
+  }
+  // A signing identity that does not match the executor this deployment claims
+  // to be would sign truthfully and still attest to the wrong process.
+  if (nonEmptyString(expectedExecutorId) && executorIdentity.executor_id !== expectedExecutorId) {
+    throw Object.assign(
+      new Error(`${ERR_STARTUP_CONFIG}: executorIdentity.executor_id does not match expectedExecutorId`),
+      { code: ERR_STARTUP_CONFIG }
+    );
+  }
+  if (nonEmptyString(environmentId) && executorIdentity.environment_id !== environmentId) {
+    throw Object.assign(
+      new Error(`${ERR_STARTUP_CONFIG}: executorIdentity.environment_id does not match environmentId`),
+      { code: ERR_STARTUP_CONFIG }
+    );
   }
 
   const transport = buildTransportEnv(transportEnv);
@@ -220,6 +261,83 @@ export function createGitPushExecutor(startup = {}) {
     }
   }
 
+  // Sign the portable record of what happened.
+  //
+  // Signed evidence descends from an authorization, so it can only be produced
+  // once one has verified: before that there is no execution id, no grant id
+  // and no approved effect to bind to, and signing a record of "a malformed
+  // request arrived" would bind nothing worth verifying. Those early refusals
+  // still write the local unsigned record; they simply have no portable form.
+  // Everything from the action check onward — every refusal that names a real
+  // authorization, and every post-transport outcome — is signed.
+  async function signEvidence(evidence) {
+    if (!evidence.authorized || !nonEmptyString(evidence.execution_id)) {
+      return { envelope: null, reason: "no verified authorization to bind evidence to" };
+    }
+    const built = buildExecutionEvidenceBody({
+      execution_id: evidence.execution_id,
+      grant_id: evidence.grant_id,
+      authorization_receipt_hash: evidence.receipt_hash ?? null,
+      authority_digest: evidence.authority_digest ?? null,
+      executor_id: evidence.executor_id,
+      environment_id: executorIdentity.environment_id,
+      key_id: executorIdentity.key_id,
+      credential_id: executorIdentity.credential_id,
+      authority_bundle_fingerprint: trustedRootFingerprint ?? null,
+      repository: evidence.authorized.repository,
+      remote: evidence.authorized.remote,
+      remote_url: evidence.authorized.remote_url,
+      target_ref: evidence.authorized.target_ref,
+      expected_old_sha: evidence.authorized.expected_old_sha,
+      approved_new_sha: evidence.authorized.source_commit,
+      observed_before_sha: evidence.observed?.before ?? null,
+      observed_after_sha: evidence.observed?.after ?? null,
+      claim: {
+        decision: evidence.claim?.decision ?? null,
+        namespace: evidence.claim?.namespace ?? null,
+        record_digest: evidence.claim?.record_digest ?? null
+      },
+      effect_attempted: evidence.effect_attempted === true,
+      outcome: evidence.outcome,
+      reason_code: evidence.reason_code ?? null,
+      recorded_at: evidence.recorded_at
+    });
+    if (!built.ok) return { envelope: null, reason: built.detail ?? built.reason_code };
+
+    const signed = await signExecutionEvidence(built.body, { identity: executorIdentity, signer: executorSigner });
+    if (!signed.ok) return { envelope: null, reason: signed.detail ?? signed.reason_code };
+    return { envelope: signed.envelope, reason: null };
+  }
+
+  // Write the signed envelope beside the local record. A failure to persist it
+  // is reported rather than swallowed: evidence that was not stored must not
+  // look like evidence that was.
+  function writeSignedEvidence(envelope, executionId, recordedAt) {
+    if (!envelope) return null;
+    try {
+      mkdirSync(evidenceDir, { recursive: true });
+      const path = join(evidenceDir, `git-push-${executionId}-${recordedAt.replace(/[:.]/g, "-")}.signed.json`);
+      writeFileSync(path, `${JSON.stringify(envelope, null, 2)}\n`, "utf8");
+      return path;
+    } catch {
+      return null;
+    }
+  }
+
+  async function settle(evidence, result) {
+    const { envelope, reason } = await signEvidence(evidence);
+    const local = { ...evidence, evidence_signed: envelope !== null, evidence_unsigned_reason: reason };
+    const evidencePath = writeEvidence(local);
+    const signedEvidencePath = writeSignedEvidence(envelope, local.execution_id ?? "unidentified", local.recorded_at);
+    return Object.freeze({
+      ...result,
+      evidence: Object.freeze(local),
+      evidencePath,
+      signedEvidence: envelope,
+      signedEvidencePath
+    });
+  }
+
   function refuse(reason, detail, partial = {}) {
     const evidence = {
       schema: EVIDENCE_SCHEMA,
@@ -231,15 +349,12 @@ export function createGitPushExecutor(startup = {}) {
       recorded_at: new Date().toISOString(),
       ...partial
     };
-    const evidencePath = writeEvidence(evidence);
-    return Object.freeze({
+    return settle(evidence, {
       ok: false,
       outcome: OUTCOME.REFUSED,
       executed: false,
       reason_code: reason,
-      detail: detail ?? null,
-      evidence: Object.freeze(evidence),
-      evidencePath
+      detail: detail ?? null
     });
   }
 
@@ -423,15 +538,12 @@ export function createGitPushExecutor(startup = {}) {
       targetRef: p.target_ref
     });
     const evidence = { ...base, outcome: verdict.outcome, reason_code: verdict.reason_code, detail: verdict.detail };
-    const evidencePath = writeEvidence(evidence);
-    return Object.freeze({
+    return settle(evidence, {
       ok: verdict.outcome === OUTCOME.EXECUTED,
       outcome: verdict.outcome,
       executed: verdict.executed,
       reason_code: verdict.reason_code,
-      detail: verdict.detail,
-      evidence: Object.freeze(evidence),
-      evidencePath
+      detail: verdict.detail
     });
   }
 

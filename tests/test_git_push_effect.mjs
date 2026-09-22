@@ -125,6 +125,8 @@ async function main() {
       allowedSchemes: ["file"],
       evidenceDir: join(caseDir, "evidence"),
       claimBackend: backend,
+      executorIdentity: trust.executor.identity,
+      executorSigner: trust.executor.signer,
       ...startupOverrides
     });
     return { repos, backend, executor, caseDir };

@@ -14,7 +14,7 @@ Every `package.json` tracked in this repository.
 | Package | Version | License | Manifest | Manifest hash |
 | --- | --- | --- | --- | --- |
 | `@mnde/executor` | `0.1.0` | `SEE LICENSE IN ../LICENSE` | `executor/package.json` | `sha256:73ed0ead053b21f507509e1ee079935898101c09de884eb5a8cdccd9b84ac0c1` |
-| `mnde-public-test` | `0.1.1` | Not declared in package.json | `package.json` | `sha256:e7dbce86fa9c4f2d722b2477ba615732c42d675a703400910192b2f11cf1cd35` |
+| `mnde-public-test` | `0.1.1` | Not declared in package.json | `package.json` | `sha256:f07a81b529e0d567a35ecb5efac68cfe60b64c270da6dc0fe0cbc3b5f05f17f6` |
 
 | Lockfile | Lockfile version | Hash |
 | --- | --- | --- |
