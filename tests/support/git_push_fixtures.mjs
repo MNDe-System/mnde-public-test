@@ -60,7 +60,47 @@ export async function productionTrust(dir, { authorityId = "mnde-git-push-test" 
   });
   const bundlePath = join(dir, `published-authority-bundle-${authorityId}.json`);
   writeFileSync(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`, "utf8");
-  return { bundle, bundlePath, fingerprint: bundle.root_key.fingerprint, root, receipt, authorityId };
+
+  // The default executor identity, minted once so the same executor both signs
+  // the authorization envelope and signs the execution evidence. Hoisting it
+  // here is what lets a test verify that the evidence came from the executor
+  // the authorization was bound to, rather than from some other holder of a
+  // valid credential.
+  const executor = await mintExecutor(bundle, root, EXECUTOR_ID, ENVIRONMENT_ID);
+
+  return { bundle, bundlePath, fingerprint: bundle.root_key.fingerprint, root, receipt, authorityId, executor };
+}
+
+// An executor key pair plus the root-signed credential that carries its public
+// key, and a signer that keeps the private key to itself.
+async function mintExecutor(bundle, root, executorId, environmentId, now = "2026-06-14T00:00:00.000Z") {
+  const keys = generateAuthorityKeyPair();
+  const credential = await issueExecutorCredential({
+    authorityBundle: bundle,
+    rootPrivatePem: root.privatePem,
+    executorId,
+    publicPem: keys.publicPem,
+    environmentId,
+    capabilities: [EXECUTOR_RECEIPT_CAPABILITY],
+    issuedAt: now,
+    notBefore: "2026-01-01T00:00:00.000Z",
+    expiresAt: "2099-01-01T00:00:00.000Z"
+  });
+  return {
+    keys,
+    credential,
+    identity: {
+      executor_id: executorId,
+      key_id: credential.key_id,
+      credential_id: credential.credential_id,
+      environment_id: environmentId,
+      credential
+    },
+    signer: {
+      sign: async (body) =>
+        nodeSign(null, Buffer.from(body, "utf8"), createPrivateKey(keys.privatePem)).toString("hex")
+    }
+  };
 }
 
 // Re-sign a policy-engine receipt with the production authority.
@@ -96,18 +136,15 @@ export async function gitPushAuthorization(trust, parameters, {
   now = "2026-06-14T00:00:00.000Z",
   repoLocalInner = false
 } = {}) {
-  const executorKeys = generateAuthorityKeyPair();
-  const credential = await issueExecutorCredential({
-    authorityBundle: trust.bundle,
-    rootPrivatePem: trust.root.privatePem,
-    executorId,
-    publicPem: executorKeys.publicPem,
-    environmentId,
-    capabilities: [EXECUTOR_RECEIPT_CAPABILITY],
-    issuedAt: now,
-    notBefore: "2026-01-01T00:00:00.000Z",
-    expiresAt: "2099-01-01T00:00:00.000Z"
-  });
+  // Reuse the trust's default executor when this authorization is for it, so
+  // the authorization and any later execution evidence share one identity. A
+  // test asking for a different executor gets a freshly minted one.
+  const acting =
+    executorId === trust.executor.identity.executor_id && environmentId === trust.executor.identity.environment_id
+      ? trust.executor
+      : await mintExecutor(trust.bundle, trust.root, executorId, environmentId, now);
+  const executorKeys = acting.keys;
+  const credential = acting.credential;
 
   const provider = {
     mode: "file-backed-production",
