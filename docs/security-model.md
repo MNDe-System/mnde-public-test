@@ -20,6 +20,17 @@ Onboarding must never weaken:
 
 Onboarding code is not allowed to special-case reviewer flows or bypass authority checks.
 
+One of those invariants needs stating precisely, because the short form overstates
+it. **When the runtime is healthy, MNDe preserves specific refusal reasons. When
+runtime health cannot be established, MNDe fails closed with the applicable
+runtime-health refusal instead of continuing evaluation** — so a caller may
+receive `ERR_RUNTIME_DEGRADED` or `ERR_SYSTEM_SATURATED` in place of a more
+specific result such as `APPROVAL_EXPIRED`. The same qualification applies to
+deterministic decisions: determinism holds for a given request *and* a healthy
+runtime, and an unhealthy one refuses rather than deciding. It never produces an
+ALLOW. See
+[Runtime Health Refusals](production-readiness.md#runtime-health-refusals-take-precedence-over-decision-specific-refusals).
+
 ## Authority Separation
 
 The authority system owns decisions, receipts, signatures, replay, trust anchors, and policy hashes.
