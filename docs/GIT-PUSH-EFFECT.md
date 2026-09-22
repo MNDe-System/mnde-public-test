@@ -129,10 +129,12 @@ Read this section before quoting the ones above.
   nothing is sent on anything but `CLAIMED`, and that a second presentation of
   the same authority is refused. It proves nothing about durability or
   non-rollback. Those are the separate proof's job.
-- **The execution evidence is UNSIGNED.** It is a faithful record of what
-  happened, written to the evidence directory, but it is not offline-verifiable
-  the way a decision receipt is and must not be described as one. Signing it
-  needs the executor's receipt-signing key on the dispatch path.
+- **Refusals that happen before an authorization verifies are unsigned.** They
+  have no execution id, no grant id and no approved effect to bind to, so there
+  is nothing for a signature to attest. They are still written to the evidence
+  directory as local records; they simply have no portable form. Everything from
+  the action check onward is signed — see
+  [Signed execution evidence](#signed-execution-evidence).
 - **The generic execution path is untouched.** `executor/index.mjs` still refuses
   every protected effect with `ERR_FRESHNESS_DEPLOYMENT_DISABLED`, and nothing
   here reaches it. An ALLOW receipt is still evidence of a policy decision, not
@@ -181,11 +183,58 @@ The third is the one to read twice. Without that check, a receipt whose policy
 decision was signed by the authority bundle that ships inside the npm package
 moves a real branch on a real remote.
 
+## Signed execution evidence
+
+An authorization and an execution answer different questions. The first says
+*this exact action was approved*; it is signed before anything happens and stays
+true whether or not the effect was ever attempted. The second says *this is what
+the executor observed*, and it cannot exist until after the attempt. Collapsing
+them would let an approval be read as proof that something happened, which is
+the confusion this whole project exists to prevent — so they carry different
+schema strings, `mnde.git-push-execution-evidence.v1` and
+`mnde.signed-receipt.v2`, and neither is accepted where the other is required.
+
+**The chain is root → credential → evidence.** The executor signs with its own
+key. The envelope carries the root-signed executor credential, which is what
+holds the public key, so a verifier needs only the envelope, the published
+authority bundle and the root fingerprint it obtained out of band. It reaches no
+network and consults no clock it was not given.
+
+**What is bound.** The authorization it descends from (execution id, grant id,
+the receipt hash and the authenticated authority digest), the executor that
+acted (id, environment, key, credential), the exact approved effect (repository,
+remote, remote URL, target ref, expected old SHA, approved new SHA), what was
+actually seen (the remote's ref before and after), whether the single-use
+authority was claimed and under which namespace, the outcome, the reason code
+and the timestamp. The signature is over the canonical form of the whole body,
+so changing any one of them breaks it.
+
+**What is deliberately not carried.** No key material, and no captured stderr.
+Git writes remote URLs and occasionally credential-helper chatter to stderr, so
+it stays in the local record and out of the portable one.
+
+**EXECUTED is a claim about the remote, not about a process.** Evidence may say
+`EXECUTED` only when the ref was read back and equals the approved new SHA. That
+rule is enforced when the body is built *and* again when it is verified, so a
+record that says `EXECUTED` while its own observed SHA disagrees is refused even
+though its signature is intact. A correct signature over an incoherent claim is
+not evidence. An unobserved final state — the ambiguous transport case — can
+never be promoted to `EXECUTED` by assertion; only a reconciling read of the
+remote can do that, and the consumed grant stays consumed either way.
+
+**The executor will not start without a way to sign.** `executorIdentity` and
+`executorSigner` are required at construction, and the identity must match the
+executor and environment the deployment claims to be. There is no configuration
+in which the push runs and the evidence goes unsigned.
+
+`npm run test:git-push-execution-evidence` covers this at 49 cases. It was run
+against three broken builds: accepting every signature scores 34/49, dropping
+the coherence rule 42/49, and dropping the credential-to-body identity check
+47/49.
+
 ## What is next
 
 1. Operate it once, end to end, against the provisioned claim database — the
    thing neither this suite nor the claim-store proof does.
-2. Sign the execution evidence, so an effect is offline-verifiable the way a
-   decision is.
-3. Re-run `deployment/freshness/claim-store-proof.mjs` against the chosen
+2. Re-run `deployment/freshness/claim-store-proof.mjs` against the chosen
    production database, including a managed provider if one is chosen.
