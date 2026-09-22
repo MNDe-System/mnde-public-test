@@ -14,11 +14,11 @@ Every `package.json` tracked in this repository.
 | Package | Version | License | Manifest | Manifest hash |
 | --- | --- | --- | --- | --- |
 | `@mnde/executor` | `0.1.0` | `SEE LICENSE IN ../LICENSE` | `executor/package.json` | `sha256:73ed0ead053b21f507509e1ee079935898101c09de884eb5a8cdccd9b84ac0c1` |
-| `mnde-public-test` | `0.1.1` | Not declared in package.json | `package.json` | `sha256:f07a81b529e0d567a35ecb5efac68cfe60b64c270da6dc0fe0cbc3b5f05f17f6` |
+| `mnde-public-test` | `0.1.2` | Not declared in package.json | `package.json` | `sha256:713277a813cff0eeae55ee1259de1db39d5ecc809c4d5061bf14648aed145f2c` |
 
 | Lockfile | Lockfile version | Hash |
 | --- | --- | --- |
-| `package-lock.json` | `3` | `sha256:25733289e78e9a9649313ced73e238ca1bf1462f476338676327d090b6121156` |
+| `package-lock.json` | `3` | `sha256:94c9a0ed7735d3d3a4804c9084bf85f7733ba3f8ca495ba5941661eaadfa36ce` |
 
 Packages above that declare no `license` field carry no license statement of
 their own. The repository [LICENSE](LICENSE) governs the repository, but this
