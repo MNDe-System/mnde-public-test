@@ -145,29 +145,43 @@ exercise the path end to end.
 
 ---
 
-## KI-005 — One suite at a time fails on `windows-latest` when the runner stalls
+## KI-005 — Live-sidecar suites fail intermittently on `windows-latest`
 
 **Recorded:** 2026-09-22 · **Component:** `.github/workflows/ci.yml`
 (`Guardrails`) and the suites that start a live sidecar
 
-Three runs across three days went red with exactly one suite failing — a
-different suite each time, on trees that pass everywhere else.
+Four runs across three days went red with one or two suites failing — a
+different set each time, drawn every time from the suites that start a real
+sidecar, on trees that pass everywhere else.
 
-| Run | Head | Failing suite | Score |
+| Run | Head | Failing suites | Score |
 | --- | --- | --- | --- |
 | 212 | `3d070a8` on `main` | `test:freshness-boundary` | 98/99 |
 | 256 | `ee4d404` on `main` | `test:ledger-auth` | 101/102 |
 | 258 | `83abd54` on `chore/bump-0.1.2` | `test:sidecar-pe` | 101/102 |
+| 262 | `b2c01c2`, same branch | `test:ledger-auth`, `test:sidecar-pe` | 100/102 |
 
 Two of those are `main`'s own merge commits, and each one carried a **tree
 byte-identical to the one that had just passed green** on its pull request
 branch — `git rev-parse <commit>^{tree}` gives `1369cc5` for both `3d070a8` and
 `fc836a21` (run 211, green, five minutes earlier), and `2e77ca2` for both
 `ee4d404` and `ce6234f` (run 255, green). Same tree, one green and one red. The
-third failure is a four-file version bump that changes no code the failing suite
-reaches. All three failing suites start a real sidecar and talk to it over HTTP.
+other two are the four-file version bump in `chore/bump-0.1.2`, which changes no
+code any failing suite reaches. Every suite named above starts a real sidecar and
+talks to it over HTTP.
 
-One of the three names the mechanism outright. Every failure in `test:sidecar-pe`
+That branch going red twice in a row is worth answering directly, because two in
+a row is what a real regression looks like. It is not one, on three independent
+grounds: the same branch carrying the same lockfile change passed four times on
+2026-09-21 (runs 234, 241, 249 and 253); `test:ledger-auth` also failed on `main`,
+which does not carry that change; and the only mechanism by which a lockfile
+could reach a sidecar suite — the `bin` entries it corrects — is ruled out by
+reading, because `executor/sidecar-harness.mjs:65` spawns `process.execPath`
+directly against `mnde-local-sidecar.mjs` rather than through any installed bin
+shim. A `npm ci` from that lockfile on Linux links only `tsc` and `tsserver` and
+runs 102/102.
+
+One of the four names the mechanism outright. Every failure in `test:sidecar-pe`
 asked for a specific approval refusal code and got the runtime's instead:
 
 ```
@@ -182,17 +196,18 @@ the wrong reason. A shared Windows runner stalled the event loop past the
 degraded threshold, and the watchdog does not clear for the life of the process,
 so every later assertion in the suite failed too.
 
-The other two are consistent with the same mechanism and do not prove it.
-Neither suite prints a reason code, so each records a downstream effect rather
-than a cause: in `test:ledger-auth` the decision came back carrying no ledger
-metadata at all, and the proof read that depended on it then returned 404.
-**Confirmed for `test:sidecar-pe`; the leading explanation, not an established
-one, for the other two.**
+`test:ledger-auth` and `test:freshness-boundary` are consistent with the same
+mechanism and do not prove it. Neither prints a reason code, so each records a
+downstream effect rather than a cause: in `test:ledger-auth` the decision came
+back carrying no ledger metadata at all, and the proof read that depended on it
+then returned 404. **Confirmed for `test:sidecar-pe`; the leading explanation,
+not an established one, for the other two.**
 
 **This is not [KI-001](#ki-001--test-and-demo-sidecars-share-one-fixed-port).**
 That entry is about two suites contending for a fixed port, and `npm test` runs
-suites sequentially precisely so they cannot. Here a single suite has the
-machine to itself and still loses the event loop.
+suites strictly sequentially precisely so they cannot. Here each suite has the
+machine to itself and still loses the event loop; run 262's two failures were
+minutes apart in the same sequential pass, not concurrent.
 
 **Production impact:** none. The watchdog thresholds are production posture and
 they did what they are for. What this affects is CI.
@@ -213,9 +228,9 @@ CI runs again. Budget for that when cutting a release rather than reading it as 
 regression.
 
 **Workaround:** update the branch and let CI run again on the new head. Do not
-re-run a job to make a red disappear without first reading which suite failed and
-why; two of the three above named a different suite each time, and a real
-regression looks nothing like that.
+re-run a job to make a red disappear without first reading which suites failed
+and why; the four above name a different set each time, and a real regression
+looks nothing like that.
 
 **Planned remediation:** undecided, and deliberately so. Raising the watchdog
 thresholds is not on the table — the threshold is the control. The two options
