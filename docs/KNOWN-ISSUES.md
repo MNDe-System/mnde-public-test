@@ -145,6 +145,103 @@ exercise the path end to end.
 
 ---
 
+## KI-005 — Live-sidecar suites fail intermittently on `windows-latest`
+
+**Recorded:** 2026-09-22 · **Component:** `.github/workflows/ci.yml`
+(`Guardrails`) and the suites that start a live sidecar
+
+Four runs across three days went red with one or two suites failing — a
+different set each time, drawn every time from the suites that start a real
+sidecar, on trees that pass everywhere else.
+
+| Run | Head | Failing suites | Score |
+| --- | --- | --- | --- |
+| 212 | `3d070a8` on `main` | `test:freshness-boundary` | 98/99 |
+| 256 | `ee4d404` on `main` | `test:ledger-auth` | 101/102 |
+| 258 | `83abd54` on `chore/bump-0.1.2` | `test:sidecar-pe` | 101/102 |
+| 262 | `b2c01c2`, same branch | `test:ledger-auth`, `test:sidecar-pe` | 100/102 |
+
+Two of those are `main`'s own merge commits, and each one carried a **tree
+byte-identical to the one that had just passed green** on its pull request
+branch — `git rev-parse <commit>^{tree}` gives `1369cc5` for both `3d070a8` and
+`fc836a21` (run 211, green, five minutes earlier), and `2e77ca2` for both
+`ee4d404` and `ce6234f` (run 255, green). Same tree, one green and one red. The
+other two are the four-file version bump in `chore/bump-0.1.2`, which changes no
+code any failing suite reaches. Every suite named above starts a real sidecar and
+talks to it over HTTP.
+
+That branch going red twice in a row is worth answering directly, because two in
+a row is what a real regression looks like. It is not one, on three independent
+grounds: the same branch carrying the same lockfile change passed four times on
+2026-09-21 (runs 234, 241, 249 and 253); `test:ledger-auth` also failed on `main`,
+which does not carry that change; and the only mechanism by which a lockfile
+could reach a sidecar suite — the `bin` entries it corrects — is ruled out by
+reading, because `executor/sidecar-harness.mjs:65` spawns `process.execPath`
+directly against `mnde-local-sidecar.mjs` rather than through any installed bin
+shim. A `npm ci` from that lockfile on Linux links only `tsc` and `tsserver` and
+runs 102/102.
+
+One of the four names the mechanism outright. Every failure in `test:sidecar-pe`
+asked for a specific approval refusal code and got the runtime's instead:
+
+```
+[FAIL] PE mode + missing approval -> REFUSE APPROVAL_REQUIRED
++ 'ERR_RUNTIME_DEGRADED'
+- 'APPROVAL_REQUIRED'
+```
+
+That is the sidecar's own event-loop watchdog declining to evaluate policy
+because the runtime looked unhealthy — correct production behaviour, reached for
+the wrong reason. A shared Windows runner stalled the event loop past the
+degraded threshold, and the watchdog does not clear for the life of the process,
+so every later assertion in the suite failed too.
+
+`test:ledger-auth` and `test:freshness-boundary` are consistent with the same
+mechanism and do not prove it. Neither prints a reason code, so each records a
+downstream effect rather than a cause: in `test:ledger-auth` the decision came
+back carrying no ledger metadata at all, and the proof read that depended on it
+then returned 404. **Confirmed for `test:sidecar-pe`; the leading explanation,
+not an established one, for the other two.**
+
+**This is not [KI-001](#ki-001--test-and-demo-sidecars-share-one-fixed-port).**
+That entry is about two suites contending for a fixed port, and `npm test` runs
+suites strictly sequentially precisely so they cannot. Here each suite has the
+machine to itself and still loses the event loop; run 262's two failures were
+minutes apart in the same sequential pass, not concurrent.
+
+**Production impact:** none. The watchdog thresholds are production posture and
+they did what they are for. What this affects is CI.
+
+**Security impact:** none observed, and the reason is worth keeping. These suites
+assert the *specific* reason code rather than merely that a refusal occurred, so
+a degraded runtime makes them fail rather than pass for the wrong reason. A
+suite that asserted only "this was refused" would have gone green here while
+measuring nothing. Any new refusal assertion should keep that shape.
+
+**Why it is safe to defer:** it turns green runs red, never red runs green. It
+cannot produce a wrong authorization decision, and on the evidence above it
+cannot make a failing run look like a passing one.
+
+**What it costs:** with strict status checks and a required `Guardrails` check, a
+run that lands on a stalled runner blocks a merge until the branch is updated and
+CI runs again. Budget for that when cutting a release rather than reading it as a
+regression.
+
+**Workaround:** update the branch and let CI run again on the new head. Do not
+re-run a job to make a red disappear without first reading which suites failed
+and why; the four above name a different set each time, and a real regression
+looks nothing like that.
+
+**Planned remediation:** undecided, and deliberately so. Raising the watchdog
+thresholds is not on the table — the threshold is the control. The two options
+that weaken nothing are to have the sidecar harness record the runtime-health
+transition and report it, so a red run says "the runner stalled" in one line
+instead of needing a log read, or to carry it as it is. Neither is authorised.
+
+**Target release:** unscheduled.
+
+---
+
 ## Unclassified — not deferred
 
 These are **not** known-issue entries. Each is a real finding whose
