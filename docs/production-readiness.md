@@ -101,6 +101,96 @@ Production integrations should fail closed when:
 
 Fail-closed behavior should be tested at the executor boundary.
 
+## Runtime Health Refusals Take Precedence Over Decision-Specific Refusals
+
+This is intended behaviour, not a defect. It is written down because it changes
+what a caller sees, and because the guarantee it qualifies is one MNDe states
+elsewhere.
+
+**The accurate claim.** When the runtime is healthy, MNDe preserves specific
+refusal reasons. When runtime health cannot be established, MNDe fails closed
+with the applicable runtime-health refusal instead of continuing evaluation.
+
+So a request that would have been refused `APPROVAL_EXPIRED` can instead come
+back `ERR_RUNTIME_DEGRADED` or `ERR_SYSTEM_SATURATED`, and a request that would
+have been **allowed** is refused as well. The decision is never wrong in the
+dangerous direction — an unhealthy runtime never produces an ALLOW — but the
+reason is not decision-specific, because no policy evaluation ran.
+
+### The two guards, and when each fires
+
+Both sit in front of `POST /v1/decisions`, and the watchdog check runs first,
+before admission control and before the request is parsed.
+
+**1. The runtime watchdog** (`sidecar/runtime_watchdog.mjs`) ticks every
+`MNDE_WATCHDOG_INTERVAL_MS` (default 250 ms) and measures its own scheduling lag.
+
+| Condition | Default | State | Recorded reason |
+| --- | --- | --- | --- |
+| event-loop lag ≥ `MNDE_WATCHDOG_MAX_EVENT_LOOP_LAG_MS` | 250 ms | degraded | `ERR_EVENT_LOOP_LAG` |
+| open sockets ≥ `MNDE_WATCHDOG_MAX_OPEN_SOCKETS` | 256 | degraded | `ERR_SOCKET_ACCUMULATION` |
+| event-loop lag ≥ `MNDE_WATCHDOG_FATAL_EVENT_LOOP_LAG_MS` | 2000 ms | fatal | `ERR_EVENT_LOOP_FATAL` |
+| open sockets ≥ `MNDE_WATCHDOG_FATAL_OPEN_SOCKETS` | 1024 | fatal | `ERR_SOCKET_ACCUMULATION_FATAL` |
+
+While degraded the decision endpoint answers `ERR_RUNTIME_DEGRADED`; while fatal,
+`ERR_RUNTIME_FATAL`. The response carries the watchdog snapshot under
+`runtime_degraded`, including the measured lag and the recorded reason, so an
+operator can tell which condition fired.
+
+**2. The saturation controller** (`SystemSaturationController` in
+`sidecar/receipt_persistence_queue.mjs`) refuses a single request with
+`ERR_SYSTEM_SATURATED` and names the input that tripped it in
+`saturation_signal`.
+
+| Signal | Threshold | Default |
+| --- | --- | --- |
+| `inflight` | `MNDE_SHED_INFLIGHT` / `MNDE_MAX_INFLIGHT` | 64 / 128 |
+| `event_loop_lag` | `MNDE_MAX_EVENT_LOOP_LAG_MS` | 80 ms |
+| `receipt_queue_depth` | 75% of the receipt queue's `max_items` | — |
+| `receipt_queue_bytes` | 75% of the receipt queue's `max_bytes` | — |
+
+Note that the two lag thresholds differ on purpose: saturation sheds a single
+request at 80 ms, while the watchdog marks the whole process degraded at 250 ms.
+A deployment can see `ERR_SYSTEM_SATURATED` under a brief spike and
+`ERR_RUNTIME_DEGRADED` under a sustained one.
+
+### These refusals are still evidenced
+
+Both go through the same refusal path as any other REFUSE: a receipt is built,
+signed, and enqueued for persistence, and the response is HTTP 200 with
+`decision: "REFUSE"`. A health refusal is a signed, verifiable record that MNDe
+declined; it is not a dropped request.
+
+One exception is worth knowing. If the receipt queue itself cannot accept the
+refusal receipt, the reported `reason_code` is replaced again by the persistence
+failure code and `receipt_persisted` is `false`. A caller that needs to know
+whether its refusal was durably recorded must read `receipt_persisted` rather
+than infer it.
+
+### Recovery is not symmetric
+
+**Degraded clears itself.** On the first tick where no degrade condition holds
+and the receipt queue is not in its fail-closed state, the watchdog clears the
+degraded flag and decisions resume.
+
+**Fatal does not.** Nothing resets the fatal flag for the life of the process, so
+a sidecar that once exceeded a fatal threshold refuses every decision until it is
+restarted. That is deliberate — a process that lost 2 seconds of event loop has
+demonstrated it cannot be relied on to decide in time — but it means
+`ERR_RUNTIME_FATAL` is an operational alert, not a transient condition to wait
+out.
+
+### What this means for an integration
+
+- Treat `ERR_RUNTIME_DEGRADED`, `ERR_RUNTIME_FATAL` and `ERR_SYSTEM_SATURATED` as
+  refusals, exactly like any other. Do not execute.
+- Do not retry them as though they were the specific refusal they replaced, and
+  do not infer from them that the underlying request would have been allowed.
+- Alert on `ERR_RUNTIME_FATAL` specifically: it does not clear.
+- If a deployment needs specific refusal reasons under sustained load, the
+  thresholds are configurable — but raising them trades a safety margin for
+  reason granularity, and the safe direction is the current one.
+
 ## Authentication Considerations
 
 Production use should define:

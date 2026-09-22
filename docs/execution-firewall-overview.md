@@ -22,6 +22,13 @@ Evaluating the action before the executor mutates state enables:
 - policy-bound execution
 - an auditable record of refusals
 
+Determinism is conditioned on runtime health, and the condition matters enough to
+state: when the runtime is healthy MNDe preserves specific refusal reasons, and
+when runtime health cannot be established it fails closed with a runtime-health
+refusal instead of continuing evaluation. An unhealthy runtime refuses; it never
+allows. See
+[Runtime Health Refusals](production-readiness.md#runtime-health-refusals-take-precedence-over-decision-specific-refusals).
+
 The invariant the integrations enforce:
 
 ```text
