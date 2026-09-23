@@ -42,7 +42,7 @@
 // credential-helper chatter and so stays out of the portable record.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync, writeSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { sha256 } from "../../crypto/provider.mjs";
@@ -59,10 +59,12 @@ import { buildExecutionEvidenceBody, signExecutionEvidence } from "./evidence.mj
 import {
   buildPushArgv,
   buildTransportEnv,
+  createStagingRepository,
   isAncestor,
   performPush,
   readConfiguredRemoteUrl,
   readRemoteRef,
+  removeStagingRepository,
   resolveLocalCommit
 } from "./transport.mjs";
 
@@ -86,8 +88,52 @@ export const ERR_AUTHORITY_ALREADY_SPENT = "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT
 export const ERR_CLAIM_NOT_ESTABLISHED = "ERR_GIT_PUSH_CLAIM_NOT_ESTABLISHED";
 export const ERR_POSTSTATE_MISMATCH = "ERR_GIT_PUSH_POSTSTATE_MISMATCH";
 export const ERR_STARTUP_CONFIG = "ERR_GIT_PUSH_STARTUP_CONFIG";
+export const ERR_EXECUTION_START_NOT_RECORDED = "ERR_GIT_PUSH_EXECUTION_START_NOT_RECORDED";
+
+export const EXECUTION_START_SCHEMA = "mnde.git-push-execution-start.v1";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+function startRecordName(executionId) {
+  return `git-push-${executionId}.started.json`;
+}
+
+// Recovery view: what does THIS executor's evidence directory say happened to one
+// execution? Read-only; it never re-spends, retries or clears anything.
+//
+//   NOT_STARTED   no durable start record: no push was begun for this execution.
+//                 If the claim store shows the authority spent, it was consumed
+//                 without an effect and needs a fresh authorization.
+//   EXECUTED / RECONCILED_NOT_APPLIED / INDETERMINATE
+//                 the recorded post-transport outcome.
+//   INDETERMINATE a start was recorded but no outcome ever was (the process died
+//                 between starting the push and recording what the remote said):
+//                 whether the ref moved is unknown, so a human reconciles it
+//                 against the remote. Never promoted to success, never retried.
+export function classifyGitPushExecution({ evidenceDir, executionId } = {}) {
+  if (!nonEmptyString(evidenceDir) || !nonEmptyString(executionId)) {
+    return Object.freeze({ condition: "UNKNOWN_REQUEST", review_required: true });
+  }
+  const started = existsSync(join(evidenceDir, startRecordName(executionId)));
+  let outcome = null;
+  let names = [];
+  try { names = readdirSync(evidenceDir); } catch { names = []; }
+  for (const name of names) {
+    if (!name.startsWith(`git-push-${executionId}-`) || !name.endsWith(".json") || name.endsWith(".signed.json")) continue;
+    let record;
+    try { record = JSON.parse(readFileSync(join(evidenceDir, name), "utf8")); } catch { continue; }
+    if (record?.execution_id !== executionId || record.effect_attempted !== true) continue;
+    outcome = record.outcome;
+  }
+  if (outcome) {
+    return Object.freeze({ condition: outcome, started, review_required: outcome === OUTCOME.INDETERMINATE, retry_permitted: false });
+  }
+  if (started) {
+    return Object.freeze({ condition: OUTCOME.INDETERMINATE, started, review_required: true, retry_permitted: false,
+      detail: "an execution start was recorded but no outcome was: reconcile against the remote" });
+  }
+  return Object.freeze({ condition: "NOT_STARTED", started, review_required: false, retry_permitted: false });
+}
 
 function nonEmptyString(value) {
   return typeof value === "string" && value.length > 0;
@@ -324,6 +370,34 @@ export function createGitPushExecutor(startup = {}) {
     }
   }
 
+  // One file per execution id, created exclusively and fsynced. It records only
+  // that an attempt began and what it was bound to; the outcome, when there is
+  // one, lives in the ordinary evidence record.
+  function recordExecutionStart({ execution_id, grant_id, executor_id, authorized, namespace: ns }) {
+    if (!nonEmptyString(execution_id)) return { ok: false, detail: "no execution id" };
+    let fd = null;
+    try {
+      mkdirSync(evidenceDir, { recursive: true });
+      const path = join(evidenceDir, startRecordName(execution_id));
+      fd = openSync(path, "wx");
+      writeSync(fd, `${JSON.stringify({
+        schema: EXECUTION_START_SCHEMA,
+        execution_id,
+        grant_id: grant_id ?? null,
+        executor_id: executor_id ?? null,
+        namespace: ns,
+        authorized,
+        started_at: new Date().toISOString()
+      }, null, 2)}\n`);
+      fsyncSync(fd);
+      return { ok: true, path };
+    } catch (error) {
+      return { ok: false, detail: String(error?.code ?? error?.message ?? error) };
+    } finally {
+      if (fd !== null) { try { closeSync(fd); } catch { /* already closed */ } }
+    }
+  }
+
   async function settle(evidence, result) {
     const { envelope, reason } = await signEvidence(evidence);
     const local = { ...evidence, evidence_signed: envelope !== null, evidence_unsigned_reason: reason };
@@ -442,14 +516,29 @@ export function createGitPushExecutor(startup = {}) {
         { ...identity, authorized });
     }
 
+    // ── 6b. Leave the local repository ───────────────────────────────────────
+    // Everything from here on — the commit checks, both remote reads and the push
+    // itself — runs in an executor-owned staging repository that reads the local
+    // repository's objects but never its configuration. See
+    // createStagingRepository in ./transport.mjs for the attacks this closes.
+    const staging = await createStagingRepository(context.repoPath, context);
+    if (!staging.ok) return refuse(staging.reason, staging.detail, { ...identity, authorized });
+    try {
+      return await effectFromStaging(staging.context, { authority, identity, authorized, p });
+    } finally {
+      removeStagingRepository(staging);
+    }
+  }
+
+  async function effectFromStaging(stage, { authority, identity, authorized, p }) {
     // ── 7 & 8. Both approved SHAs exist locally and are commits ──────────────
     for (const sha of [p.source_commit, p.expected_old_sha]) {
-      const local = await resolveLocalCommit(sha, context);
+      const local = await resolveLocalCommit(sha, stage);
       if (!local.ok) return refuse(local.reason, local.detail, { ...identity, authorized });
     }
 
     // ── 9. The remote is observed, independently, in the approved pre-state ──
-    const before = await readRemoteRef(p.remote_url, p.target_ref, context);
+    const before = await readRemoteRef(p.remote_url, p.target_ref, stage);
     if (!before.ok) return refuse(before.reason, before.detail, { ...identity, authorized });
     if (before.sha !== p.expected_old_sha) {
       return refuse(ERR_REMOTE_MOVED,
@@ -461,7 +550,7 @@ export function createGitPushExecutor(startup = {}) {
     // --force-with-lease alone would permit rewriting history that happened to
     // still be at the leased SHA. It is an exact-state guard, not a direction
     // guard, so the direction is checked here.
-    const ancestry = await isAncestor(p.expected_old_sha, p.source_commit, context);
+    const ancestry = await isAncestor(p.expected_old_sha, p.source_commit, stage);
     if (!ancestry.ok) return refuse(ancestry.reason, ancestry.detail, { ...identity, authorized, observed: { before: before.sha } });
     if (ancestry.ancestor !== true) {
       return refuse(ERR_NOT_FAST_FORWARD,
@@ -497,6 +586,20 @@ export function createGitPushExecutor(startup = {}) {
         { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
     }
 
+    // ── 11b. Durably record that the effect is starting ──────────────────────
+    // Claim-before-effect deliberately spends authority before the push, so a
+    // crash here can leave "spent, never sent" or "sent, outcome never recorded".
+    // Those need opposite handling and are indistinguishable unless the start is
+    // written — and fsynced — before anything leaves the process. If it cannot
+    // be, nothing is sent: an effect whose start cannot be recorded cannot later
+    // be classified, and the authority is already spent either way.
+    const started = recordExecutionStart({ ...identity, authorized, namespace });
+    if (!started.ok) {
+      return refuse(ERR_EXECUTION_START_NOT_RECORDED,
+        `the execution start could not be durably recorded (${started.detail}); nothing was sent`,
+        { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
+    }
+
     // ── 12. THE EFFECT ───────────────────────────────────────────────────────
     const argv = buildPushArgv({
       remoteUrl: p.remote_url,
@@ -504,13 +607,13 @@ export function createGitPushExecutor(startup = {}) {
       targetRef: p.target_ref,
       expectedOldSha: p.expected_old_sha
     });
-    const pushed = await performPush(argv, context);
+    const pushed = await performPush(argv, stage);
 
     // ── 13. Believe the remote, not the exit code ────────────────────────────
     // Exit 0 is the subprocess's opinion. The effect is what the remote says it
     // is, so it is read back independently and that observation is what the
     // evidence records.
-    const after = await readRemoteRef(p.remote_url, p.target_ref, context);
+    const after = await readRemoteRef(p.remote_url, p.target_ref, stage);
 
     const base = {
       schema: EVIDENCE_SCHEMA,

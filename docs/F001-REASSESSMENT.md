@@ -240,3 +240,42 @@ claimed once it does.
 - Not "the design is proven." The design is *built and tested*. Proof of the
   deployed property needs the deployment.
 - Not that an ALLOW decision implies execution occurred or is permitted.
+
+## Addendum, 2026-09-23 — the local repository could steer the effect
+
+Found after this reassessment was written, and fixed in the same change that
+records it. **It does not change the verdict: F-001 is still NOT closed**, and
+blocker 1 — operate the path end to end against a provisioned claim database — is
+still the one that moves it.
+
+**What was wrong.** Question 7 above answers "can a *caller* substitute the
+remote?" correctly: every request field must equal the signed parameters. But
+the transport ran every git command inside the local repository, and git honours
+that repository's `.git/config`, which the agent that produced the commits can
+write. With a genuine executor-bound authorization through the production
+verifier, at `main` `6c9f05a`:
+
+- `protocol.ext.allow=always` plus `url.ext::<program>.pushInsteadOf=<approved url>`
+  made the authorized push **start an arbitrary program** inside the executor's
+  transport environment — the process holding the deployment's push credential.
+- `url.<other remote>.pushInsteadOf=<approved url>` sent the push to a different
+  remote. The remote-URL check reads the fetch URL, so it still passed.
+
+That is a substitution of the effect's target and of what runs, by a route
+question 7 did not examine. It also bears on question 8: code execution inside
+the typed executor is a way around it.
+
+**What changed.** After the remote-URL check, every git operation that forms or
+observes the effect runs in a fresh executor-owned staging repository that reads
+the local objects through `objects/info/alternates` and none of the local
+configuration; the exported `performPush` refuses any argv that is not the typed
+push; a durable, fsynced execution-start record is written after the claim and
+before the push, so a crash in that window is classifiable (`NOT_STARTED` versus
+`INDETERMINATE`) instead of silent; and a static reachability guard keeps any
+other module from reaching the transport. See `docs/GIT-PUSH-EFFECT.md` and
+`npm run test:git-push-isolation`, `npm run test:git-push-reachability`.
+
+**What it does not change.** The operating blocker, the power-loss question and
+question 6 are exactly as stated above. The start record makes a crash
+*classifiable*; it does not make an in-flight push's outcome knowable — that case
+is `INDETERMINATE` and a human reconciles it against the remote.
