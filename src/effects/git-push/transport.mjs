@@ -20,10 +20,12 @@
 // there is no `sh -c`, no `cmd /c`, and nothing to quote wrongly.
 
 import { execFile } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 
 export const ERR_GIT_UNAVAILABLE = "ERR_GIT_UNAVAILABLE";
+export const ERR_STAGING_FAILED = "ERR_GIT_PUSH_STAGING_FAILED";
 export const ERR_GIT_TIMEOUT = "ERR_GIT_TIMEOUT";
 export const ERR_LOCAL_COMMIT_MISSING = "ERR_GIT_PUSH_LOCAL_COMMIT_MISSING";
 export const ERR_REMOTE_READ_FAILED = "ERR_GIT_PUSH_REMOTE_READ_FAILED";
@@ -75,10 +77,12 @@ export function buildTransportEnv(operatorEnv = {}, { platform = process.platfor
   }
 
   const env = {
-    // No git config from anywhere but the repository itself. The global and
-    // system files are pointed at the platform's null device, which git reads as
-    // empty, so an operator's ~/.gitconfig cannot install an alias, a credential
-    // helper, or a url.*.insteadOf rewrite that changes where this push lands.
+    // No global or system git config. Both files are pointed at a path that is
+    // never created, which git reads as empty, so an operator's ~/.gitconfig
+    // cannot install an alias, a credential helper, or a url.*.insteadOf rewrite
+    // that changes where this push lands. Repository config is handled
+    // separately: the effect runs in an executor-owned staging repository, never
+    // in the local one (see createStagingRepository).
     GIT_CONFIG_NOSYSTEM: "1",
     GIT_CONFIG_GLOBAL: NO_CONFIG_FILE,
     GIT_CONFIG_SYSTEM: NO_CONFIG_FILE,
@@ -205,6 +209,76 @@ export async function readConfiguredRemoteUrl(remoteName, context) {
   return { ok: true, url };
 }
 
+// THE STAGING REPOSITORY — why the effect never runs inside the local repository.
+//
+// The environment above neutralizes global and system git config, but not the
+// repository's own `.git/config`, and the local repository is exactly where the
+// agent that produced the commits has write access. Git honours that file for
+// every command run inside it: `url.<x>.pushInsteadOf` silently rewrites the
+// approved remote URL for the push alone (the remote-URL check above reads the
+// fetch URL, so it still passes), `protocol.ext.allow=always` plus an `ext::`
+// rewrite turns the push into an arbitrary program started inside the authorized
+// effect, and `core.sshCommand` / `credential.helper` do the same over ssh and
+// https. None of these is a flag MNDe passes; they arrive by standing in a
+// directory an agent can write.
+//
+// So after the repository has been checked against the authorization, every git
+// operation that forms or observes the effect runs in a fresh, executor-owned
+// bare repository instead: created from an empty template (no hooks, no config
+// beyond git's defaults), outside the local repository, reading the local
+// repository's objects through `objects/info/alternates`. That reaches the
+// approved commits without running git in the local repository and without
+// reading one line of its configuration. It is the same principle as the
+// environment — built from empty rather than filtered — applied to git config,
+// because config has no allowlist to filter against.
+//
+// Object integrity does not depend on the local repository being honest: the
+// remote computes every object id from the bytes it receives, the ref update
+// names the approved commit id, and the post-state is read back from the remote.
+export async function createStagingRepository(localRepoPath, context) {
+  // Where the local repository keeps its objects. `--git-common-dir` resolves
+  // worktrees and `.git` files; this is a read of repository layout, not of any
+  // configured program.
+  const common = await runGit(["-C", localRepoPath, "rev-parse", "--path-format=absolute", "--git-common-dir"], context);
+  if (common.spawnFailed) return { ok: false, reason: ERR_GIT_UNAVAILABLE, detail: common.message };
+  const commonDir = common.ok ? common.stdout.trim() : "";
+  if (!commonDir || !isAbsolute(commonDir)) {
+    return { ok: false, reason: ERR_STAGING_FAILED, detail: `could not locate the object store of ${localRepoPath}: ${common.stderr.trim() || "no git directory"}` };
+  }
+  const objectsDir = resolve(commonDir, "objects");
+
+  let root = null;
+  try {
+    root = mkdtempSync(join(tmpdir(), "mnde-git-push-stage-"));
+    const template = join(root, "empty-template");
+    mkdirSync(template);
+    const gitDir = join(root, "stage.git");
+    const init = await runGit(["init", "--quiet", "--bare", `--template=${template}`, gitDir], { ...context, cwd: root });
+    if (!init.ok) {
+      rmSync(root, { recursive: true, force: true });
+      return { ok: false, reason: init.spawnFailed ? ERR_GIT_UNAVAILABLE : ERR_STAGING_FAILED, detail: init.stderr.trim() || init.message };
+    }
+    mkdirSync(join(gitDir, "objects", "info"), { recursive: true });
+    writeFileSync(join(gitDir, "objects", "info", "alternates"), `${objectsDir}\n`, "utf8");
+    return {
+      ok: true,
+      root,
+      // The context every effect-forming operation uses from here on: `-C` and
+      // the working directory are the staging repository, so git discovers it
+      // and nothing else.
+      context: Object.freeze({ ...context, repoPath: gitDir, cwd: gitDir })
+    };
+  } catch (error) {
+    if (root) { try { rmSync(root, { recursive: true, force: true }); } catch { /* best effort */ } }
+    return { ok: false, reason: ERR_STAGING_FAILED, detail: String(error?.message ?? error) };
+  }
+}
+
+export function removeStagingRepository(staging) {
+  if (!staging?.root) return;
+  try { rmSync(staging.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* best effort */ }
+}
+
 // THE ARGV. Everything in it is either a literal MNDe wrote or a value that
 // cleared validate.mjs. There is no caller-supplied refspec and no caller-
 // supplied flag, and `--` ends option parsing before either operand.
@@ -230,7 +304,23 @@ export function buildPushArgv({ remoteUrl, sourceCommit, targetRef, expectedOldS
 
 // Perform the push. Returns the raw outcome; deciding what it MEANS is the
 // caller's job, because exit code 0 is not proof that the ref moved.
+// performPush is exported, so it must not be a generic `git <anything>` runner
+// behind a narrow name. It accepts only the exact shape buildPushArgv produces:
+// one lease-guarded push of one full SHA to one refs/heads/ branch.
+const LEASE_ARG = /^--force-with-lease=refs\/heads\/[^\s:]+:[0-9a-f]{40}$/;
+const REFSPEC_ARG = /^[0-9a-f]{40}:refs\/heads\/[^\s:]+$/;
+export const ERR_PUSH_ARGV_NOT_TYPED = "ERR_GIT_PUSH_ARGV_NOT_TYPED";
+function isTypedPushArgv(argv) {
+  return Array.isArray(argv) && argv.length === 6 && argv.every((a) => typeof a === "string")
+    && argv[0] === "push" && argv[1] === "--no-verify" && LEASE_ARG.test(argv[2]) && argv[3] === "--"
+    && argv[4].length > 0 && !argv[4].startsWith("-") && REFSPEC_ARG.test(argv[5])
+    && argv[2].split("=")[1].split(":")[0] === argv[5].split(":")[1];
+}
+
 export async function performPush(argv, context) {
+  if (!isTypedPushArgv(argv)) {
+    return { ok: false, reason: ERR_PUSH_ARGV_NOT_TYPED, detail: "performPush only runs the argv built by buildPushArgv", indeterminate: false };
+  }
   const result = await runGit(argv, context);
   if (result.spawnFailed) return { ok: false, reason: ERR_GIT_UNAVAILABLE, detail: result.message, indeterminate: false };
   if (!result.ok) {

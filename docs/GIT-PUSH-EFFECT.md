@@ -86,6 +86,10 @@ Everything above the claim is a read. Everything below it is irreversible.
    from `remote_url`.
 6. The caller's request equals the signed parameters, field for field.
 7. The local repository's configured remote points at the authorized URL.
+   **From here on nothing runs in the local repository.** A fresh,
+   executor-owned staging repository is created (see
+   [The local repository cannot steer the effect](#the-local-repository-cannot-steer-the-effect))
+   and every remaining step runs there.
 8. Both approved SHAs exist locally and are commits.
 9. The remote's current ref is read independently and equals `expected_old_sha`.
 10. `expected_old_sha` is an ancestor of `source_commit`.
@@ -94,7 +98,11 @@ Everything above the claim is a read. Everything below it is irreversible.
     `BACKEND_UNAVAILABLE` all refuse and send nothing — and `UNKNOWN` is never
     retried, because the claim may have landed and a retry is exactly the replay
     F-001 names.
-12. Only then, the push.
+12. **The start is durably recorded** — an exclusive, fsynced
+    `git-push-<execution-id>.started.json` in the evidence directory. If it
+    cannot be written, nothing is sent (`ERR_GIT_PUSH_EXECUTION_START_NOT_RECORDED`);
+    see [The claim → outcome window](#the-claim--outcome-window).
+13. Only then, the push.
 
 ## After the push, the remote decides
 
@@ -167,6 +175,70 @@ The operator may set exactly five variables, each for a stated reason: `PATH`,
 `HOME`, `SSH_AUTH_SOCK`, `GIT_SSH_COMMAND`, `GIT_SSL_CAINFO`. Anything else is a
 startup error. `GIT_PROXY_COMMAND`, `GIT_EXTERNAL_DIFF`, `GIT_DIR`,
 `GIT_WORK_TREE`, `LD_PRELOAD` and their kind are absent by construction.
+
+## The local repository cannot steer the effect
+
+The environment above neutralizes global and system git config. It could not
+neutralize the local repository's own `.git/config`, and the local repository is
+where the agent that produced the commits has write access. Git honours that file
+for every command run inside the repository, so while the push ran there:
+
+| Two lines of local config | Effect on a correctly authorized push |
+| --- | --- |
+| `protocol.ext.allow=always` + `url.ext::<program>.pushInsteadOf=<approved url>` | **an arbitrary program ran inside the authorized effect**, with the executor's transport environment |
+| `url.<other remote>.pushInsteadOf=<approved url>` | the push went to a different remote; the step-7 check reads the *fetch* URL, so it still passed |
+
+Both were demonstrated against `main` at `6c9f05a` with a genuine executor-bound
+authorization through the production verifier. `core.sshCommand` and
+`credential.helper` are the same class over ssh and https.
+
+Config has no allowlist to filter against, so the answer is the environment's
+answer applied to config: build from empty. After step 7, a fresh bare staging
+repository is created outside the local repository from an empty template (no
+hooks, no config beyond git's defaults). It reads the local repository's objects
+through `objects/info/alternates`, so the approved commits are reachable without
+running git in the local repository and without reading its configuration. The
+commit checks, both remote reads, the ancestry check and the push all run there,
+and it is removed afterwards. Object integrity does not depend on the local
+repository being honest: the remote computes every object id from the bytes it
+receives, the ref update names the approved commit id, and the post-state is read
+back from the remote.
+
+The argv is unchanged. `performPush`, which is exported, now also refuses any
+argv that is not exactly the shape `buildPushArgv` produces, so it cannot serve as
+a generic `git <anything>` runner. `npm run test:git-push-isolation` covers the
+attacks above plus local hooks, `core.fsmonitor`, `core.sshCommand` and
+`credential.helper`; against a build with the staging repository removed it
+scores 7/9, and the command-execution case runs its payload.
+
+## The claim → outcome window
+
+Claim-before-effect deliberately spends the authority before the push, so a crash
+in between can leave either "spent, never sent" or "sent, outcome never
+recorded". Both look the same — a consumed grant and no outcome — and they need
+opposite handling. The start record separates them. `classifyGitPushExecution({
+evidenceDir, executionId })` is a read-only recovery view:
+
+| Condition | Meaning |
+| --- | --- |
+| `NOT_STARTED` | no start record: no push was begun. If the claim store shows the authority spent, it was consumed without an effect and needs a fresh authorization. |
+| `EXECUTED` / `RECONCILED_NOT_APPLIED` / `INDETERMINATE` | the recorded post-transport outcome |
+| `INDETERMINATE` (start, no outcome) | the process died with the push in flight: reconcile against the remote. Never promoted to success, never retried. |
+
+`retry_permitted` is always `false`. Both crash cases are tested in a real child
+process that dies at the exact point — after its claim, and with its push blocked
+inside the remote's `pre-receive` hook. Against a build without the start record,
+the second one is misclassified as `NOT_STARTED`: exactly the wrong direction.
+
+## Static reachability
+
+`npm run test:git-push-reachability` fails if any non-test module other than this
+executor imports the transport, if a new shipped file gains the ability to spawn
+a process without review, if a shipped spawner other than the transport carries a
+git mutation literal, if a git library or GitHub write client appears, or if
+shipped code imports tests or experiments. Against a planted bypass file it fails
+six of its eleven checks. It protects the architecture; it is not a substitute
+for it.
 
 ## The proof bites
 

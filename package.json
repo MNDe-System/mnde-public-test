@@ -161,6 +161,8 @@
     "test:freshness-boundary": "node ./tests/run-freshness-boundary.mjs",
     "test:git-push-effect": "node ./tests/test_git_push_effect.mjs",
     "test:git-push-execution-evidence": "node ./tests/test_git_push_execution_evidence.mjs",
+    "test:git-push-isolation": "node ./tests/test_git_push_isolation.mjs",
+    "test:git-push-reachability": "node ./tests/test_git_push_reachability.mjs",
     "test:decision-not-execution": "node ./tests/test_decision_not_execution.mjs"
   },
   "devDependencies": {
