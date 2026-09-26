@@ -8,6 +8,7 @@
   },
   "bin": {
     "mnde": "./dist/bin/mnde.mjs",
+    "mnde-git-push": "./dist/bin/mnde-git-push.mjs",
     "mnde-sidecar": "./dist/bin/mnde-sidecar.mjs",
     "sidecar": "./dist/bin/mnde-sidecar.mjs"
   },
@@ -159,6 +160,7 @@
     "test:executor-signer-load": "node ./tests/test_executor_signer_load.mjs",
     "test:executor-readiness": "node ./tests/test_executor_readiness.mjs",
     "test:freshness-boundary": "node ./tests/run-freshness-boundary.mjs",
+    "test:git-push-cli": "node ./tests/test_git_push_cli.mjs",
     "test:git-push-effect": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_effect.mjs",
     "test:git-push-execution-evidence": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_execution_evidence.mjs",
     "test:git-push-isolation": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_isolation.mjs",

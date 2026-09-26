@@ -41,6 +41,7 @@
   "test:feline",
   "test:fresh-setup",
   "test:freshness-boundary",
+  "test:git-push-cli",
   "test:git-push-effect",
   "test:git-push-execution-evidence",
   "test:git-push-isolation",

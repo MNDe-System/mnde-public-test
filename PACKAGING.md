@@ -29,6 +29,10 @@ The CLI itself, [`bin/mnde-sidecar.mjs`](bin/mnde-sidecar.mjs), is wired as thre
 (`mnde-sidecar`, `sidecar`, `mnde`) and reuses the repo's audited signing, verification,
 policy, and authority modules unchanged — no new trust path.
 
+A separate bin, `mnde-git-push` ([`bin/mnde-git-push.mjs`](bin/mnde-git-push.mjs)), is the
+production caller of the typed `git.push` executor. It is not part of the sidecar CLI; see
+[docs/GIT-PUSH-CLI.md](docs/GIT-PUSH-CLI.md).
+
 | Command | Does | Reuses |
 |---|---|---|
 | `init` | generate receipt keys + local authority + starter policy under `MNDE_HOME` (idempotent, never overwrites) | `bootstrapReceiptKeys` |
