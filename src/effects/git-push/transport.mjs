@@ -24,6 +24,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 
+import { sha256 } from "../../crypto/provider.mjs";
+import { redeemClaimTicket } from "../../freshness/claim.mjs";
+
 export const ERR_GIT_UNAVAILABLE = "ERR_GIT_UNAVAILABLE";
 export const ERR_STAGING_FAILED = "ERR_GIT_PUSH_STAGING_FAILED";
 export const ERR_GIT_TIMEOUT = "ERR_GIT_TIMEOUT";
@@ -302,11 +305,25 @@ export function buildPushArgv({ remoteUrl, sourceCommit, targetRef, expectedOldS
   ]);
 }
 
+// The digest a durable claim ticket is bound to: the exact argv, nothing else.
+// Every field that decides where the push lands and what it writes is in it.
+export function pushEffectDigest(argv) {
+  return sha256(JSON.stringify(argv));
+}
+
 // Perform the push. Returns the raw outcome; deciding what it MEANS is the
 // caller's job, because exit code 0 is not proof that the ref moved.
-// performPush is exported, so it must not be a generic `git <anything>` runner
-// behind a narrow name. It accepts only the exact shape buildPushArgv produces:
-// one lease-guarded push of one full SHA to one refs/heads/ branch.
+//
+// performPush is exported (the executor lives in another module), so it is
+// built to be useless on its own. It runs only when BOTH hold:
+//   - the argv is the exact shape buildPushArgv produces: one lease-guarded push
+//     of one full SHA to one refs/heads/ branch, so it is not a generic
+//     `git <anything>` runner behind a narrow name; and
+//   - it is handed an unspent ticket that src/freshness/claim.mjs minted when a
+//     claim store the executor opened itself durably acknowledged a fresh claim
+//     for exactly this argv (see CLAIM TICKET there). The ticket is spent here.
+// A direct import therefore reaches no effect: there is no way to obtain a
+// ticket except by durably spending an authority through the executor's store.
 const LEASE_ARG = /^--force-with-lease=refs\/heads\/[^\s:]+:[0-9a-f]{40}$/;
 const REFSPEC_ARG = /^[0-9a-f]{40}:refs\/heads\/[^\s:]+$/;
 export const ERR_PUSH_ARGV_NOT_TYPED = "ERR_GIT_PUSH_ARGV_NOT_TYPED";
@@ -317,10 +334,12 @@ function isTypedPushArgv(argv) {
     && argv[2].split("=")[1].split(":")[0] === argv[5].split(":")[1];
 }
 
-export async function performPush(argv, context) {
+export async function performPush(argv, context, ticket) {
   if (!isTypedPushArgv(argv)) {
     return { ok: false, reason: ERR_PUSH_ARGV_NOT_TYPED, detail: "performPush only runs the argv built by buildPushArgv", indeterminate: false };
   }
+  const redeemed = redeemClaimTicket(ticket, pushEffectDigest(argv));
+  if (!redeemed.ok) return { ok: false, reason: redeemed.reason, detail: redeemed.detail, indeterminate: false };
   const result = await runGit(argv, context);
   if (result.spawnFailed) return { ok: false, reason: ERR_GIT_UNAVAILABLE, detail: result.message, indeterminate: false };
   if (!result.ok) {

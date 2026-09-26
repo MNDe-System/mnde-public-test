@@ -42,6 +42,7 @@ import {
   pushParameters,
   readJson
 } from "./support/git_push_fixtures.mjs";
+import { installClaimBackend } from "./support/claim_backend_double.mjs";
 
 const NAMESPACE = "mnde-git-push-evidence-namespace";
 
@@ -114,6 +115,7 @@ async function main() {
     pendingCleanup.push(caseDir);
     const repos = makeRepositories(caseDir);
     const backend = inMemoryClaimBackend({ namespace: NAMESPACE, ...backendOptions });
+    installClaimBackend(backend);
     const executor = createGitPushExecutor({
       repoPath: repos.localPath,
       namespace: NAMESPACE,
@@ -124,7 +126,6 @@ async function main() {
       expectedExecutorId: EXECUTOR_ID,
       allowedSchemes: ["file"],
       evidenceDir: join(caseDir, "evidence"),
-      claimBackend: backend,
       executorIdentity: trust.executor.identity,
       executorSigner: trust.executor.signer,
       ...startupOverrides
@@ -565,8 +566,7 @@ async function main() {
       trustedRootFingerprint: trust.fingerprint,
       environmentId: ENVIRONMENT_ID,
       expectedExecutorId: EXECUTOR_ID,
-      evidenceDir: join(caseDir, "evidence"),
-      claimBackend: inMemoryClaimBackend({ namespace: NAMESPACE })
+      evidenceDir: join(caseDir, "evidence")
     }), /executorIdentity and executorSigner are required/);
   });
 
@@ -583,7 +583,6 @@ async function main() {
       environmentId: ENVIRONMENT_ID,
       expectedExecutorId: "mnde:test:prod:executor:someone-else:01",
       evidenceDir: join(caseDir, "evidence"),
-      claimBackend: inMemoryClaimBackend({ namespace: NAMESPACE }),
       executorIdentity: trust.executor.identity,
       executorSigner: trust.executor.signer
     }), /does not match expectedExecutorId/);

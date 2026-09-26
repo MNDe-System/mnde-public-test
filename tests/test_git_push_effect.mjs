@@ -49,6 +49,7 @@ import {
   pushParameters,
   readJson
 } from "./support/git_push_fixtures.mjs";
+import { installClaimBackend } from "./support/claim_backend_double.mjs";
 
 const NAMESPACE = "mnde-git-push-test-namespace";
 
@@ -114,6 +115,10 @@ async function main() {
     pendingCleanup.push(caseDir);
     const repos = makeRepositories(caseDir);
     const backend = inMemoryClaimBackend({ namespace: NAMESPACE, ...backendOptions });
+    // The executor opens its own claim store; the test decides what that store
+    // is by installing it, never by handing it to the executor.
+    const { claimBackend: installed = backend, ...overrides } = startupOverrides;
+    installClaimBackend(installed);
     const executor = createGitPushExecutor({
       repoPath: repos.localPath,
       namespace: NAMESPACE,
@@ -124,10 +129,9 @@ async function main() {
       expectedExecutorId: EXECUTOR_ID,
       allowedSchemes: ["file"],
       evidenceDir: join(caseDir, "evidence"),
-      claimBackend: backend,
       executorIdentity: trust.executor.identity,
       executorSigner: trust.executor.signer,
-      ...startupOverrides
+      ...overrides
     });
     return { repos, backend, executor, caseDir };
   }

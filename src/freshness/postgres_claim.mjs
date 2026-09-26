@@ -1,8 +1,18 @@
-// Unwired deployment adapter. Only trusted executor startup may call this factory.
-// Deliberately accepts no backend, client, driver, config object, or dispatch callback.
+// Deployment adapter. Only the git.push executor's own startup calls this factory
+// (src/effects/git-push/index.mjs); nothing hands it a backend, client, driver,
+// config object or dispatch callback, and it accepts none.
 // Requires the separately provisioned PostgreSQL schema in deployment/freshness.
 import { readFileSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
+
+// Every backend this factory has returned. claim.mjs mints a push ticket only for
+// a claim made through one of these, so an object that merely has the right
+// method names — however it was built — can never authorize an effect.
+const OPENED = new WeakSet();
+
+export function isExecutorClaimBackend(value) {
+  return value !== null && typeof value === 'object' && OPENED.has(value);
+}
 
 function configFromExecutor() {
   const path = process.env.MNDE_CLAIM_CONFIG;
@@ -46,7 +56,7 @@ export async function openExecutorClaimBackend() {
       return await fn(client);
     } finally { await client.end().catch(() => {}); }
   }
-  return Object.freeze({
+  const backend = Object.freeze({
     kind: 'remote-postgresql',
     async health() {
       try {
@@ -84,4 +94,6 @@ export async function openExecutorClaimBackend() {
       });
     }
   });
+  OPENED.add(backend);
+  return backend;
 }

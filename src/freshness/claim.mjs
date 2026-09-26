@@ -24,6 +24,24 @@
 // is treated as used. The alternative — re-spending on uncertainty — is F-001.
 
 import { isProductionExecutionAuthority } from "../execution-authority/index.mjs";
+import { isExecutorClaimBackend } from "./postgres_claim.mjs";
+
+// THE CLAIM TICKET — why the raw push cannot run without a durable claim.
+//
+// A CLAIMED decision is a value, and a value can be forged or reused. So a claim
+// made through a backend the executor's own startup opened (never one a caller
+// built) also mints a ticket: an opaque object whose only meaning is membership
+// in this module-private map. The push primitive in src/effects/git-push/
+// transport.mjs redeems it and refuses without it. A ticket
+//   - exists only after the durable store acknowledged a FRESH claim;
+//   - is bound to the digest of the exact effect it was minted for;
+//   - is spent by its first redemption, matching or not.
+// Importing the transport directly, or calling claimAuthority with a stub
+// backend, therefore yields no push: the stub is not in the adapter's opened set,
+// so no ticket is minted.
+const CLAIM_TICKETS = new WeakMap();
+
+export const ERR_CLAIM_TICKET = "ERR_CLAIM_TICKET";
 
 export const DISPATCH = Object.freeze({
   CLAIMED: "CLAIMED",                       // fresh: proceed to exactly one dispatch
@@ -79,8 +97,10 @@ export function deriveClaimRecord(authority, { namespace } = {}) {
 }
 
 // Attempt the durable claim. NEVER retries; on uncertainty returns UNKNOWN and
-// the caller sends nothing.
-export async function claimAuthority(backend, record) {
+// the caller sends nothing. `effectDigest` names the one effect a resulting
+// ticket may start; without it, or through a backend the executor did not open,
+// a CLAIMED decision carries no ticket.
+export async function claimAuthority(backend, record, { effectDigest = null } = {}) {
   if (!backend) return { decision: DISPATCH.NO_BACKEND };
 
   let health;
@@ -111,10 +131,27 @@ export async function claimAuthority(backend, record) {
     if (!res.record || Object.keys(record).some((k) => res.record[k] !== record[k])) {
       return { decision: DISPATCH.UNKNOWN, note: "inconsistent-ack" };
     }
-    return { decision: DISPATCH.CLAIMED, claim: res.record };
+    if (!isExecutorClaimBackend(backend) || typeof effectDigest !== "string" || !effectDigest) {
+      return { decision: DISPATCH.CLAIMED, claim: res.record, ticket: null };
+    }
+    const ticket = Object.freeze(Object.create(null));
+    CLAIM_TICKETS.set(ticket, Object.freeze({ record: res.record, effect_digest: effectDigest }));
+    return { decision: DISPATCH.CLAIMED, claim: res.record, ticket };
   }
   if (res.status === "ALREADY_SPENT") {
     return { decision: DISPATCH.SPENT, claim: res.prior ?? null, collided_on: res.collided_on ?? null };
   }
   return { decision: DISPATCH.UNKNOWN, note: "unrecognized-claim-status" };
+}
+
+// Spend a ticket. The entry is deleted before it is compared, so a mismatched
+// redemption burns the ticket too: there is no second try with different effect.
+export function redeemClaimTicket(ticket, effectDigest) {
+  const entry = ticket !== null && typeof ticket === "object" ? CLAIM_TICKETS.get(ticket) : undefined;
+  if (!entry) return { ok: false, reason: ERR_CLAIM_TICKET, detail: "no unspent durable claim ticket was presented" };
+  CLAIM_TICKETS.delete(ticket);
+  if (typeof effectDigest !== "string" || entry.effect_digest !== effectDigest) {
+    return { ok: false, reason: ERR_CLAIM_TICKET, detail: "the claim ticket was minted for a different effect" };
+  }
+  return { ok: true, record: entry.record };
 }
