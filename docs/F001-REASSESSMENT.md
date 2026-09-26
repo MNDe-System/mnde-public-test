@@ -335,3 +335,97 @@ over `file://`. That is a rehearsal of the wiring, not a deployment.
    `git` or install a module loader hook without MNDe. The boundary there is
    custody of the push credential, a deployment property.
 
+
+## Addendum, 2026-09-26 — a supported production caller (question 8)
+
+**Verdict unchanged: F-001 is still NOT closed.** This addendum moves question 8
+from "not yet answerable" to "answerable, and answered for MNDe's own code". It
+does not touch questions 4 or 6.
+
+**Before.** Nothing outside `tests/` constructed `createGitPushExecutor`. There
+was no supported production caller for the typed `git.push` executor, so
+question 8 could only be answered by reading code.
+
+**After.** A shipped CLI, `mnde-git-push <request.json>`
+(`bin/mnde-git-push.mjs`, package bin `mnde-git-push`), invokes the typed
+`git.push` executor end to end: the same authorization verification, request
+binding, durable single-use claim, claim ticket, typed transport, post-state
+observation and signed evidence, with nothing added in front of them. Its startup
+configuration comes only from the deployment environment
+(`src/effects/git-push/startup.mjs`). Details are in
+[GIT-PUSH-CLI.md](GIT-PUSH-CLI.md).
+
+**Question 8 against the operated path.** *Can the supported production path
+bypass the typed executor?* For MNDe's own code, no, and this is now under test
+rather than only read:
+
+- The CLI imports only `node:fs`, the executor module and its startup loader. It
+  names no transport, claim or claim-adapter symbol, starts no process and never
+  names `git`. Outside `tests/`, only the executor and the CLI name
+  `createGitPushExecutor`. (`npm run test:git-push-cli`, case K.)
+- Every invocation constructs one executor and calls `executeGitPush()` once,
+  counted in every case through a test-only preload. There is no retry path (L,
+  M1, M2, M3).
+- A missing `MNDE_CLAIM_CONFIG` exits `4` before an executor exists. A bad or
+  unreachable claim store is refused by the executor with nothing sent and no
+  substitute backend (E, F1, F2).
+- Request fields cannot reach startup configuration. They are refused before
+  construction (J).
+- Only an observed `EXECUTED` exits `0`.
+
+`npm run test:git-push-cli`: 17/17. It spawns the real CLI, and for case N the
+built `dist/` CLI, against real git repositories, with a post-receive hook in the
+remote counting every push it receives. The claim store there is a file-backed
+test double, because CI has no PostgreSQL.
+
+**Red-cased**, with temporary edits that were never committed:
+
+| Mutation | Result |
+| --- | --- |
+| CLI calls `executeGitPush()` twice in a loop | 4/17, 13 cases fail |
+| CLI retries on any non-`EXECUTED` outcome | 6/17, 11 cases fail |
+| CLI imports `performPush` | 16/17, case K fails |
+| CLI starts `git` itself via `child_process` | 16/17, case K fails |
+| In-memory claim backend fallback when `MNDE_CLAIM_CONFIG` is unset | 15/17, cases E and K fail |
+| `REFUSED` exits `0` | 7/17, 10 cases fail |
+
+**Operated, 2026-09-26, not in CI.** The CLI, with no preload and no test double,
+against the real adapter and a PostgreSQL 16.13 primary over verified TLS, as a
+restricted `NOINHERIT` non-owner login bound to one namespace. Run once from the
+source tree and once from the built `dist/` CLI, with the same results:
+
+- 8 concurrent CLI processes presenting one authority: 1 `EXECUTED` (exit 0).
+  The other 7 were refused, with nothing sent. On the source run all 7 were
+  `ERR_GIT_PUSH_REMOTE_MOVED`, because the winner's push landed before they read
+  the remote. On the `dist/` run, 6 were `REMOTE_MOVED` and 1 was
+  `ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT`. One claim row was written either way.
+  This run shows at-most-one push under concurrency. It does not by itself show
+  the claim deciding every race.
+- Remote reset to the pre-state, same request replayed: exit 1,
+  `ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT`, `claim.decision` `SPENT`. Refused by the
+  claim, not the lease.
+- A fresh execution id on the spent grant, and the spent execution id under a new
+  grant: both exit 1 `SPENT`, nothing sent.
+- A new grant and a new execution id: exit 0 `EXECUTED`. Two rows in total.
+- Server stopped with `-m immediate`, new authority: exit 1,
+  `ERR_GIT_PUSH_CLAIM_NOT_ESTABLISHED` (`BACKEND_UNAVAILABLE`), remote untouched,
+  no row written.
+- `MNDE_CLAIM_CONFIG` unset: exit 4, `ERR_GIT_PUSH_CLI_CONFIG`.
+
+As in the earlier rehearsal, the trust material came from test fixtures and the
+remote was a local bare repository over `file://`. The CLI, the adapter and the
+claim store were real. This is a rehearsal of the production wiring, not a
+deployment.
+
+**What remains.**
+
+1. **Question 4, power loss.** Unchanged, and not re-run here.
+2. **Question 6, datastore restore.** Unchanged. The database owner can restore a
+   backup and revive consumed authority.
+3. **Credential custody and in-process code.** Unchanged. The CLI closes the gap
+   of "no supported caller". It cannot stop code running inside the executor
+   process, or anyone else holding the push credential, from starting `git`.
+   That boundary is custody of the push credential and the executor key.
+4. **An actual deployment.** The path has now been operated through its
+   production entry point against a real claim store. It has not been operated
+   with production trust material against a production remote.

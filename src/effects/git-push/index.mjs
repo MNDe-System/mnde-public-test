@@ -149,7 +149,10 @@ function nonEmptyString(value) {
 // The key set is exact. Dropping an unrecognized field would let a caller write
 // `force: true` and be quietly ignored, which reads to them as a request that
 // was honoured. There is no field here that is safe to ignore, so none is.
-const REQUEST_KEYS = Object.freeze([
+//
+// Exported so bin/mnde-git-push.mjs can refuse a malformed request file before it
+// loads any key material, against this list rather than a copy of it.
+export const REQUEST_KEYS = Object.freeze([
   "authorization", "expectedOldSha", "remote", "remoteUrl", "repository", "sourceCommit", "targetRef"
 ]);
 
