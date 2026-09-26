@@ -45,6 +45,7 @@
   "test:git-push-execution-evidence",
   "test:git-push-isolation",
   "test:git-push-reachability",
+  "test:git-push-single-route",
   "test:graceful-shutdown",
   "test:historical-policy-bundle",
   "test:identity-assertion",

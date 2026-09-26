@@ -50,9 +50,11 @@ import {
   pushParameters,
   readJson
 } from "./support/git_push_fixtures.mjs";
+import { installClaimBackend } from "./support/claim_backend_double.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RUNNER = join(HERE, "support", "git_push_crash_runner.mjs");
+const HOOKS = pathToFileURL(join(HERE, "support", "claim_backend_hooks.mjs")).href;
 const NAMESPACE = "mnde-git-push-isolation-namespace";
 
 let passed = 0;
@@ -105,6 +107,7 @@ async function main() {
     pendingCleanup.push(caseDir);
     const repos = makeRepositories(caseDir);
     const evidenceDir = join(caseDir, "evidence");
+    installClaimBackend(inMemoryClaimBackend({ namespace: NAMESPACE }));
     const executor = createGitPushExecutor({
       repoPath: repos.localPath,
       namespace: NAMESPACE,
@@ -115,7 +118,6 @@ async function main() {
       expectedExecutorId: EXECUTOR_ID,
       allowedSchemes: ["file"],
       evidenceDir,
-      claimBackend: inMemoryClaimBackend({ namespace: NAMESPACE }),
       executorIdentity: trust.executor.identity,
       executorSigner: trust.executor.signer,
       ...startupOverrides
@@ -235,7 +237,7 @@ async function main() {
     const caseDir = join(dir, `crash-after-claim-${caseIndex}`);
     mkdirSync(caseDir);
     pendingCleanup.push(caseDir);
-    const child = spawn(process.execPath, ["--no-warnings", RUNNER, "crash-after-claim", caseDir], { stdio: ["ignore", "ignore", "pipe"] });
+    const child = spawn(process.execPath, ["--no-warnings", "--import", HOOKS, RUNNER, "crash-after-claim", caseDir], { stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
     child.stderr.on("data", (d) => { stderr += d; });
     const code = await new Promise((r) => child.on("exit", (c) => r(c)));
@@ -252,7 +254,7 @@ async function main() {
     const caseDir = join(dir, `killed-in-push-${caseIndex}`);
     mkdirSync(caseDir);
     pendingCleanup.push(caseDir);
-    const child = spawn(process.execPath, ["--no-warnings", RUNNER, "hang-in-push", caseDir], { stdio: ["ignore", "ignore", "pipe"] });
+    const child = spawn(process.execPath, ["--no-warnings", "--import", HOOKS, RUNNER, "hang-in-push", caseDir], { stdio: ["ignore", "ignore", "pipe"] });
     let exited = false;
     child.on("exit", () => { exited = true; });
     try {

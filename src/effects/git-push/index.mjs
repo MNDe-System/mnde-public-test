@@ -49,6 +49,7 @@ import { sha256 } from "../../crypto/provider.mjs";
 import { evaluateExecutorPosture } from "../../executor-posture-preflight.mjs";
 import { isProductionExecutionAuthority, verifyExecutionAuthority } from "../../execution-authority/index.mjs";
 import { claimAuthority, deriveClaimRecord, DISPATCH } from "../../freshness/claim.mjs";
+import { openExecutorClaimBackend } from "../../freshness/postgres_claim.mjs";
 import { parseRuntimeProfile } from "../../../shared/runtime-profile.mjs";
 import {
   bindRequestToAuthority,
@@ -62,6 +63,7 @@ import {
   createStagingRepository,
   isAncestor,
   performPush,
+  pushEffectDigest,
   readConfiguredRemoteUrl,
   readRemoteRef,
   removeStagingRepository,
@@ -89,6 +91,7 @@ export const ERR_CLAIM_NOT_ESTABLISHED = "ERR_GIT_PUSH_CLAIM_NOT_ESTABLISHED";
 export const ERR_POSTSTATE_MISMATCH = "ERR_GIT_PUSH_POSTSTATE_MISMATCH";
 export const ERR_STARTUP_CONFIG = "ERR_GIT_PUSH_STARTUP_CONFIG";
 export const ERR_EXECUTION_START_NOT_RECORDED = "ERR_GIT_PUSH_EXECUTION_START_NOT_RECORDED";
+export const ERR_BACKEND_SUBSTITUTION = "ERR_GIT_PUSH_BACKEND_SUBSTITUTION";
 
 export const EXECUTION_START_SCHEMA = "mnde.git-push-execution-start.v1";
 
@@ -232,14 +235,6 @@ export function createGitPushExecutor(startup = {}) {
     transportEnv = {},
     evidenceDir,
     timeoutMs = DEFAULT_TIMEOUT_MS,
-    // The durable claim backend. The trusted startup owns this choice: a caller
-    // cannot supply one, and there is no code path that constructs a backend
-    // from a request. Production deployments pass the adapter returned by
-    // src/freshness/postgres_claim.mjs, whose single-use property is proven in
-    // docs/F001-CLAIM-STORE-PROOF.md. Whatever is passed, its `kind` is recorded
-    // in the evidence, so a non-durable backend is visible in the audit record
-    // rather than indistinguishable from the real one.
-    claimBackend = null,
     // The executor's own signing identity, and a signer that keeps the private
     // key to itself. Both are required: this effect exists to produce evidence
     // of what it did, and evidence nobody signed is a log entry. There is no
@@ -248,6 +243,20 @@ export function createGitPushExecutor(startup = {}) {
     executorSigner = null,
     env = process.env
   } = startup;
+
+  // The durable claim store is not configuration a caller passes in. An earlier
+  // version took `claimBackend` here, which meant whoever constructed the
+  // executor chose whether replay protection was durable — an in-memory stub
+  // made every authority single-use only until the process restarted, which is
+  // F-001 exactly. The executor now opens the one adapter itself, from the
+  // operator's MNDE_CLAIM_CONFIG, and refuses to start if handed a substitute
+  // rather than silently ignoring it.
+  if (Object.hasOwn(startup, "claimBackend")) {
+    throw Object.assign(
+      new Error(`${ERR_BACKEND_SUBSTITUTION}: the claim store is opened by the executor from MNDE_CLAIM_CONFIG and cannot be supplied`),
+      { code: ERR_BACKEND_SUBSTITUTION }
+    );
+  }
 
   for (const [name, value] of [["repoPath", repoPath], ["namespace", namespace], ["evidenceDir", evidenceDir]]) {
     if (!nonEmptyString(value)) {
@@ -292,6 +301,14 @@ export function createGitPushExecutor(startup = {}) {
     cwd: resolve(repoPath),
     timeoutMs
   });
+
+  // Opened once, at startup, by the executor itself. A store that cannot be
+  // opened is not an error here: every push then refuses at the claim step with
+  // nothing sent, which is the fail-closed answer, and the reason is recorded.
+  const claimStore = openExecutorClaimBackend().then(
+    (backend) => ({ backend, detail: null }),
+    (error) => ({ backend: null, detail: String(error?.message ?? error) })
+  );
 
   function writeEvidence(evidence) {
     const body = JSON.stringify(evidence, null, 2);
@@ -560,15 +577,24 @@ export function createGitPushExecutor(startup = {}) {
 
     // ── 11. Spend the authority, durably, BEFORE anything leaves the process ─
     // Everything above this line is a read. Everything below is irreversible.
+    // The argv is fixed first because the claim ticket is bound to it: the one
+    // push the transport will run is the one this claim paid for.
     const derived = deriveClaimRecord(authority, { namespace });
     if (!derived.ok) return refuse(derived.reason, "the claim record could not be derived from the verified authority", { ...identity, authorized, observed: { before: before.sha } });
 
-    const claim = await claimAuthority(claimBackend, derived.record);
+    const argv = buildPushArgv({
+      remoteUrl: p.remote_url,
+      sourceCommit: p.source_commit,
+      targetRef: p.target_ref,
+      expectedOldSha: p.expected_old_sha
+    });
+    const store = await claimStore;
+    const claim = await claimAuthority(store.backend, derived.record, { effectDigest: pushEffectDigest(argv) });
     const claimMeta = {
       namespace,
-      backend_kind: claimBackend?.kind ?? null,
+      backend_kind: store.backend?.kind ?? null,
       decision: claim.decision,
-      note: claim.note ?? null
+      note: claim.note ?? store.detail ?? null
     };
     if (claim.decision === DISPATCH.SPENT) {
       // The one case the whole design exists for. A second presentation of the
@@ -577,7 +603,7 @@ export function createGitPushExecutor(startup = {}) {
         "this execution authority has already been spent; it cannot authorize a second push",
         { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
     }
-    if (claim.decision !== DISPATCH.CLAIMED) {
+    if (claim.decision !== DISPATCH.CLAIMED || !claim.ticket) {
       // NO_BACKEND, BACKEND_UNAVAILABLE and UNKNOWN all land here and all send
       // nothing. UNKNOWN in particular must never be retried: the claim may have
       // landed, and a retry would be exactly the replay F-001 names.
@@ -601,13 +627,7 @@ export function createGitPushExecutor(startup = {}) {
     }
 
     // ── 12. THE EFFECT ───────────────────────────────────────────────────────
-    const argv = buildPushArgv({
-      remoteUrl: p.remote_url,
-      sourceCommit: p.source_commit,
-      targetRef: p.target_ref,
-      expectedOldSha: p.expected_old_sha
-    });
-    const pushed = await performPush(argv, stage);
+    const pushed = await performPush(argv, stage, claim.ticket);
 
     // ── 13. Believe the remote, not the exit code ────────────────────────────
     // Exit 0 is the subprocess's opinion. The effect is what the remote says it

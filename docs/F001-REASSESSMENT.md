@@ -279,3 +279,59 @@ other module from reaching the transport. See `docs/GIT-PUSH-EFFECT.md` and
 question 6 are exactly as stated above. The start record makes a crash
 *classifiable*; it does not make an in-flight push's outcome knowable — that case
 is `INDETERMINATE` and a human reconciles it against the remote.
+
+## Addendum, 2026-09-26 — two routes around the claim, closed by construction
+
+**Verdict unchanged: F-001 is still NOT closed.** Nothing below moves questions
+4, 6 or 8.
+
+**What was wrong.** Question 2 above counts `performPush` call sites, which is
+true of the tree but not a property of the code: `performPush` was exported and
+ran a push when handed a well-formed argv, with no authorization and no claim.
+And `createGitPushExecutor` took its claim store as a startup argument, so the
+durability that answers question 1 was a choice made by whoever constructed the
+executor; an in-memory object passed there made replay protection last only
+until restart.
+
+**What changed.** `performPush` now requires a single-use claim ticket that
+`src/freshness/claim.mjs` mints only for a fresh claim durably acknowledged by a
+store the executor opened itself, bound to the digest of the exact argv. The
+executor opens `src/freshness/postgres_claim.mjs` from `MNDE_CLAIM_CONFIG` and
+refuses to start if handed a `claimBackend`. See
+[One route to the effect](GIT-PUSH-EFFECT.md#one-route-to-the-effect) and
+`npm run test:git-push-single-route` (15 cases). Red-cased: with the ticket check
+removed from `performPush` the suite scores 9/15; with tickets minted for any
+backend, 13/15.
+
+**Operated, 2026-09-26, not in CI.** For the first time the executor opened the
+real adapter itself (no test double, no injection) against a PostgreSQL 16
+primary over verified TLS as a restricted `NOINHERIT` non-owner login, after
+`claim-store-proof.mjs` scored 21/21 with the restart case skipped:
+
+- 8 OS processes presenting one authority at once: 1 `EXECUTED`, 7
+  `ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT` with nothing sent; 1 row in the store.
+- Remote reset to the pre-state, then the same authority replayed: refused by
+  the claim, not the lease. A fresh execution id on the spent grant: refused. A
+  new grant: `EXECUTED`. 2 rows in total.
+- Server stopped with `-m immediate`: `ERR_GIT_PUSH_CLAIM_NOT_ESTABLISHED`
+  (`BACKEND_UNAVAILABLE`), remote untouched, no row written.
+
+The trust material was test fixtures and the remote was a local bare repository
+over `file://`. That is a rehearsal of the wiring, not a deployment.
+
+**What remains, unchanged in kind.**
+
+1. **Question 8 — no production caller.** Nothing outside `tests/` constructs
+   `createGitPushExecutor`. There is no CLI, sidecar route or job that invokes
+   `git.push`, so there is no supported production path to show unbypassable in
+   practice. Adding one is a product decision, not a fix.
+2. **Question 4 — power loss.** Restart with `-m immediate` is not loss of
+   power, and it was not re-run here.
+3. **Question 6 — datastore restore.** The executor login cannot roll the store
+   back. The database owner can restore a backup and revive consumed authority.
+   That is a property of the chosen database and its administrators.
+4. **In-process code is out of scope by construction.** The ticket closes routes
+   through MNDe's own modules. Code running inside the executor process can start
+   `git` or install a module loader hook without MNDe. The boundary there is
+   custody of the push credential, a deployment property.
+

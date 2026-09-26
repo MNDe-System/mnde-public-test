@@ -1,7 +1,8 @@
 // TEST SUPPORT ONLY — one git.push attempt in its own OS process, so the parent
 // test can crash or kill it at an exact point in the claim -> start -> push
 // window. Real repositories, real production verifier, real signing; the only
-// seam is the claim backend, which is trusted startup configuration anyway.
+// seam is the claim store module, replaced for the whole process by
+// claim_backend_hooks.mjs (the parent starts this runner with it preloaded).
 //
 //   node tests/support/git_push_crash_runner.mjs <mode> <caseDir>
 //
@@ -19,6 +20,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { createGitPushExecutor } from "../../src/effects/git-push/index.mjs";
+import { installClaimBackend } from "./claim_backend_double.mjs";
 import {
   ENVIRONMENT_ID,
   EXECUTOR_ID,
@@ -50,6 +52,7 @@ if (mode === "hang-in-push") {
 }
 
 const evidenceDir = join(caseDir, "evidence");
+installClaimBackend(claimBackend);
 const executor = createGitPushExecutor({
   repoPath: repos.localPath,
   namespace: NAMESPACE,
@@ -60,7 +63,6 @@ const executor = createGitPushExecutor({
   expectedExecutorId: EXECUTOR_ID,
   allowedSchemes: ["file"],
   evidenceDir,
-  claimBackend,
   executorIdentity: trust.executor.identity,
   executorSigner: trust.executor.signer
 });

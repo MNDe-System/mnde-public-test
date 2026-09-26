@@ -132,7 +132,11 @@ Read this section before quoting the ones above.
   ordering is now built and tested, but no deployment has run this path against
   that store. Until a real deployment does, this is a correct design that has not
   been operated.
-- **The test suite's claim backend is in-memory.** It implements the same
+- **The test suite's claim backend is in-memory.** The executor opens its own
+  store (see [One route to the effect](#one-route-to-the-effect)), so the suites
+  replace the adapter *module* for the whole test process with
+  `tests/support/claim_backend_double.mjs`, preloaded by
+  `node --import ./tests/support/claim_backend_hooks.mjs`. It implements the same
   protocol and the same at-most-once semantics, so it proves the ORDERING — that
   nothing is sent on anything but `CLAIMED`, and that a second presentation of
   the same authority is refused. It proves nothing about durability or
@@ -149,8 +153,42 @@ Read this section before quoting the ones above.
   permission to act.
 - **This is inert unless configured.** Outside `MNDE_PROFILE=production` it
   refuses. Inside it, it refuses without a trust root, an executor identity, an
-  environment id and a claim backend. There is no flag that turns it on; the
-  configuration is the gate.
+  environment id and a claim store configured through `MNDE_CLAIM_CONFIG`. There
+  is no flag that turns it on; the configuration is the gate.
+
+## One route to the effect
+
+Two ways around the executor existed in the code and are now closed by
+construction rather than by another check.
+
+**The push primitive was importable.** `performPush` is exported from
+`transport.mjs` because the executor lives in another module, and before this
+change any code that imported it could run a well-formed, lease-guarded push with
+no authorization and no claim. It now requires a *claim ticket*: an opaque object
+that `src/freshness/claim.mjs` mints only when a claim store the executor opened
+itself durably acknowledges a fresh claim, bound to the digest of the exact argv,
+and spent by its first redemption — matching or not. A plain object, a string, a
+ticket from a stub backend, a ticket for a different push and a spent ticket are
+all refused with `ERR_CLAIM_TICKET`.
+
+**The claim store was caller-supplied.** `createGitPushExecutor` accepted
+`claimBackend`, so whoever constructed the executor chose whether replay
+protection was durable; an in-memory object made every authority single-use only
+until the process restarted, which is F-001 exactly. The executor now opens the
+one adapter itself, `openExecutorClaimBackend()` from `MNDE_CLAIM_CONFIG`, and
+throws `ERR_GIT_PUSH_BACKEND_SUBSTITUTION` if `claimBackend` is passed at all.
+The adapter records every backend it returns, and only those can mint a ticket.
+A store that cannot be opened makes every push refuse at the claim step with
+nothing sent.
+
+What this is not: a defence against code already running inside the executor
+process. Such code can start `git` itself, or register a module loader hook,
+without touching MNDe. The boundary against that is custody of the push
+credential — only the executor process may hold it — which is a deployment
+property. `npm run test:git-push-single-route` covers the attacks above, replay
+under concurrency and re-labelling, a lost acknowledgement, a partitioned store,
+an inconsistent acknowledgement, and a child process running the real adapter
+with no configuration.
 
 ## The transport environment
 
