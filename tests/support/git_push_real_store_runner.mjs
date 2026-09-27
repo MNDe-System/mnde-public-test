@@ -40,6 +40,7 @@ const stub = await claimAuthority(inMemoryClaimBackend({ namespace: NAMESPACE })
 const direct = await performPush(argv, { repoPath: repos.localPath, cwd: repos.localPath, env: buildTransportEnv({}).env, timeoutMs: 30_000 }, stub.ticket);
 
 // The executor, configured for production in every respect except the claim store.
+process.env.MNDE_GIT_CREDENTIAL_CONFIG = repos.credentialConfigPath;
 const executor = createGitPushExecutor({
   repoPath: repos.localPath,
   namespace: NAMESPACE,

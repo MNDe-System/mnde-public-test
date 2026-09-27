@@ -75,7 +75,8 @@ absolute. There are no defaults, no development fallbacks, and no demo keys.
 | Variable | Meaning |
 | --- | --- |
 | `MNDE_PROFILE` | Must be `production`. |
-| `MNDE_CLAIM_CONFIG` | Absolute path to the claim-store config read by `src/freshness/postgres_claim.mjs`. The CLI only checks that it is set; the executor's own adapter opens and validates it. See `docs/F001-CLAIM-STORE-PROOF.md`. The `pg` driver must be installed in the executor runtime. |
+| `MNDE_CLAIM_CONFIG` | Absolute path to the claim-store config read by `src/freshness/postgres_claim.mjs`. The CLI checks that the file exists and is not writable by other users; the executor's own adapter opens and validates it. See `docs/F001-CLAIM-STORE-PROOF.md`. The `pg` driver must be installed in the executor runtime. |
+| `MNDE_GIT_CREDENTIAL_CONFIG` | Absolute path to the push credential configuration (`mnde.git-credential-config.v1`): which kind of credential the executor uses and which repositories it is scoped to. The only source of push credentials; there is no fallback. See `docs/PRODUCTION-TRUST-BOUNDARY.md`. |
 | `MNDE_GIT_PUSH_REPO_PATH` | The local repository holding the objects to push. |
 | `MNDE_GIT_PUSH_NAMESPACE` | The claim namespace. It must equal the namespace the claim-store login is bound to, or every claim fails closed. |
 | `MNDE_GIT_PUSH_EVIDENCE_DIR` | Where local and signed execution evidence and start records are written. |
@@ -88,13 +89,22 @@ absolute. There are no defaults, no development fallbacks, and no demo keys.
 | `MNDE_EXECUTOR_CREDENTIAL` | Root-signed executor credential for that key. |
 | `MNDE_EXECUTOR_ENVIRONMENT` | This executor's environment. Must equal `MNDE_VERIFY_ENVIRONMENT_ID`. |
 | `MNDE_GIT_PUSH_ALLOWED_SCHEMES` | Optional. Comma-separated remote URL schemes. Unset means the executor default, `https,ssh`. |
-| `MNDE_GIT_PUSH_TRANSPORT_ENV` | Optional. Absolute path to a JSON object of transport variables for git (for example `GIT_SSH_COMMAND`, `HOME`). The executor accepts only its own allowlist (`ALLOWED_TRANSPORT_ENV` in `src/effects/git-push/transport.mjs`) and refuses anything else. |
+| `MNDE_GIT_PUSH_TRANSPORT_ENV` | Optional. Absolute path to a JSON object of transport variables for git. Only `PATH` and `GIT_SSL_CAINFO` are accepted (`ALLOWED_TRANSPORT_ENV` in `src/effects/git-push/transport.mjs`); anything else, including `HOME`, `SSH_AUTH_SOCK` and `GIT_SSH_COMMAND`, is refused, because credentials come only from `MNDE_GIT_CREDENTIAL_CONFIG`. |
 
 The executor key and credential are loaded by the existing
 `assertExecutorIdentityReadiness()`, which verifies the credential against the
 configured bundle and proves the key matches it before the executor is built. The
 key is never printed and never copied. If any of this fails, the CLI exits `4`
 before an executor exists.
+
+Startup also refuses, with exit `4`: MNDe's shipped demo root or an authority
+named `local`/`demo` (`ERR_GIT_PUSH_DEMO_TRUST_MATERIAL`); an executor key that
+is also one of the authority's keys (`ERR_GIT_PUSH_TRUST_ROLE_REUSE`); and, on
+POSIX, a trust file that is inside the local repository or the package, not
+owned by the executor's user (configuration may be root-owned), writable by
+others, or for the executor key, readable by others
+(`ERR_GIT_PUSH_TRUST_FILE_INSECURE`). On Windows the permission part is not
+checked; see `docs/PRODUCTION-TRUST-BOUNDARY.md`.
 
 ## Production invocation
 
@@ -104,7 +114,7 @@ MNDE_CLAIM_CONFIG=/etc/mnde/claim-config.json \
 MNDE_GIT_PUSH_REPO_PATH=/srv/mnde/work/example-repo \
 MNDE_GIT_PUSH_NAMESPACE=mnde-prod-git-push-01 \
 MNDE_GIT_PUSH_EVIDENCE_DIR=/var/lib/mnde/git-push-evidence \
-MNDE_GIT_PUSH_TRANSPORT_ENV=/etc/mnde/git-push-transport.json \
+MNDE_GIT_CREDENTIAL_CONFIG=/etc/mnde/git-credential.json \
 MNDE_VERIFY_AUTHORITY_BUNDLE=/etc/mnde/published-authority-bundle.json \
 MNDE_VERIFY_TRUSTED_ROOT_FINGERPRINT=<root fingerprint, from out of band> \
 MNDE_VERIFY_ENVIRONMENT_ID=prod \
@@ -197,8 +207,15 @@ What the CLI does not do, each enforced by `npm run test:git-push-cli`:
 - It constructs the executor once and calls `executeGitPush()` once per
   invocation. Every case counts both calls through a test-only preload.
 - It never supplies a claim backend and has no fallback store. Missing claim
-  configuration exits `4` before the executor exists (case E). Bad or unreachable
-  claim storage is refused by the executor with nothing sent (cases F1 and F2).
+  configuration, or a claim config file that does not exist, exits `4` before
+  the executor exists (cases E and F1). Unreachable claim storage is refused by
+  the executor with nothing sent (case F2).
+- It never supplies a push credential and there is no fallback to ambient ones.
+  A missing credential configuration exits `4` (case P1); a credential scoped to
+  another repository refuses before the claim, so the same authority can then
+  execute (P2); ambient tokens, askpass, ssh settings, `HOME` and injected git
+  config never reach the push, observed from the remote's own hook (P3); demo
+  trust, a reused key and insecure trust files refuse startup (P4, P5).
 - Request input cannot select or change startup configuration (case J).
 
 The suite runs the CLI as a child process against real git repositories. A
@@ -217,5 +234,7 @@ not close F-001.** These remain separate questions:
 - **Database-owner restore.** The executor login cannot roll the claim store
   back. The database owner can restore an old backup and revive spent authority.
 - **Credential custody and in-process code.** Code running inside the executor
-  process could start `git` itself. The boundary there is custody of the push
-  credential and the executor key, which is a deployment property.
+  process could start `git` itself. The executor now takes its push credential
+  only from `MNDE_GIT_CREDENTIAL_CONFIG` and gives it only to the git processes
+  that talk to the remote (`docs/PRODUCTION-TRUST-BOUNDARY.md`). Whether nothing
+  else holds a credential for the repository is still a deployment property.

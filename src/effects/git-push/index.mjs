@@ -43,7 +43,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync, writeSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { sha256 } from "../../crypto/provider.mjs";
 import { evaluateExecutorPosture } from "../../executor-posture-preflight.mjs";
@@ -58,6 +59,11 @@ import {
 } from "./validate.mjs";
 import { buildExecutionEvidenceBody, signExecutionEvidence } from "./evidence.mjs";
 import {
+  ERR_CREDENTIAL_SUBSTITUTION,
+  ERR_CREDENTIAL_UNAVAILABLE,
+  openExecutorPushCredentialProvider
+} from "./credential-provider.mjs";
+import {
   buildPushArgv,
   buildTransportEnv,
   createStagingRepository,
@@ -67,8 +73,13 @@ import {
   readConfiguredRemoteUrl,
   readRemoteRef,
   removeStagingRepository,
-  resolveLocalCommit
+  resolveLocalCommit,
+  withPushCredential
 } from "./transport.mjs";
+
+// The MNDe package root. A push credential file under it would ship, or be
+// writable by whoever updates the package, so the provider refuses one there.
+const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 export const EVIDENCE_SCHEMA = "mnde.execution-evidence.v1";
 
@@ -261,6 +272,17 @@ export function createGitPushExecutor(startup = {}) {
     );
   }
 
+  // Likewise the push credential. Whoever constructs the executor does not
+  // choose how it authenticates to the remote: the executor opens its one
+  // provider from the operator's MNDE_GIT_CREDENTIAL_CONFIG, and a provider
+  // offered here is refused rather than ignored.
+  if (Object.hasOwn(startup, "credentialProvider")) {
+    throw Object.assign(
+      new Error(`${ERR_CREDENTIAL_SUBSTITUTION}: the push credential is opened by the executor from MNDE_GIT_CREDENTIAL_CONFIG and cannot be supplied`),
+      { code: ERR_CREDENTIAL_SUBSTITUTION }
+    );
+  }
+
   for (const [name, value] of [["repoPath", repoPath], ["namespace", namespace], ["evidenceDir", evidenceDir]]) {
     if (!nonEmptyString(value)) {
       throw Object.assign(new Error(`${ERR_STARTUP_CONFIG}: ${name} is required`), { code: ERR_STARTUP_CONFIG });
@@ -303,6 +325,15 @@ export function createGitPushExecutor(startup = {}) {
     env: transport.env,
     cwd: resolve(repoPath),
     timeoutMs
+  });
+
+  // Opened once, at startup, from deployment configuration only. Missing or
+  // malformed configuration, or a secret file another OS user could read or
+  // one inside the local repository or the package, refuses construction:
+  // there is no credential fallback of any kind. The secret itself is not read
+  // here; acquire() reads or mints it per execution.
+  const credentials = openExecutorPushCredentialProvider(env, {
+    forbiddenRoots: [context.repoPath, PACKAGE_ROOT]
   });
 
   // Opened once, at startup, by the executor itself. A store that cannot be
@@ -432,7 +463,9 @@ export function createGitPushExecutor(startup = {}) {
     });
   }
 
-  function refuse(reason, detail, partial = {}) {
+  // A refusal as data, so a caller holding a credential can release it and
+  // scrub its output before anything is written.
+  function refusal(reason, detail, partial = {}) {
     const evidence = {
       schema: EVIDENCE_SCHEMA,
       outcome: OUTCOME.REFUSED,
@@ -443,13 +476,21 @@ export function createGitPushExecutor(startup = {}) {
       recorded_at: new Date().toISOString(),
       ...partial
     };
-    return settle(evidence, {
-      ok: false,
-      outcome: OUTCOME.REFUSED,
-      executed: false,
-      reason_code: reason,
-      detail: detail ?? null
-    });
+    return {
+      evidence,
+      result: {
+        ok: false,
+        outcome: OUTCOME.REFUSED,
+        executed: false,
+        reason_code: reason,
+        detail: detail ?? null
+      }
+    };
+  }
+
+  function refuse(reason, detail, partial = {}) {
+    const { evidence, result } = refusal(reason, detail, partial);
+    return settle(evidence, result);
   }
 
   async function executeGitPush(request = {}) {
@@ -557,8 +598,58 @@ export function createGitPushExecutor(startup = {}) {
       if (!local.ok) return refuse(local.reason, local.detail, { ...identity, authorized });
     }
 
+    // ── 8b. Obtain the push credential ───────────────────────────────────────
+    // As late as the transport allows, and no later. Every step above is local
+    // and needs no credential. The very next step reads the remote, and a
+    // private remote cannot be read without authenticating, so the credential
+    // is obtained here — BEFORE the claim, deliberately: if the credential
+    // cannot be obtained (secret service down, token refused, scope wrong),
+    // the refusal spends nothing and a fresh attempt with the same
+    // authorization is legitimate. Obtaining it after the claim would turn
+    // every credential outage into burned authority.
+    let handle;
+    try {
+      handle = await credentials.acquire({ repository: p.repository, remoteUrl: p.remote_url, executorId: identity.executor_id });
+    } catch (error) {
+      return refuse(error?.code ?? ERR_CREDENTIAL_UNAVAILABLE,
+        `${String(error?.message ?? error)}; nothing was sent and the authority was not spent`,
+        { ...identity, authorized });
+    }
+    const credentialed = withPushCredential(stage, handle);
+    if (!credentialed.ok) {
+      await handle.release().catch(() => null);
+      return refuse(credentialed.reason, credentialed.detail, { ...identity, authorized });
+    }
+
+    // Whatever happens next, the credential is released before the outcome is
+    // written, and everything written is scrubbed of it first.
+    let parts;
+    try {
+      parts = await remoteEffect(stage, credentialed.context, { authority, identity, authorized, p });
+    } finally {
+      parts = await releaseInto(parts, handle);
+    }
+    return settle(parts.evidence, parts.result);
+  }
+
+  async function releaseInto(parts, handle) {
+    let released;
+    try { released = await handle.release(); } catch { released = { released: false }; }
+    if (!parts) return parts;
+    const scrub = (value) => JSON.parse(handle.redact(JSON.stringify(value)));
+    return {
+      evidence: scrub({ ...parts.evidence, push_credential: { ...handle.metadata, ...released } }),
+      result: scrub(parts.result)
+    };
+  }
+
+  // Steps 9 onward, run with the credentialed context for the three operations
+  // that talk to the remote. Returns { evidence, result } unsettled.
+  async function remoteEffect(stage, remote, { authority, identity, authorized, p }) {
+    const refuse = refusal;
+
     // ── 9. The remote is observed, independently, in the approved pre-state ──
-    const before = await readRemoteRef(p.remote_url, p.target_ref, stage);
+    const before = await readRemoteRef(p.remote_url, p.target_ref, remote);
     if (!before.ok) return refuse(before.reason, before.detail, { ...identity, authorized });
     if (before.sha !== p.expected_old_sha) {
       return refuse(ERR_REMOTE_MOVED,
@@ -630,13 +721,13 @@ export function createGitPushExecutor(startup = {}) {
     }
 
     // ── 12. THE EFFECT ───────────────────────────────────────────────────────
-    const pushed = await performPush(argv, stage, claim.ticket);
+    const pushed = await performPush(argv, remote, claim.ticket);
 
     // ── 13. Believe the remote, not the exit code ────────────────────────────
     // Exit 0 is the subprocess's opinion. The effect is what the remote says it
     // is, so it is read back independently and that observation is what the
     // evidence records.
-    const after = await readRemoteRef(p.remote_url, p.target_ref, stage);
+    const after = await readRemoteRef(p.remote_url, p.target_ref, remote);
 
     const base = {
       schema: EVIDENCE_SCHEMA,
@@ -664,13 +755,16 @@ export function createGitPushExecutor(startup = {}) {
       targetRef: p.target_ref
     });
     const evidence = { ...base, outcome: verdict.outcome, reason_code: verdict.reason_code, detail: verdict.detail };
-    return settle(evidence, {
-      ok: verdict.outcome === OUTCOME.EXECUTED,
-      outcome: verdict.outcome,
-      executed: verdict.executed,
-      reason_code: verdict.reason_code,
-      detail: verdict.detail
-    });
+    return {
+      evidence,
+      result: {
+        ok: verdict.outcome === OUTCOME.EXECUTED,
+        outcome: verdict.outcome,
+        executed: verdict.executed,
+        reason_code: verdict.reason_code,
+        detail: verdict.detail
+      }
+    };
   }
 
   return Object.freeze({ executeGitPush, action: GIT_PUSH_ACTION });

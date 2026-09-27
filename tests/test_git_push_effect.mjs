@@ -119,6 +119,7 @@ async function main() {
     // is by installing it, never by handing it to the executor.
     const { claimBackend: installed = backend, ...overrides } = startupOverrides;
     installClaimBackend(installed);
+    process.env.MNDE_GIT_CREDENTIAL_CONFIG = repos.credentialConfigPath;
     const executor = createGitPushExecutor({
       repoPath: repos.localPath,
       namespace: NAMESPACE,
@@ -505,8 +506,14 @@ async function main() {
       assert.equal(result.ok, false, `${rejected} was accepted`);
       assert.equal(result.reason, ERR_TRANSPORT_ENV_NOT_ALLOWED);
     }
-    // The allowlisted ones are accepted, because the operator needs them.
-    assert.equal(buildTransportEnv({ GIT_SSH_COMMAND: "ssh -i /k" }, { platform: "linux" }).ok, true);
+    // Nothing an operator injects can select a credential: those come only
+    // from the push credential provider. The two remaining names are accepted.
+    for (const credentialSelecting of ["GIT_SSH_COMMAND", "SSH_AUTH_SOCK", "HOME", "GIT_ASKPASS", "GIT_CONFIG_COUNT", "GITHUB_TOKEN", "GH_TOKEN"]) {
+      assert.equal(buildTransportEnv({ [credentialSelecting]: "x" }, { platform: "linux" }).ok, false, `${credentialSelecting} was accepted`);
+    }
+    assert.equal(buildTransportEnv({ PATH: "/usr/bin", GIT_SSL_CAINFO: "/etc/ca.pem" }, { platform: "linux" }).ok, true);
+    // And no transport is allowed until a credential handle names exactly one.
+    assert.equal(built.env.GIT_ALLOW_PROTOCOL, "");
   });
 
   console.log("\n── the bound fields are validated before anything is built ──");

@@ -39,13 +39,29 @@ export const ERR_TRANSPORT_ENV_NOT_ALLOWED = "ERR_GIT_PUSH_TRANSPORT_ENV_NOT_ALL
 // stated reason. Everything else — credential helpers, proxy commands, hook
 // paths, external diff drivers, loader overrides — is absent by construction
 // because the environment is built from empty rather than filtered.
+//
+// Nothing on this list can select a credential. HOME, SSH_AUTH_SOCK and
+// GIT_SSH_COMMAND used to be here; each let deployment wiring outside the
+// credential provider decide how git authenticates (a home directory's ssh
+// keys and netrc, an inherited agent, an arbitrary ssh command). Credentials now
+// come only from the push credential provider (./credential-provider.mjs), and
+// only into the context that talks to the remote (withPushCredential below).
 export const ALLOWED_TRANSPORT_ENV = Object.freeze({
   PATH: "git resolves its own helpers (git-remote-https, ssh) through PATH",
-  HOME: "ssh reads the operator's known_hosts and key material from HOME; git config is separately neutralized",
-  SSH_AUTH_SOCK: "ssh-agent socket, when the deployment authenticates with an agent rather than a key file",
-  GIT_SSH_COMMAND: "explicit ssh invocation, when the deployment pins a key or a known-hosts file",
   GIT_SSL_CAINFO: "explicit CA bundle for https, when the deployment does not use the system store"
 });
+
+// The variables a credential handle may add, and nothing else. A provider that
+// returned anything outside this set would be widening git's configuration,
+// not authenticating it.
+const CREDENTIAL_ENV_KEYS = new Set([
+  "GIT_CONFIG_COUNT",
+  "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0",
+  "GIT_CONFIG_KEY_1", "GIT_CONFIG_VALUE_1",
+  "GIT_SSH_COMMAND", "GIT_SSH_VARIANT"
+]);
+const ALLOW_PROTOCOLS = new Set(["https", "ssh", "file"]);
+export const ERR_CREDENTIAL_ENV_NOT_ALLOWED = "ERR_GIT_PUSH_CREDENTIAL_ENV_NOT_ALLOWED";
 
 // A path that is deliberately never created. Git reads a configured-but-missing
 // config file as empty, which is exactly what is wanted, and unlike the
@@ -94,6 +110,12 @@ export function buildTransportEnv(operatorEnv = {}, { platform = process.platfor
     GIT_TERMINAL_PROMPT: "0",
     GIT_ASKPASS: "",
     SSH_ASKPASS: "",
+    // No transport at all. Every git operation that does not talk to the remote
+    // (reading the local repository, building the staging repository, the
+    // commit checks) runs with this empty allowlist, so none of them can reach
+    // a network or an ext:: helper. Only the credentialed context built by
+    // withPushCredential names a protocol, and it names exactly one.
+    GIT_ALLOW_PROTOCOL: "",
     // Deterministic output, because ls-remote output is parsed.
     LC_ALL: "C",
     LANG: "C",
@@ -263,18 +285,55 @@ export async function createStagingRepository(localRepoPath, context) {
     }
     mkdirSync(join(gitDir, "objects", "info"), { recursive: true });
     writeFileSync(join(gitDir, "objects", "info", "alternates"), `${objectsDir}\n`, "utf8");
+    // An empty home directory owned by this execution. git's XDG config lookup
+    // and libcurl's .netrc lookup both start from HOME, so pointing it at an
+    // empty directory means the executor OS user's own dotfiles cannot supply a
+    // credential or a setting. (ssh ignores HOME; the ssh credential kind pins
+    // its identity and known_hosts explicitly for that reason.)
+    const home = join(root, "home");
+    mkdirSync(home);
     return {
       ok: true,
       root,
       // The context every effect-forming operation uses from here on: `-C` and
       // the working directory are the staging repository, so git discovers it
       // and nothing else.
-      context: Object.freeze({ ...context, repoPath: gitDir, cwd: gitDir })
+      context: Object.freeze({
+        ...context,
+        env: Object.freeze({ ...context.env, HOME: home, XDG_CONFIG_HOME: join(home, ".config") }),
+        repoPath: gitDir,
+        cwd: gitDir
+      })
     };
   } catch (error) {
     if (root) { try { rmSync(root, { recursive: true, force: true }); } catch { /* best effort */ } }
     return { ok: false, reason: ERR_STAGING_FAILED, detail: String(error?.message ?? error) };
   }
+}
+
+// The context for the operations that talk to the remote — the pre-state read,
+// the push and the post-state read — and only those. It is the staging context
+// plus exactly what one credential handle supplies, with git restricted to the
+// one protocol that credential authenticates. The local-only operations keep
+// the credential-free context, so the secret is in the environment of the
+// fewest possible processes.
+export function withPushCredential(stageContext, handle) {
+  if (!handle || typeof handle !== "object" || !ALLOW_PROTOCOLS.has(handle.allowProtocol)) {
+    return { ok: false, reason: ERR_CREDENTIAL_ENV_NOT_ALLOWED, detail: "the credential handle names no permitted protocol" };
+  }
+  const added = handle.env ?? {};
+  for (const [key, value] of Object.entries(added)) {
+    if (!CREDENTIAL_ENV_KEYS.has(key) || typeof value !== "string") {
+      return { ok: false, reason: ERR_CREDENTIAL_ENV_NOT_ALLOWED, detail: `a credential handle may not set '${key}'` };
+    }
+  }
+  return {
+    ok: true,
+    context: Object.freeze({
+      ...stageContext,
+      env: Object.freeze({ ...stageContext.env, ...added, GIT_ALLOW_PROTOCOL: handle.allowProtocol })
+    })
+  };
 }
 
 export function removeStagingRepository(staging) {

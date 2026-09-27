@@ -209,10 +209,22 @@ all. Neither changes what git executes or where it pushes, and an attacker who
 can set `PATH` in the executor's own environment can already replace the
 executor.
 
-The operator may set exactly five variables, each for a stated reason: `PATH`,
-`HOME`, `SSH_AUTH_SOCK`, `GIT_SSH_COMMAND`, `GIT_SSL_CAINFO`. Anything else is a
-startup error. `GIT_PROXY_COMMAND`, `GIT_EXTERNAL_DIFF`, `GIT_DIR`,
-`GIT_WORK_TREE`, `LD_PRELOAD` and their kind are absent by construction.
+The operator may set exactly two variables: `PATH` and `GIT_SSL_CAINFO`.
+Anything else is a startup error. `HOME`, `SSH_AUTH_SOCK` and `GIT_SSH_COMMAND`
+were on this list until 2026-09-27 and were removed, because each let wiring
+outside the credential provider decide how git authenticates.
+`GIT_PROXY_COMMAND`, `GIT_EXTERNAL_DIFF`, `GIT_DIR`, `GIT_WORK_TREE`,
+`LD_PRELOAD` and their kind are absent by construction.
+
+`GIT_ALLOW_PROTOCOL` is set to empty, so the local-only operations (reading the
+local repository, building the staging repository, the commit checks) cannot
+use any transport. Only the three operations that talk to the remote (the
+pre-state read, the push, the post-state read) run with a credential, and they
+get exactly the variables the push credential handle supplies plus
+`GIT_ALLOW_PROTOCOL` pinned to that credential's one scheme. `HOME` is an empty
+directory inside the staging area, so the executor user's own dotfiles (git's
+XDG config, libcurl's `.netrc`) supply nothing. See
+`docs/PRODUCTION-TRUST-BOUNDARY.md`.
 
 ## The local repository cannot steer the effect
 

@@ -22,6 +22,7 @@ Release and safety review:
 - `F001-CLAIM-STORE-PROOF.md` - what the durable single-use claim store was proven to do against a real PostgreSQL primary, and what remains open on F-001
 - `F001-REASSESSMENT.md` - F-001 asked again against the merged typed effect, question by question: what is established, what is only indicated, and the exact blockers that remain
 - `GIT-PUSH-EFFECT.md` - the first narrow typed production effect: what it does, the order it does it in, and what it does not establish
+- `PRODUCTION-TRUST-BOUNDARY.md` - what the git.push executor trusts, where its push credential and trust material come from, how to deploy it under its own OS identity, and what is still not enforced in code
 - `KNOWN-ISSUES.md` - problems carried rather than fixed, each with why it is safe to defer, plus the findings whose classification is still open and the ones that have since been closed
 - `release-891ceda-onboarding.md`
 - `release-checklist.md`

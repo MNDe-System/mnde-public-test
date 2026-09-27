@@ -429,3 +429,23 @@ deployment.
 4. **An actual deployment.** The path has now been operated through its
    production entry point against a real claim store. It has not been operated
    with production trust material against a production remote.
+
+## Addendum, 2026-09-27: push credential custody
+
+**What changed.** The executor now obtains its push credential itself, from
+`MNDE_GIT_CREDENTIAL_CONFIG` only, scoped to an allowlist of repositories, and
+gives it only to the three git processes that talk to the remote. Operator
+transport variables can no longer select a credential (`HOME`, `SSH_AUTH_SOCK`
+and `GIT_SSH_COMMAND` were removed from the allowlist). Startup refuses MNDe's
+demo root, a demo-named authority, an executor key that is also an authority
+key, and (POSIX) trust files another user could rewrite. Details and the
+deployment model: `docs/PRODUCTION-TRUST-BOUNDARY.md`.
+
+**What it moves.** Item 3 of "What remains" above (credential custody) moves
+from "a deployment property" to "enforced inside the executor; the rest is the
+executor's OS identity and the repository host's settings". Nothing else moves.
+
+**F-001 is still NOT closed.** Q4 (power loss) and Q6 (database-owner restore)
+are unchanged. No external rollback witness exists; no design for one has been
+approved. There has still been no run with production trust material against a
+production remote.

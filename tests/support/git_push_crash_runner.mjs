@@ -53,6 +53,7 @@ if (mode === "hang-in-push") {
 
 const evidenceDir = join(caseDir, "evidence");
 installClaimBackend(claimBackend);
+process.env.MNDE_GIT_CREDENTIAL_CONFIG = repos.credentialConfigPath;
 const executor = createGitPushExecutor({
   repoPath: repos.localPath,
   namespace: NAMESPACE,

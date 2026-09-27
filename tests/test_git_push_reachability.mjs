@@ -17,7 +17,10 @@
 //   5. no shipped import of tests/ or experiments/;
 //   6. surfaces — the generic run() executor never invokes a callback, and the
 //      effect module exports no generic runner (performPush refuses any argv
-//      that is not the typed push).
+//      that is not the typed push);
+//   7. credential custody — only the typed executor imports the push credential
+//      provider, only the executor's startup path names its configuration, and
+//      the provider starts no process.
 //
 // The shipped set is parsed out of build/build-package.mjs itself, so this test
 // and the package cannot silently disagree about what ships.
@@ -32,6 +35,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const posix = (p) => p.split(sep).join("/");
 const EFFECT = "src/effects/git-push/transport.mjs";
 const EXECUTOR = "src/effects/git-push/index.mjs";
+const CREDENTIALS = "src/effects/git-push/credential-provider.mjs";
 
 let passed = 0;
 let failed = 0;
@@ -161,6 +165,21 @@ async function main() {
       const r = await t.performPush(argv, ctx);
       assert.equal(r.reason, t.ERR_PUSH_ARGV_NOT_TYPED, `untyped argv reached git: ${argv.join(" ")}`);
     }
+  });
+
+  await test("7a: only the typed executor imports the push credential provider", () => {
+    const importers = NON_TEST.filter((f) => specifiers(read(f)).some((s) => resolveSpec(f, s) === CREDENTIALS));
+    assert.deepEqual(importers, [EXECUTOR], `credential-provider importers: ${importers.join(", ")}`);
+  });
+  await test("7b: only the executor's startup path names MNDE_GIT_CREDENTIAL_CONFIG", () => {
+    const namers = NON_TEST.filter((f) => /MNDE_GIT_CREDENTIAL_CONFIG/.test(stripComments(read(f)))).sort();
+    assert.deepEqual(namers, [CREDENTIALS, EXECUTOR, "src/effects/git-push/startup.mjs"].sort());
+  });
+  await test("7c: the credential provider starts no process and carries no git mutation literal", () => {
+    const src = stripComments(read(CREDENTIALS));
+    assert.doesNotMatch(src, /child_process|node:cluster|worker_threads/);
+    const hits = [...src.matchAll(/"([^"\n]*)"|'([^'\n]*)'|`([^`$\n]*)`/g)].map((m) => m[1] ?? m[2] ?? m[3]).filter((lit) => MUTATION.has(lit));
+    assert.deepEqual(hits, []);
   });
 
   const total = passed + failed;

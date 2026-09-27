@@ -108,6 +108,7 @@ async function main() {
     const repos = makeRepositories(caseDir);
     const evidenceDir = join(caseDir, "evidence");
     installClaimBackend(inMemoryClaimBackend({ namespace: NAMESPACE }));
+    process.env.MNDE_GIT_CREDENTIAL_CONFIG = repos.credentialConfigPath;
     const executor = createGitPushExecutor({
       repoPath: repos.localPath,
       namespace: NAMESPACE,

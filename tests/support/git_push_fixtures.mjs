@@ -240,15 +240,29 @@ export function makeRepositories(dir) {
   // Seed the remote at the first commit.
   git(["push", "--quiet", "origin", `${commits[0]}:refs/heads/main`], localPath);
 
+  // The executor's push credential configuration for this remote: a file://
+  // remote carries no credential, so the `none` kind, scoped to exactly this
+  // repository. Written beside the repositories, never inside the local one.
+  const credentialConfigPath = writeCredentialConfig(dir, { kind: "none", repositories: [canonicalRepositoryIdentity(remoteUrl)] });
+
   return {
     barePath,
     localPath,
     remoteUrl,
+    credentialConfigPath,
     commits,
     divergent,
     remoteSha: () => git(["ls-remote", "--refs", remoteUrl, "refs/heads/main"], localPath).split(/\s+/)[0] ?? null,
     setRemoteTo: (sha) => git(["push", "--quiet", "--force", remoteUrl, `${sha}:refs/heads/main`], localPath)
   };
+}
+
+// Write an MNDE_GIT_CREDENTIAL_CONFIG file. Private (0600) so the provider's
+// POSIX permission checks pass as they would for a real deployment's file.
+export function writeCredentialConfig(dir, fields, name = "git-credential-config.json") {
+  const path = join(dir, name);
+  writeFileSync(path, `${JSON.stringify({ schema: "mnde.git-credential-config.v1", ...fields }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  return path;
 }
 
 // Build the six signed parameters for a push on these repositories.
