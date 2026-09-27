@@ -36,7 +36,7 @@ import {
   ERR_REMOTE_MOVED,
   OUTCOME
 } from "../src/effects/git-push/index.mjs";
-import { buildPushArgv, performPush, pushEffectDigest, buildTransportEnv } from "../src/effects/git-push/transport.mjs";
+import { buildPushArgv, performPush, pushEffectDigest, buildTransportEnv, withPushCredential } from "../src/effects/git-push/transport.mjs";
 import { claimAuthority, DISPATCH, ERR_CLAIM_TICKET } from "../src/freshness/claim.mjs";
 import { openExecutorClaimBackend } from "../src/freshness/postgres_claim.mjs";
 import {
@@ -81,6 +81,7 @@ function repositories() {
 
 function executorFor(repos, caseDir, backend) {
   installClaimBackend(backend);
+  process.env.MNDE_GIT_CREDENTIAL_CONFIG = repos.credentialConfigPath;
   return createGitPushExecutor({
     repoPath: repos.localPath,
     namespace: NAMESPACE,
@@ -118,8 +119,14 @@ function directPush(repos) {
     expectedOldSha: repos.commits[0]
   });
   const env = buildTransportEnv({});
-  const context = { repoPath: repos.localPath, cwd: repos.localPath, env: env.env, timeoutMs: 30_000 };
-  return { argv, context };
+  // The context the executor gives the remote-facing operations for a file://
+  // remote: the base environment (which allows no transport at all) plus what
+  // a `none` credential handle adds, which is permission for `file` only.
+  const credentialed = withPushCredential(
+    { repoPath: repos.localPath, cwd: repos.localPath, env: env.env, timeoutMs: 30_000 },
+    { env: {}, allowProtocol: "file" }
+  );
+  return { argv, context: credentialed.context };
 }
 
 let seq = 0;
@@ -216,6 +223,19 @@ await test("createGitPushExecutor refuses a claimBackend, whatever its value", a
       executorIdentity: trust.executor.identity, executorSigner: trust.executor.signer,
       claimBackend: value
     }), (error) => error.code === ERR_BACKEND_SUBSTITUTION);
+  }
+});
+
+await test("createGitPushExecutor refuses a credentialProvider, whatever its value", async () => {
+  const { repos, caseDir } = repositories();
+  process.env.MNDE_GIT_CREDENTIAL_CONFIG = repos.credentialConfigPath;
+  const hostile = { describe: { kind: "none" }, acquire: async () => ({ env: {}, allowProtocol: "file", metadata: {}, redact: (t) => t, release: async () => ({}) }) };
+  for (const value of [hostile, null, undefined]) {
+    assert.throws(() => createGitPushExecutor({
+      repoPath: repos.localPath, namespace: NAMESPACE, evidenceDir: join(caseDir, "evidence"),
+      executorIdentity: trust.executor.identity, executorSigner: trust.executor.signer,
+      credentialProvider: value
+    }), (error) => error.code === "ERR_GIT_CREDENTIAL_SUBSTITUTION");
   }
 });
 

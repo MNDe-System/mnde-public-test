@@ -24,7 +24,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, normalize, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -36,8 +36,11 @@ import {
   gitPushAuthorization,
   makeRepositories,
   productionTrust,
-  pushParameters
+  pushParameters,
+  writeCredentialConfig
 } from "./support/git_push_fixtures.mjs";
+import { issueExecutorCredential } from "../src/custody/executor-credential.mjs";
+import { EXECUTOR_RECEIPT_CAPABILITY } from "../src/custody/executor-identity.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
@@ -107,6 +110,7 @@ function operatorEnv(c, overrides = {}) {
   Object.assign(env, {
     MNDE_PROFILE: "production",
     MNDE_CLAIM_CONFIG: doubleClaimConfigPath,
+    MNDE_GIT_CREDENTIAL_CONFIG: c.repos.credentialConfigPath,
     MNDE_GIT_PUSH_REPO_PATH: c.repos.localPath,
     MNDE_GIT_PUSH_NAMESPACE: NAMESPACE,
     MNDE_GIT_PUSH_EVIDENCE_DIR: c.evidenceDir,
@@ -303,17 +307,15 @@ async function main() {
     assert.equal(existsSync(c.evidenceDir), false, "no evidence: no executor ran");
   });
 
-  await test("F1: a claim config that does not exist fails closed at the claim, with no fallback backend", async () => {
+  await test("F1: a claim config that does not exist refuses at startup, before any executor or fallback backend exists", async () => {
     const c = newCase();
     const request = await validRequest(c);
     const run = runCli(c, [request.path], { env: { MNDE_CLAIM_CONFIG: join(operatorDir, "no-such-claim-config.json") }, claimDouble: false });
-    assert.equal(run.status, 1);
-    assert.equal(run.out.reason_code, "ERR_GIT_PUSH_CLAIM_NOT_ESTABLISHED");
-    assert.equal(run.out.claim.decision, "NO_BACKEND");
-    assert.equal(run.out.claim.backend_kind, null, "no substitute backend was opened");
-    assert.equal(run.out.effect_attempted, false);
+    assert.equal(run.status, 4, JSON.stringify(run.out));
+    assert.equal(run.out.reason_code, "ERR_GIT_PUSH_CLI_CONFIG");
+    assert.match(run.out.detail, /MNDE_CLAIM_CONFIG cannot be read \(ENOENT\)/);
     assertNothingSent(c, run, "F1");
-    assertOneCall(run, "F1");
+    assertNoExecutor(run, "F1");
   });
 
   await test("F2: a well-formed claim config pointing at unreachable storage fails closed, no fallback", async () => {
@@ -420,7 +422,7 @@ async function main() {
     const cli = readFileSync(SOURCE_CLI, "utf8");
     const startup = readFileSync(join(ROOT, "src", "effects", "git-push", "startup.mjs"), "utf8");
     assert.deepEqual(specifiers(cli).sort(), ["../src/effects/git-push/index.mjs", "../src/effects/git-push/startup.mjs", "node:fs"]);
-    assert.deepEqual(specifiers(startup).sort(), ["../../../shared/runtime-profile.mjs", "../../custody/executor-readiness.mjs", "node:fs", "node:path"]);
+    assert.deepEqual(specifiers(startup).sort(), ["../../../shared/runtime-profile.mjs", "../../custody/bundle.mjs", "../../custody/executor-readiness.mjs", "./secret-files.mjs", "node:fs", "node:path", "node:url"]);
 
     const forbidden = /child_process|node:cluster|worker_threads|\bspawn|\bexecFile|\bexecSync|\bfetch\s*\(|performPush|buildPushArgv|claimAuthority|redeemClaimTicket|openExecutorClaimBackend|claimBackend|postgres_claim|freshness\/|transport\.mjs|api\.github\.com|["'`]git["'`]/;
     for (const [name, src] of [["bin/mnde-git-push.mjs", cli], ["src/effects/git-push/startup.mjs", startup]]) {
@@ -500,6 +502,134 @@ async function main() {
     assert.equal(reset.out.reason_code, "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT");
     assert.equal(reset.out.claim.decision, "SPENT");
     assertNothingSent(c, reset, "M3 after reset");
+  });
+
+  await test("P1: no MNDE_GIT_CREDENTIAL_CONFIG is a startup failure, whatever ambient credentials exist", async () => {
+    const c = newCase();
+    const request = await validRequest(c);
+    const run = runCli(c, [request.path], { env: { MNDE_GIT_CREDENTIAL_CONFIG: undefined, GITHUB_TOKEN: "ghp_ambient", GH_TOKEN: "gho_ambient", SSH_AUTH_SOCK: join(c.caseDir, "agent.sock") } });
+    assert.equal(run.status, 4);
+    assert.match(run.out.detail, /MNDE_GIT_CREDENTIAL_CONFIG/);
+    assertNoExecutor(run, "P1");
+    assertNothingSent(c, run, "P1");
+  });
+
+  await test("P2: a credential scoped to another repository refuses before the claim; the same authority then executes", async () => {
+    const c = newCase();
+    const request = await validRequest(c);
+    const elsewhere = writeCredentialConfig(c.caseDir, { kind: "none", repositories: ["file:/srv/some/other/repo"] }, "elsewhere.json");
+    const refused = runCli(c, [request.path], { env: { MNDE_GIT_CREDENTIAL_CONFIG: elsewhere } });
+    assert.equal(refused.status, 1, JSON.stringify(refused.out));
+    assert.equal(refused.out.reason_code, "ERR_GIT_CREDENTIAL_SCOPE");
+    assertNothingSent(c, refused, "P2 refused");
+    assert.deepEqual(claimFiles(c), { execution: 0, grant: 0 }, "a credential refusal must not spend the authority");
+    const ok = runCli(c, [request.path]);
+    assert.equal(ok.status, 0, JSON.stringify(ok.out));
+    assert.equal(ok.out.push_credential.credential_provider_kind, "none");
+    assert.equal(ok.out.push_credential.credential_scope, request.parameters.repository);
+    assert.equal(ok.pushesReceived, 1);
+  });
+
+  await test("P3: ambient credentials, askpass, ssh settings, HOME and injected git config never reach the push", async () => {
+    const c = newCase();
+    // The remote records the environment the push arrived with: receive-pack
+    // runs as a child of the executor's git, so this is the push's own env.
+    writeFileSync(join(c.repos.barePath, "hooks", "pre-receive"), "#!/bin/sh\nenv > push-env.txt\n", { encoding: "utf8", mode: 0o755 });
+    const decoy = join(c.caseDir, "decoy.git");
+    git(["init", "--quiet", "--bare", decoy], c.caseDir);
+    const hostileHome = join(c.caseDir, "hostile-home");
+    mkdirSync(hostileHome, { recursive: true });
+    const decoyUrl = pathToFileURL(decoy).href;
+    writeFileSync(join(hostileHome, ".gitconfig"), `[url "${decoyUrl}"]\n\tpushInsteadOf = ${c.repos.remoteUrl}\n[credential]\n\thelper = store\n`, "utf8");
+    const request = await validRequest(c);
+    const run = runCli(c, [request.path], {
+      env: {
+        GITHUB_TOKEN: "ghp_ambient_token_value",
+        GH_TOKEN: "gho_ambient_token_value",
+        GIT_ASKPASS: "/bin/echo",
+        SSH_ASKPASS: "/bin/echo",
+        SSH_AUTH_SOCK: join(c.caseDir, "agent.sock"),
+        GIT_SSH_COMMAND: "ssh -i /home/founder/.ssh/id_ed25519",
+        GIT_CONFIG_GLOBAL: join(hostileHome, ".gitconfig"),
+        GIT_CONFIG_COUNT: "1",
+        GIT_CONFIG_KEY_0: `url.${decoyUrl}.pushInsteadOf`,
+        GIT_CONFIG_VALUE_0: c.repos.remoteUrl,
+        GIT_DIR: decoy,
+        HOME: hostileHome,
+        XDG_CONFIG_HOME: hostileHome
+      }
+    });
+    assert.equal(run.status, 0, JSON.stringify(run.out));
+    assert.equal(c.repos.remoteSha(), c.repos.commits[1], "the push landed on the authorized remote");
+    assert.equal(git(["for-each-ref"], decoy), "", "the decoy received nothing");
+    const pushEnv = readFileSync(join(c.repos.barePath, "push-env.txt"), "utf8");
+    for (const leaked of ["ghp_ambient_token_value", "gho_ambient_token_value", "agent.sock", "id_ed25519", "hostile-home", "pushInsteadOf"]) {
+      assert.ok(!pushEnv.includes(leaked), `${leaked} reached the push environment`);
+    }
+    assert.match(pushEnv, /^GIT_ALLOW_PROTOCOL=file$/m, "the push may use exactly the configured protocol");
+    assert.doesNotMatch(pushEnv, /^GIT_ASKPASS=.+$/m);
+  });
+
+  await test("P4: MNDe's shipped demo root, a demo-named authority, or an executor key that is also an authority key refuse startup", async () => {
+    const c = newCase();
+    const request = await validRequest(c);
+    const demoRoot = runCli(c, [request.path], { env: { MNDE_VERIFY_TRUSTED_ROOT_FINGERPRINT: "6e987c47fe1144c9a9e957b1c9f45f50e37df8892e2f0b3ad80b6d2a20ec4efa" } });
+    assert.equal(demoRoot.status, 4);
+    assert.equal(demoRoot.out.reason_code, "ERR_GIT_PUSH_DEMO_TRUST_MATERIAL");
+    assertNoExecutor(demoRoot, "P4 demo root");
+
+    const demoTrust = await productionTrust(c.caseDir, { authorityId: "acme-demo-authority" });
+    const demoNamed = runCli(c, [request.path], { env: { MNDE_VERIFY_AUTHORITY_BUNDLE: demoTrust.bundlePath, MNDE_VERIFY_TRUSTED_ROOT_FINGERPRINT: demoTrust.fingerprint } });
+    assert.equal(demoNamed.status, 4);
+    assert.equal(demoNamed.out.reason_code, "ERR_GIT_PUSH_DEMO_TRUST_MATERIAL");
+
+    // An executor credential issued for the authority's own receipt-signing key.
+    const reused = await issueExecutorCredential({
+      authorityBundle: trust.bundle,
+      rootPrivatePem: trust.root.privatePem,
+      executorId: EXECUTOR_ID,
+      publicPem: trust.receipt.publicPem,
+      environmentId: ENVIRONMENT_ID,
+      capabilities: [EXECUTOR_RECEIPT_CAPABILITY],
+      issuedAt: "2026-06-14T00:00:00.000Z",
+      notBefore: "2026-01-01T00:00:00.000Z",
+      expiresAt: "2099-01-01T00:00:00.000Z"
+    });
+    const reusedKey = join(operatorDir, "reused-key.pem");
+    writeFileSync(reusedKey, trust.receipt.privatePem, { encoding: "utf8", mode: 0o600 });
+    const reusedCredential = join(operatorDir, "reused-credential.json");
+    writeFileSync(reusedCredential, JSON.stringify(reused), "utf8");
+    const roleReuse = runCli(c, [request.path], { env: { MNDE_EXECUTOR_PRIVATE_KEY: reusedKey, MNDE_EXECUTOR_CREDENTIAL: reusedCredential } });
+    assert.equal(roleReuse.status, 4, JSON.stringify(roleReuse.out));
+    assert.equal(roleReuse.out.reason_code, "ERR_GIT_PUSH_TRUST_ROLE_REUSE");
+    assertNoExecutor(roleReuse, "P4 role reuse");
+    assertNothingSent(c, roleReuse, "P4");
+  });
+
+  await test("P5: a trust file inside the local repository, or (POSIX) writable by others, refuses startup", async () => {
+    const c = newCase();
+    const request = await validRequest(c);
+    const planted = join(c.repos.localPath, "authority-bundle.json");
+    writeFileSync(planted, readFileSync(trust.bundlePath, "utf8"), "utf8");
+    const inRepo = runCli(c, [request.path], { env: { MNDE_VERIFY_AUTHORITY_BUNDLE: planted } });
+    assert.equal(inRepo.status, 4);
+    assert.equal(inRepo.out.reason_code, "ERR_GIT_PUSH_TRUST_FILE_INSECURE");
+    assertNoExecutor(inRepo, "P5 in repo");
+    if (process.platform !== "win32") {
+      const loose = join(operatorDir, "world-writable-bundle.json");
+      writeFileSync(loose, readFileSync(trust.bundlePath, "utf8"), "utf8");
+      chmodSync(loose, 0o666);
+      const writable = runCli(c, [request.path], { env: { MNDE_VERIFY_AUTHORITY_BUNDLE: loose } });
+      assert.equal(writable.status, 4);
+      assert.equal(writable.out.reason_code, "ERR_GIT_PUSH_TRUST_FILE_INSECURE");
+      const openKey = join(operatorDir, "group-readable-key.pem");
+      writeFileSync(openKey, trust.executor.keys.privatePem, "utf8");
+      chmodSync(openKey, 0o640);
+      const readable = runCli(c, [request.path], { env: { MNDE_EXECUTOR_PRIVATE_KEY: openKey } });
+      assert.equal(readable.status, 4);
+      assert.equal(readable.out.reason_code, "ERR_GIT_PUSH_TRUST_FILE_INSECURE");
+    }
+    assertNothingSent(c, inRepo, "P5");
   });
 
   await test("N: the built package ships the CLI, runs it end to end, and ships no test code", async () => {

@@ -109,6 +109,7 @@ function report(result) {
     authorized: evidence.authorized ?? null,
     observed: evidence.observed ?? null,
     claim: evidence.claim ?? null,
+    push_credential: evidence.push_credential ?? null,
     evidence_path: result.evidencePath ?? null,
     signed_evidence_path: result.signedEvidencePath ?? null,
     signed_evidence: result.signedEvidence ?? null

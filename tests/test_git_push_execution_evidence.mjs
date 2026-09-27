@@ -116,6 +116,7 @@ async function main() {
     const repos = makeRepositories(caseDir);
     const backend = inMemoryClaimBackend({ namespace: NAMESPACE, ...backendOptions });
     installClaimBackend(backend);
+    process.env.MNDE_GIT_CREDENTIAL_CONFIG = repos.credentialConfigPath;
     const executor = createGitPushExecutor({
       repoPath: repos.localPath,
       namespace: NAMESPACE,

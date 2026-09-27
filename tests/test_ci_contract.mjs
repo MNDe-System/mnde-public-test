@@ -262,6 +262,7 @@ const allowedCryptoImports = new Map([
   ["sidecar/refusal_receipt.mjs", "deferred legacy HMAC refusal receipts"],
   ["src/crypto/node-provider.mjs", "crypto provider implementation"],
   ["src/custody/lifecycle.mjs", "Node-only lifecycle root-key validation"],
+  ["src/effects/git-push/credential-provider.mjs", "RS256 GitHub App JWT for push credential minting (provider is Ed25519-only)"],
   ["src/identity/adapters/github-actions.mjs", "deferred RS256 OIDC adapter support"],
   ["src/policy-engine/authenticated-approvals.mjs", "deferred raw Ed25519 approval helper"],
   ["src/policy-engine/authority-grants.mjs", "deferred raw Ed25519 grant helper"],
