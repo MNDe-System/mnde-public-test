@@ -27,6 +27,7 @@
 //   4 startup/config failure  the executor was not constructed
 //   5 internal error          unexpected exception; if executor_invoked is true, reconcile
 //   6 RECONCILED_NOT_APPLIED  sent, did not land, remote unchanged; authority spent
+//   7 EFFECT_EXECUTED_EVIDENCE_FAILURE  remote changed; required evidence incomplete
 
 import { readFileSync } from "node:fs";
 
@@ -42,7 +43,8 @@ const EXIT = Object.freeze({
   INVALID_INPUT: 3,
   STARTUP_FAILED: 4,
   INTERNAL_ERROR: 5,
-  RECONCILED_NOT_APPLIED: 6
+  RECONCILED_NOT_APPLIED: 6,
+  EFFECT_EXECUTED_EVIDENCE_FAILURE: 7
 });
 
 function emit(exitCode, body) {
@@ -83,7 +85,9 @@ function readRequest(args) {
 }
 
 function exitFor(result) {
-  if (result?.outcome === OUTCOME.EXECUTED && result.ok === true && result.executed === true) return EXIT.EXECUTED;
+  if (result?.outcome === OUTCOME.EFFECT_EXECUTED_EVIDENCE_FAILURE) return EXIT.EFFECT_EXECUTED_EVIDENCE_FAILURE;
+  if (result?.outcome === OUTCOME.EXECUTED && result.ok === true && result.executed === true
+    && result.signedEvidence && result.signedEvidencePath && !result.evidenceError) return EXIT.EXECUTED;
   if (result?.outcome === OUTCOME.REFUSED) return EXIT.REFUSED;
   if (result?.outcome === OUTCOME.INDETERMINATE) return EXIT.INDETERMINATE;
   if (result?.outcome === OUTCOME.RECONCILED_NOT_APPLIED) return EXIT.RECONCILED_NOT_APPLIED;
@@ -110,6 +114,7 @@ function report(result) {
     observed: evidence.observed ?? null,
     claim: evidence.claim ?? null,
     push_credential: evidence.push_credential ?? null,
+    evidence_error: result.evidenceError ?? null,
     evidence_path: result.evidencePath ?? null,
     signed_evidence_path: result.signedEvidencePath ?? null,
     signed_evidence: result.signedEvidence ?? null

@@ -175,9 +175,40 @@ stderr, apart from anything Node itself prints on a crash.
 | 4 | `STARTUP_FAILED` | Configuration missing or unusable, or the executor refused to construct. Nothing was sent. |
 | 5 | `INTERNAL_ERROR` | Unexpected exception. If `executor_invoked` is `true`, treat it like `2`: the push may have started. |
 | 6 | `RECONCILED_NOT_APPLIED` | A push was sent and did not land, and the remote was read back unchanged. The authority is spent. |
+| 7 | `EFFECT_EXECUTED_EVIDENCE_FAILURE` | The remote was observed at the approved SHA, but required signed evidence generation or durable persistence failed. `executed: true`, `ok: false`; the authority is spent. This is an MNDe completion failure, not a failed push. |
+
+Exit `0` requires both the confirmed remote effect and a completed signed artifact.
+For exit `7`, `observed.after` retains the approved SHA and `evidence_error.stage`
+distinguishes `generation` from `persistence`; the reason code is
+`ERR_GIT_PUSH_EVIDENCE_GENERATION` or `ERR_GIT_PUSH_EVIDENCE_PERSISTENCE`.
+There is no network retry on either failure. Reconcile and preserve any returned
+signed envelope; do not submit the same push again to repair evidence.
+
+The signed artifact is written to an exclusively created temporary file in the
+evidence directory, file-fsynced, closed, renamed to a unique final name, then
+directory-fsynced. Any new evidence-directory ancestors and their links in the
+existing parent are also flushed when created. A path is acknowledged only when
+all required operations succeed. After a rename followed by a directory-flush
+failure, a valid file may exist, but `signed_evidence_path` is null because its
+durability was not acknowledged. The returned envelope still describes the
+observed effect with the existing `EXECUTED` evidence schema; exit `7` describes
+MNDe's failure to complete persistence, so offline verification is unchanged.
+Handled failures attempt to remove the temporary file. If cleanup itself fails,
+or the process dies before cleanup, a `.tmp` file can remain; it is not an
+acknowledged signed artifact.
+
+The local unsigned diagnostic record remains a best-effort direct write: it is
+not atomically replaced or fsynced and is not the required success artifact.
+The start record remains exclusive and file-fsynced; this change does not claim
+to prove its power-loss recovery classification. Filesystem, OS and storage must
+honor successful flushes and same-directory rename semantics. Windows uses a
+read/write directory handle for flushing; unsupported flush operations fail
+closed rather than being skipped. Existing evidence-directory parents must
+already be durably provisioned. Hardware power loss, remote durability, backup
+rollback and PostgreSQL durability are not proven by these filesystem calls.
 
 An authorization that says ALLOW never produces exit `0` by itself. Only the
-executor's observed `EXECUTED` outcome does.
+executor's observed `EXECUTED` outcome with completed signed-evidence persistence does.
 
 ## What an operator does after a non-zero exit
 

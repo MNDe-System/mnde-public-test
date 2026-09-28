@@ -45,8 +45,9 @@ import { GIT_PUSH_ACTION } from "./validate.mjs";
 export const EXECUTION_EVIDENCE_SCHEMA = "mnde.git-push-execution-evidence.v1";
 export const EXECUTION_EVIDENCE_ENVELOPE_SCHEMA = "mnde.git-push-execution-evidence-envelope.v1";
 
-// The outcomes evidence may report. Kept identical to the executor's own
-// vocabulary so a record never has to be translated between the two.
+// Observed effect outcomes. MNDe completion failure (for example, inability to
+// persist this envelope) is reported separately by the executor/CLI; it does not
+// change what this signed record says was observed on the remote.
 export const EVIDENCE_OUTCOME = Object.freeze({
   EXECUTED: "EXECUTED",
   REFUSED: "REFUSED",

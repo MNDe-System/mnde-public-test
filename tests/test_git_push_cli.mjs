@@ -30,6 +30,7 @@ import { dirname, join, normalize, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { verifyExecutionEvidence } from "../src/effects/git-push/evidence.mjs";
+import { classifyGitPushExecution } from "../src/effects/git-push/index.mjs";
 import {
   ENVIRONMENT_ID,
   EXECUTOR_ID,
@@ -224,6 +225,70 @@ const posix = (p) => p.split(sep).join("/");
 async function main() {
   console.log("git.push production CLI (bin/mnde-git-push.mjs, run as a child process)\n");
 
+  for (const fault of ["signer", "write", "file-sync", "rename", "directory-sync"]) {
+    await test(`evidence completion: ${fault} fails after one confirmed effect, exits 7, never retries`, async () => {
+      const c = newCase();
+      const request = await validRequest(c);
+      const run = runCli(c, [request.path], { env: { MNDE_TEST_EVIDENCE_FAULT: fault } });
+      assert.equal(run.status, 7, JSON.stringify(run.out));
+      assert.equal(run.out.outcome, "EFFECT_EXECUTED_EVIDENCE_FAILURE");
+      assert.equal(run.out.ok, false);
+      assert.equal(run.out.executed, true);
+      assert.equal(run.out.effect_attempted, true);
+      assert.equal(run.out.claim.decision, "CLAIMED");
+      assert.deepEqual(run.out.observed, { before: c.repos.commits[0], after: c.repos.commits[1] });
+      assert.equal(c.repos.remoteSha(), c.repos.commits[1]);
+      assert.equal(run.pushesReceived, 1);
+      assertOneCall(run, fault);
+      assert.match(readFileSync(c.callLog, "utf8"), /evidence-fault/, "fault must actually fire");
+      assert.equal(run.out.reason_code, fault === "signer" ? "ERR_GIT_PUSH_EVIDENCE_GENERATION" : "ERR_GIT_PUSH_EVIDENCE_PERSISTENCE");
+      assert.equal(run.out.evidence_error.stage, fault === "signer" ? "generation" : "persistence");
+      assert.equal(run.out.signed_evidence_path, null);
+      const local = JSON.parse(readFileSync(run.out.evidence_path, "utf8"));
+      assert.equal(local.outcome, "EFFECT_EXECUTED_EVIDENCE_FAILURE");
+      assert.equal(local.evidence_persisted, false);
+      assert.equal(local.executed, true);
+      const recovery = classifyGitPushExecution({ evidenceDir: c.evidenceDir, executionId: run.out.execution_id });
+      assert.equal(recovery.condition, "EFFECT_EXECUTED_EVIDENCE_FAILURE");
+      assert.equal(recovery.review_required, true);
+      assert.equal(recovery.retry_permitted, false);
+      const files = readdirSync(c.evidenceDir);
+      assert.ok(!files.some((f) => f.endsWith(".tmp")), "failed temporary writes are cleaned up");
+      const published = files.filter((f) => f.endsWith(".signed.json"));
+      assert.equal(published.length, fault === "directory-sync" ? 1 : 0);
+      if (fault === "directory-sync") {
+        const envelope = JSON.parse(readFileSync(join(c.evidenceDir, published[0]), "utf8"));
+        assert.equal((await verifyExecutionEvidence(envelope, { authorityBundle: trust.bundle, trustedRootFingerprint: trust.fingerprint })).ok, true);
+        assert.equal(envelope.evidence.outcome, "EXECUTED", "valid observed-effect evidence is not a durable completion acknowledgement");
+      }
+      // Even evidence failure cannot unspend authority. Resetting the disposable
+      // remote ensures this tests the claim, not merely the pre-state guard.
+      c.repos.setRemoteTo(c.repos.commits[0]);
+      const replay = runCli(c, [request.path]);
+      assert.equal(replay.out.reason_code, "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT");
+      assertNothingSent(c, replay, "replay after evidence failure");
+    });
+  }
+
+  for (const outcome of ["INDETERMINATE", "RECONCILED_NOT_APPLIED"]) {
+    await test(`evidence completion: signer failure preserves ${outcome}`, async () => {
+      const c = newCase();
+      const request = await validRequest(c);
+      if (outcome === "INDETERMINATE") {
+        git(["push", "--quiet", c.repos.remoteUrl, `${c.repos.divergent}:refs/heads/divergent`], c.repos.localPath);
+        writeFileSync(join(c.repos.barePath, "move-away"), `${c.repos.divergent}\n`);
+      } else writeFileSync(join(c.repos.barePath, "hooks", "pre-receive"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+      const run = runCli(c, [request.path], { env: { MNDE_TEST_EVIDENCE_FAULT: "signer" } });
+      assert.equal(run.out.outcome, outcome, JSON.stringify(run.out));
+      assert.equal(run.status, outcome === "INDETERMINATE" ? 2 : 6);
+      assert.equal(run.out.executed, outcome === "INDETERMINATE" ? null : false);
+      assert.equal(run.out.evidence_error.stage, "generation");
+      assert.equal(c.repos.remoteSha(), outcome === "INDETERMINATE" ? c.repos.divergent : c.repos.commits[0]);
+      assert.equal(run.pushesReceived, outcome === "INDETERMINATE" ? 1 : 0);
+      assertOneCall(run, outcome);
+    });
+  }
+
   await test("A: a valid authorized request reaches the typed executor and executes exactly once", async () => {
     const c = newCase();
     const ids = { executionId: `exec-cli-${caseIndex}`, grantId: `grant-cli-${caseIndex}` };
@@ -240,6 +305,8 @@ async function main() {
     assert.equal(run.out.claim.backend_kind, "test-file-claim-store");
     assert.deepEqual(claimFiles(c), { execution: 1, grant: 1 }, "one consumed authority in the claim store");
     assert.ok(run.out.signed_evidence_path && existsSync(run.out.signed_evidence_path), "signed evidence was written");
+    assert.equal(run.out.evidence_error, null);
+    assert.equal(JSON.parse(readFileSync(run.out.evidence_path, "utf8")).evidence_persisted, true);
     const envelope = JSON.parse(readFileSync(run.out.signed_evidence_path, "utf8"));
     assert.deepEqual(envelope, run.out.signed_evidence, "stdout carries the same signed evidence that was written");
     const verdict = await verifyExecutionEvidence(envelope, { authorityBundle: trust.bundle, trustedRootFingerprint: trust.fingerprint });
