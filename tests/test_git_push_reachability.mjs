@@ -173,7 +173,10 @@ async function main() {
   });
   await test("7b: only the executor's startup path names MNDE_GIT_CREDENTIAL_CONFIG", () => {
     const namers = NON_TEST.filter((f) => /MNDE_GIT_CREDENTIAL_CONFIG/.test(stripComments(read(f)))).sort();
-    assert.deepEqual(namers, [CREDENTIALS, EXECUTOR, "src/effects/git-push/startup.mjs"].sort());
+    // prepare-git-push-trust writes the variable's name and a path into the
+    // operator's env file. It never opens the credential configuration, and it
+    // is excluded from the package.
+    assert.deepEqual(namers, [CREDENTIALS, EXECUTOR, "src/effects/git-push/startup.mjs", "scripts/prepare-git-push-trust.mjs"].sort());
   });
   await test("7c: the credential provider starts no process and carries no git mutation literal", () => {
     const src = stripComments(read(CREDENTIALS));
