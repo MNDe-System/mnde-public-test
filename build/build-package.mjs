@@ -113,7 +113,14 @@ const EXCLUDE_FILES = new Set([
   join(repoRoot, "mcp", "shell-mcp-server.mjs"),
   join(repoRoot, "scripts", "mcp-demo.mjs"),
   join(repoRoot, "scripts", "mcp-proxy-demo.mjs"),
-  join(repoRoot, "scripts", "shell-demo.mjs")
+  join(repoRoot, "scripts", "shell-demo.mjs"),
+  // First production git.push ceremony (docs/FIRST-PRODUCTION-GIT-PUSH.md). Run
+  // by the operator from a source checkout, never by a deployed executor, so they
+  // stay out of the tarball and add nothing to its shipped process or signing
+  // surface. prepare-git-push-trust spawns the enrolment script.
+  join(repoRoot, "scripts", "prepare-git-push-trust.mjs"),
+  join(repoRoot, "scripts", "authorize-git-push.mjs"),
+  join(repoRoot, "scripts", "verify-git-push-evidence.mjs")
 ].map((p) => p.toLowerCase()));
 
 function isExcluded(absPath) {

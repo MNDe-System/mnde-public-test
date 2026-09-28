@@ -17,6 +17,9 @@ A failed, refused or ambiguous push is reported and left alone. Another attempt
 needs a new authorization, because the claim store refuses a second use of the
 same authority (see "What an operator does after a non-zero exit").
 
+To go from no trust material to a first real push, follow
+`docs/FIRST-PRODUCTION-GIT-PUSH.md`.
+
 ## Command
 
 ```

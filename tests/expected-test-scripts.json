@@ -45,6 +45,7 @@
   "test:git-push-credential-custody",
   "test:git-push-effect",
   "test:git-push-execution-evidence",
+  "test:git-push-first-run",
   "test:git-push-isolation",
   "test:git-push-reachability",
   "test:git-push-single-route",

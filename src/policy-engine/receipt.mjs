@@ -42,7 +42,10 @@ const RECEIPT_TO_DECISION_SCHEMA = new Map([
   [SCHEMA_V2, "2.0"]
 ]);
 
-function canonicalPayloadWithoutSignature(receiptLike) {
+// The exact bytes a policy-engine receipt signature covers. Exported so a signer
+// other than the repo-local authority (a production custody key) signs the same
+// bytes verifyPolicyReceipt checks.
+export function canonicalPayloadWithoutSignature(receiptLike) {
   const { verifiable_signature: _omit, ...payload } = receiptLike;
   return canonicalizeJson(payload);
 }
@@ -86,8 +89,11 @@ async function verifyReceiptSignatureWithAuthorityBundle(receipt, signature, opt
     : { verified: false, reason: "signature invalid" };
 }
 
-// Build a signed receipt for a policy-engine decision.
-export function buildPolicyReceipt(request, policy, options = {}) {
+// Build the unsigned payload of a policy-engine receipt: the decision, the
+// embedded request and policy, and their hashes. buildPolicyReceipt signs it with
+// the repo-local authority; a production issuer signs it with its own custody key
+// (scripts/authorize-git-push.mjs). The payload is identical either way.
+export function buildPolicyReceiptPayload(request, policy, options = {}) {
   // Default to the frozen v1 receipt format; v2 is opt-in via options.receiptSchema.
   const receiptSchema = options.receiptSchema ?? SCHEMA;
   const decisionSchemaVersion = RECEIPT_TO_DECISION_SCHEMA.get(receiptSchema);
@@ -153,6 +159,12 @@ export function buildPolicyReceipt(request, policy, options = {}) {
     ...(executionStatus ? { execution_status: executionStatus } : {}),
     decision_output: decision
   };
+  return payload;
+}
+
+// Build a signed receipt for a policy-engine decision.
+export function buildPolicyReceipt(request, policy, options = {}) {
+  const payload = buildPolicyReceiptPayload(request, policy, options);
 
   const bundle = loadAuthorityBundle(repoRoot, { kind: "local" });
   if (!bundle.ok) throw new Error(`ERR_AUTHORITY_MANIFEST_INVALID: ${bundle.reason}`);
