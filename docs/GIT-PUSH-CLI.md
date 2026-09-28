@@ -199,8 +199,8 @@ acknowledged signed artifact.
 
 The local unsigned diagnostic record remains a best-effort direct write: it is
 not atomically replaced or fsynced and is not the required success artifact.
-The start record remains exclusive and file-fsynced; this change does not claim
-to prove its power-loss recovery classification. Filesystem, OS and storage must
+The start record uses the pre-push durability sequence described below.
+Filesystem, OS and storage must
 honor successful flushes and same-directory rename semantics. Windows uses a
 read/write directory handle for flushing; unsupported flush operations fail
 closed rather than being skipped. Existing evidence-directory parents must
@@ -209,6 +209,52 @@ rollback and PostgreSQL durability are not proven by these filesystem calls.
 
 An authorization that says ALLOW never produces exit `0` by itself. Only the
 executor's observed `EXECUTED` outcome with completed signed-evidence persistence does.
+
+## Execution-start durability
+
+After a successful claim acknowledgement, the executor selects the deterministic
+`git-push-<execution-id>.started.json` path in its evidence directory. Before
+calling the push transport it must complete, in order:
+
+1. Exclusive creation (`wx`) at the final path.
+2. Complete contents written with `writeFileSync` on the open descriptor.
+3. File `fsyncSync`.
+4. Successful file `closeSync`.
+5. Parent-directory `fsyncSync` and close, using the existing directory helper.
+
+Failure returns `REFUSED` / `ERR_GIT_PUSH_EXECUTION_START_NOT_RECORDED` (CLI exit
+`1`), with `executed: false` and `effect_attempted: false`. The claim remains
+consumed. There is no automatic retry, marker removal, or authority refund.
+The previous implementation file-fsynced the marker, suppressed close errors,
+and did not explicitly flush the new directory entry.
+
+Creation is directly at the final location: no cross-filesystem move or rename
+is involved. Exclusive creation prevents replacement of an existing marker.
+A temp-and-rename publication step is unnecessary here: no push is allowed until
+the final marker is complete and flushed, and incomplete or failed markers must
+not be erased to make the execution appear unstarted. The executor retains the
+marker after refusal, completion, and indeterminate outcomes. Process death after
+the durability sequence but before push conservatively classifies as
+`INDETERMINATE` when no outcome record exists; it does not permit retry.
+
+On Linux, the directory is opened read-only and fsynced; any unsupported operation
+or error fails closed before push. On Windows, the directory is opened read/write
+and fsynced, with no unsupported-operation bypass. A direct probe on Windows with
+Node 24.20.0 returned `EPERM` for a read-only directory flush and success for a
+read/write directory flush. The exact Windows guarantee is that Node acknowledged
+the file flush, file close, directory flush, and directory close before invocation.
+This is not a demonstrated guarantee equivalent to Linux directory-entry
+durability under hard power loss. Microsoft's
+[FlushFileBuffers documentation](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers)
+requires write access but does not establish that equivalence for this sequence.
+
+Both platforms depend on the filesystem and storage honoring flush requests and
+exclusive creation. Existing parent directories must already be durable; newly
+created evidence directories and their parent links are flushed by the existing
+helper. The tests inject I/O errors and kill processes; they do not simulate
+machine power loss, failed hardware caches, or every filesystem implementation.
+Cross-process replay tests use the existing file-backed claim test double and
+make no additional claim-store power-loss claim.
 
 ## What an operator does after a non-zero exit
 

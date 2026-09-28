@@ -23,7 +23,7 @@
 // no or bad claim configuration run WITHOUT the double, against the real adapter.
 
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, normalize, relative, resolve, sep } from "node:path";
@@ -224,6 +224,77 @@ const posix = (p) => p.split(sep).join("/");
 
 async function main() {
   console.log("git.push production CLI (bin/mnde-git-push.mjs, run as a child process)\n");
+
+  for (const fault of ["write", "file-sync", "close", "directory-sync"]) {
+    await test(`start durability: ${fault} failure consumes authority but sends nothing`, async () => {
+      const c = newCase();
+      const request = await validRequest(c);
+      const run = runCli(c, [request.path], { env: { MNDE_TEST_START_FAULT: fault } });
+      assert.equal(run.status, 1, JSON.stringify(run.out));
+      assert.equal(run.out.reason_code, "ERR_GIT_PUSH_EXECUTION_START_NOT_RECORDED");
+      assert.equal(run.out.executed, false);
+      assert.equal(run.out.effect_attempted, false);
+      assert.equal(run.out.claim.decision, "CLAIMED");
+      assertOneCall(run, fault);
+      assertNothingSent(c, run, fault);
+      assert.match(readFileSync(c.callLog, "utf8"), new RegExp(`start-fault:${fault}`));
+      assert.deepEqual(claimFiles(c), { execution: 1, grant: 1 });
+      assert.equal(readdirSync(c.evidenceDir).filter((f) => f.endsWith(".started.json")).length, 1, "never delete the marker on failure");
+      const replay = runCli(c, [request.path]);
+      assert.equal(replay.out.reason_code, "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT");
+      assertNothingSent(c, replay, "replay after start persistence failure");
+    });
+  }
+
+  await test("start durability: successful file-close-directory sequence precedes exactly one push", async () => {
+    const c = newCase();
+    const request = await validRequest(c);
+    // The remote itself rejects the push unless the full sequence was logged.
+    writeFileSync(join(c.repos.barePath, "hooks", "pre-receive"),
+      `#!/bin/sh\ngrep -q 'start:directory-close' '${posix(c.callLog)}' || exit 1\n`, { mode: 0o755 });
+    const run = runCli(c, [request.path], { env: { MNDE_TEST_START_FAULT: "observe" } });
+    assert.equal(run.status, 0, JSON.stringify(run.out));
+    assert.equal(run.pushesReceived, 1);
+    assert.equal(c.repos.remoteSha(), c.repos.commits[1]);
+    assert.deepEqual(readFileSync(c.callLog, "utf8").trim().split("\n").filter((s) => s.startsWith("start:")),
+      ["start:create", "start:write", "start:file-sync", "start:close", "start:directory-sync", "start:directory-close"]);
+    const startPath = readdirSync(c.evidenceDir).find((f) => f.endsWith(".started.json"));
+    assert.equal(JSON.parse(readFileSync(join(c.evidenceDir, startPath), "utf8")).execution_id, run.out.execution_id);
+  });
+
+  await test("start durability: kill after directory flush before push retains marker and spent authority", async () => {
+    const c = newCase();
+    const request = await validRequest(c);
+    const child = spawn(process.execPath, ["--import", COUNTING, "--import", CLAIM_DOUBLE, SOURCE_CLI, request.path], {
+      cwd: c.caseDir, env: operatorEnv(c, { MNDE_TEST_START_FAULT: "kill-before-push" }), stdio: ["ignore", "ignore", "pipe"]
+    });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    const ended = new Promise((resolve, reject) => { child.once("exit", resolve); child.once("error", reject); });
+    try {
+      const deadline = Date.now() + 60_000;
+      while (!(existsSync(c.callLog) && readFileSync(c.callLog, "utf8").includes("start:directory-close"))) {
+        assert.equal(child.exitCode, null, stderr);
+        assert.ok(Date.now() < deadline, `start durability wait timed out: ${stderr}`);
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    } finally {
+      child.kill("SIGKILL");
+      await ended;
+    }
+    assert.equal(c.received(), 0);
+    assert.equal(c.repos.remoteSha(), c.repos.commits[0]);
+    assert.deepEqual(claimFiles(c), { execution: 1, grant: 1 });
+    const startPath = readdirSync(c.evidenceDir).find((f) => f.endsWith(".started.json"));
+    const start = JSON.parse(readFileSync(join(c.evidenceDir, startPath), "utf8"));
+    const recovery = classifyGitPushExecution({ evidenceDir: c.evidenceDir, executionId: start.execution_id });
+    assert.equal(recovery.condition, "INDETERMINATE");
+    assert.equal(recovery.retry_permitted, false);
+    const replay = runCli(c, [request.path]);
+    assert.equal(replay.out.reason_code, "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT");
+    assertNothingSent(c, replay, "replay after killed durable start");
+    assert.ok(existsSync(join(c.evidenceDir, startPath)), "replay must retain the start marker");
+  });
 
   for (const fault of ["signer", "write", "file-sync", "rename", "directory-sync"]) {
     await test(`evidence completion: ${fault} fails after one confirmed effect, exits 7, never retries`, async () => {

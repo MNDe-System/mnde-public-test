@@ -42,7 +42,7 @@
 // credential-helper chatter and so stays out of the portable record.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, toNamespacedPath } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -460,8 +460,9 @@ export function createGitPushExecutor(startup = {}) {
     }
   }
 
-  // One file per execution id, created exclusively and fsynced. It records only
-  // that an attempt began and what it was bound to; the outcome, when there is
+  // One file per execution id, created exclusively, file- and directory-fsynced.
+  // Never remove this marker on failure: the authority is already consumed.
+  // It records only that an attempt began and what it was bound to; the outcome, when there is
   // one, lives in the ordinary evidence record.
   function recordExecutionStart({ execution_id, grant_id, executor_id, authorized, namespace: ns }) {
     if (!nonEmptyString(execution_id)) return { ok: false, detail: "no execution id" };
@@ -470,7 +471,7 @@ export function createGitPushExecutor(startup = {}) {
       ensureEvidenceDirectory();
       const path = join(evidenceDir, startRecordName(execution_id));
       fd = openSync(path, "wx");
-      writeSync(fd, `${JSON.stringify({
+      writeFileSync(fd, `${JSON.stringify({
         schema: EXECUTION_START_SCHEMA,
         execution_id,
         grant_id: grant_id ?? null,
@@ -478,8 +479,12 @@ export function createGitPushExecutor(startup = {}) {
         namespace: ns,
         authorized,
         started_at: new Date().toISOString()
-      }, null, 2)}\n`);
+      }, null, 2)}\n`, "utf8");
       fsyncSync(fd);
+      const writtenFd = fd;
+      fd = null; // Do not retry close after an error: descriptor state is unknown.
+      closeSync(writtenFd);
+      syncDirectory(dirname(path));
       return { ok: true, path };
     } catch (error) {
       return { ok: false, detail: String(error?.code ?? error?.message ?? error) };

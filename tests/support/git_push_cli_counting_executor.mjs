@@ -3,6 +3,7 @@
 import { appendFileSync } from "node:fs";
 import fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
+import { installStartFault } from "./git_push_start_faults.mjs";
 
 const realUrl = new URL(import.meta.url).searchParams.get("real");
 if (!realUrl) throw new Error("counting executor loaded without the real module URL");
@@ -20,6 +21,7 @@ export const EVIDENCE_SCHEMA = real.EVIDENCE_SCHEMA;
 
 export function createGitPushExecutor(startup) {
   log("construct");
+  if (process.env.MNDE_TEST_START_FAULT) installStartFault(process.env.MNDE_TEST_START_FAULT, log);
   // Faults exist only in this test preload, after identity readiness. Real git,
   // observation, claim ordering, settle() and CLI exit mapping remain in use.
   const fault = process.env.MNDE_TEST_EVIDENCE_FAULT;
