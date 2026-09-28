@@ -42,11 +42,11 @@
 // credential-helper chatter and so stays out of the portable record.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync, writeSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve, toNamespacedPath } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { sha256 } from "../../crypto/provider.mjs";
+import { randomBytes, sha256 } from "../../crypto/provider.mjs";
 import { evaluateExecutorPosture } from "../../executor-posture-preflight.mjs";
 import { isProductionExecutionAuthority, verifyExecutionAuthority } from "../../execution-authority/index.mjs";
 import { claimAuthority, deriveClaimRecord, DISPATCH } from "../../freshness/claim.mjs";
@@ -83,11 +83,10 @@ const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".."
 
 export const EVIDENCE_SCHEMA = "mnde.execution-evidence.v1";
 
-// Terminal outcomes. There are four because there are genuinely four things that
-// can be true after a push is attempted, and collapsing the last two into
-// "failed" is how a replay gets built later.
+// Transport outcomes and the distinct completion failure after a confirmed effect.
 export const OUTCOME = Object.freeze({
   EXECUTED: "EXECUTED",                                 // observed post-state equals the approved SHA
+  EFFECT_EXECUTED_EVIDENCE_FAILURE: "EFFECT_EXECUTED_EVIDENCE_FAILURE",
   REFUSED: "REFUSED",                                   // nothing was sent
   RECONCILED_NOT_APPLIED: "RECONCILED_NOT_APPLIED",     // sent, did not land, remote read back cleanly
   INDETERMINATE: "INDETERMINATE"                        // outcome unknown; needs a human
@@ -103,6 +102,8 @@ export const ERR_POSTSTATE_MISMATCH = "ERR_GIT_PUSH_POSTSTATE_MISMATCH";
 export const ERR_STARTUP_CONFIG = "ERR_GIT_PUSH_STARTUP_CONFIG";
 export const ERR_EXECUTION_START_NOT_RECORDED = "ERR_GIT_PUSH_EXECUTION_START_NOT_RECORDED";
 export const ERR_BACKEND_SUBSTITUTION = "ERR_GIT_PUSH_BACKEND_SUBSTITUTION";
+export const ERR_EVIDENCE_GENERATION = "ERR_GIT_PUSH_EVIDENCE_GENERATION";
+export const ERR_EVIDENCE_PERSISTENCE = "ERR_GIT_PUSH_EVIDENCE_PERSISTENCE";
 
 export const EXECUTION_START_SCHEMA = "mnde.git-push-execution-start.v1";
 
@@ -140,7 +141,7 @@ export function classifyGitPushExecution({ evidenceDir, executionId } = {}) {
     outcome = record.outcome;
   }
   if (outcome) {
-    return Object.freeze({ condition: outcome, started, review_required: outcome === OUTCOME.INDETERMINATE, retry_permitted: false });
+    return Object.freeze({ condition: outcome, started, review_required: outcome === OUTCOME.INDETERMINATE || outcome === OUTCOME.EFFECT_EXECUTED_EVIDENCE_FAILURE, retry_permitted: false });
   }
   if (started) {
     return Object.freeze({ condition: OUTCOME.INDETERMINATE, started, review_required: true, retry_permitted: false,
@@ -344,10 +345,14 @@ export function createGitPushExecutor(startup = {}) {
     (error) => ({ backend: null, detail: String(error?.message ?? error) })
   );
 
+  // Retain unfinished directory flushes across attempts in this executor. A
+  // failed flush does not turn newly created directories into provisioned ones.
+  let evidenceDirectoryParentToSync = null;
+
   function writeEvidence(evidence) {
     const body = JSON.stringify(evidence, null, 2);
     try {
-      mkdirSync(evidenceDir, { recursive: true });
+      ensureEvidenceDirectory();
       const path = join(evidenceDir, `git-push-${evidence.execution_id ?? "unidentified"}-${evidence.recorded_at.replace(/[:.]/g, "-")}.json`);
       writeFileSync(path, `${body}\n`, "utf8");
       return path;
@@ -406,32 +411,67 @@ export function createGitPushExecutor(startup = {}) {
     return { envelope: signed.envelope, reason: null };
   }
 
-  // Write the signed envelope beside the local record. A failure to persist it
-  // is reported rather than swallowed: evidence that was not stored must not
-  // look like evidence that was.
+  function syncDirectory(path) {
+    // Windows needs a writable directory handle for FlushFileBuffers. If the
+    // platform/filesystem refuses either operation, completion fails closed.
+    const fd = openSync(path, process.platform === "win32" ? "r+" : "r");
+    try { fsyncSync(fd); } finally { closeSync(fd); }
+  }
+
+  function ensureEvidenceDirectory() {
+    const firstCreated = mkdirSync(evidenceDir, { recursive: true });
+    if (firstCreated) evidenceDirectoryParentToSync = dirname(toNamespacedPath(resolve(firstCreated)));
+    if (evidenceDirectoryParentToSync === null) return;
+    // Persist any directories we created as well as their links in the existing
+    // parent. Syncing only the leaf would not persist a newly created ancestor.
+    for (let path = toNamespacedPath(resolve(evidenceDir)); ; path = dirname(path)) {
+      syncDirectory(path);
+      if (path === evidenceDirectoryParentToSync) break;
+    }
+    evidenceDirectoryParentToSync = null;
+  }
+
+  // Publish a complete signed artifact, then acknowledge it only after the file
+  // and its directory entry have been flushed. Never retry the external effect.
   function writeSignedEvidence(envelope, executionId, recordedAt) {
-    if (!envelope) return null;
+    if (!envelope) return { path: null, error: null };
+    let temporary = null;
+    let fd = null;
     try {
-      mkdirSync(evidenceDir, { recursive: true });
-      const path = join(evidenceDir, `git-push-${executionId}-${recordedAt.replace(/[:.]/g, "-")}.signed.json`);
-      writeFileSync(path, `${JSON.stringify(envelope, null, 2)}\n`, "utf8");
-      return path;
-    } catch {
-      return null;
+      ensureEvidenceDirectory();
+      const path = join(evidenceDir, `git-push-${executionId}-${recordedAt.replace(/[:.]/g, "-")}-${randomBytes(16).toString("hex")}.signed.json`);
+      temporary = `${path}.tmp`;
+      fd = openSync(temporary, "wx", 0o600);
+      writeFileSync(fd, `${JSON.stringify(envelope, null, 2)}\n`, "utf8");
+      fsyncSync(fd);
+      closeSync(fd);
+      fd = null;
+      renameSync(temporary, path);
+      temporary = null;
+      syncDirectory(resolve(evidenceDir));
+      return { path, error: null };
+    } catch (error) {
+      // A renamed file may exist after directory-flush failure. Its existence
+      // is not acknowledgement of durability; do not return a confirmed path.
+      return { path: null, error: { reason_code: ERR_EVIDENCE_PERSISTENCE, stage: "persistence", code: error?.code ?? "ERR_IO" } };
+    } finally {
+      if (fd !== null) { try { closeSync(fd); } catch { /* preserve failure */ } }
+      if (temporary !== null) { try { unlinkSync(temporary); } catch { /* best effort */ } }
     }
   }
 
-  // One file per execution id, created exclusively and fsynced. It records only
-  // that an attempt began and what it was bound to; the outcome, when there is
+  // One file per execution id, created exclusively, file- and directory-fsynced.
+  // Never remove this marker on failure: the authority is already consumed.
+  // It records only that an attempt began and what it was bound to; the outcome, when there is
   // one, lives in the ordinary evidence record.
   function recordExecutionStart({ execution_id, grant_id, executor_id, authorized, namespace: ns }) {
     if (!nonEmptyString(execution_id)) return { ok: false, detail: "no execution id" };
     let fd = null;
     try {
-      mkdirSync(evidenceDir, { recursive: true });
+      ensureEvidenceDirectory();
       const path = join(evidenceDir, startRecordName(execution_id));
       fd = openSync(path, "wx");
-      writeSync(fd, `${JSON.stringify({
+      writeFileSync(fd, `${JSON.stringify({
         schema: EXECUTION_START_SCHEMA,
         execution_id,
         grant_id: grant_id ?? null,
@@ -439,8 +479,12 @@ export function createGitPushExecutor(startup = {}) {
         namespace: ns,
         authorized,
         started_at: new Date().toISOString()
-      }, null, 2)}\n`);
+      }, null, 2)}\n`, "utf8");
       fsyncSync(fd);
+      const writtenFd = fd;
+      fd = null; // Do not retry close after an error: descriptor state is unknown.
+      closeSync(writtenFd);
+      syncDirectory(dirname(path));
       return { ok: true, path };
     } catch (error) {
       return { ok: false, detail: String(error?.code ?? error?.message ?? error) };
@@ -450,16 +494,43 @@ export function createGitPushExecutor(startup = {}) {
   }
 
   async function settle(evidence, result) {
-    const { envelope, reason } = await signEvidence(evidence);
-    const local = { ...evidence, evidence_signed: envelope !== null, evidence_unsigned_reason: reason };
+    let envelope = null;
+    let reason = null;
+    try {
+      ({ envelope, reason } = await signEvidence(evidence));
+    } catch {
+      reason = "execution evidence construction or signing failed";
+    }
+    const persisted = writeSignedEvidence(envelope, evidence.execution_id ?? "unidentified", evidence.recorded_at);
+    const evidenceRequired = result.outcome === OUTCOME.EXECUTED || (evidence.authorized && nonEmptyString(evidence.execution_id));
+    const evidenceError = envelope === null && evidenceRequired
+      ? { reason_code: ERR_EVIDENCE_GENERATION, stage: "generation" }
+      : persisted.error;
+    const completionFailed = result.outcome === OUTCOME.EXECUTED && evidenceError !== null;
+    const completion = completionFailed ? {
+      ok: false,
+      outcome: OUTCOME.EFFECT_EXECUTED_EVIDENCE_FAILURE,
+      executed: true,
+      reason_code: evidenceError.reason_code,
+      detail: "the remote mutation occurred, but MNDe could not complete the required signed evidence artifact; do not retry the push"
+    } : result;
+    // The signed body still describes the observed effect. Completion failure is
+    // caller/local metadata, not a new signed evidence schema or transport result.
+    const local = {
+      ...evidence, ...completion,
+      evidence_signed: envelope !== null,
+      evidence_unsigned_reason: reason,
+      evidence_persisted: persisted.path !== null,
+      evidence_error: evidenceError
+    };
     const evidencePath = writeEvidence(local);
-    const signedEvidencePath = writeSignedEvidence(envelope, local.execution_id ?? "unidentified", local.recorded_at);
     return Object.freeze({
-      ...result,
+      ...completion,
+      evidenceError,
       evidence: Object.freeze(local),
       evidencePath,
       signedEvidence: envelope,
-      signedEvidencePath
+      signedEvidencePath: persisted.path
     });
   }
 
