@@ -1,3 +1,4 @@
+import { readInterlock } from "../../hub/state.mjs";
 // git.push — MNDe's first narrow typed production effect.
 //
 // ─────────────────────────────────────────────────────────────────────────────
@@ -256,6 +257,7 @@ export function createGitPushExecutor(startup = {}) {
     // configuration in which the push runs and the evidence goes unsigned.
     executorIdentity = null,
     executorSigner = null,
+    verificationContext = {},
     env = process.env
   } = startup;
 
@@ -315,6 +317,18 @@ export function createGitPushExecutor(startup = {}) {
       { code: ERR_STARTUP_CONFIG }
     );
   }
+
+  // These are out-of-band replay-verification anchors, never a caller's clock
+  // or replacement verifier. In particular, do not spread arbitrary options
+  // into verifyExecutionAuthority: that could override its freshness instant.
+  const verificationKeys = ["trustAnchors", "approvalTrustAnchors", "historicalPolicyBundle", "policyAuthorityBundle", "policyTrustedRootFingerprint"];
+  if (!verificationContext || typeof verificationContext !== "object" || Array.isArray(verificationContext)
+    || Object.keys(verificationContext).some(key => !verificationKeys.includes(key))) {
+    throw Object.assign(new Error(ERR_STARTUP_CONFIG), { code: ERR_STARTUP_CONFIG });
+  }
+  const verificationAnchors = structuredClone(verificationContext);
+  const hubDataDir = env.MNDE_HUB_DATA_DIR;
+  const permitted = (epoch) => epoch !== false && readInterlock(hubDataDir) === epoch;
 
   const transport = buildTransportEnv(transportEnv);
   if (!transport.ok) {
@@ -565,6 +579,8 @@ export function createGitPushExecutor(startup = {}) {
   }
 
   async function executeGitPush(request = {}) {
+    const epoch = readInterlock(hubDataDir);
+    if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked");
     if (!request || typeof request !== "object" || Array.isArray(request)) {
       return refuse(ERR_STARTUP_CONFIG, "request must be an object");
     }
@@ -594,6 +610,7 @@ export function createGitPushExecutor(startup = {}) {
 
     // ── 2. The authorization is authentic, executor-bound and current ────────
     const authority = await verifyExecutionAuthority(request.authorization, {
+      ...verificationAnchors,
       authorityBundle,
       trustedRootFingerprint,
       environmentId,
@@ -656,13 +673,13 @@ export function createGitPushExecutor(startup = {}) {
     const staging = await createStagingRepository(context.repoPath, context);
     if (!staging.ok) return refuse(staging.reason, staging.detail, { ...identity, authorized });
     try {
-      return await effectFromStaging(staging.context, { authority, identity, authorized, p });
+      return await effectFromStaging(staging.context, { authority, identity, authorized, p, epoch });
     } finally {
       removeStagingRepository(staging);
     }
   }
 
-  async function effectFromStaging(stage, { authority, identity, authorized, p }) {
+  async function effectFromStaging(stage, { authority, identity, authorized, p, epoch }) {
     // ── 7 & 8. Both approved SHAs exist locally and are commits ──────────────
     for (const sha of [p.source_commit, p.expected_old_sha]) {
       const local = await resolveLocalCommit(sha, stage);
@@ -678,6 +695,7 @@ export function createGitPushExecutor(startup = {}) {
     // the refusal spends nothing and a fresh attempt with the same
     // authorization is legitimate. Obtaining it after the claim would turn
     // every credential outage into burned authority.
+    if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized });
     let handle;
     try {
       handle = await credentials.acquire({ repository: p.repository, remoteUrl: p.remote_url, executorId: identity.executor_id });
@@ -696,7 +714,7 @@ export function createGitPushExecutor(startup = {}) {
     // written, and everything written is scrubbed of it first.
     let parts;
     try {
-      parts = await remoteEffect(stage, credentialed.context, { authority, identity, authorized, p });
+      parts = await remoteEffect(stage, credentialed.context, { authority, identity, authorized, p, epoch });
     } finally {
       parts = await releaseInto(parts, handle);
     }
@@ -716,10 +734,11 @@ export function createGitPushExecutor(startup = {}) {
 
   // Steps 9 onward, run with the credentialed context for the three operations
   // that talk to the remote. Returns { evidence, result } unsettled.
-  async function remoteEffect(stage, remote, { authority, identity, authorized, p }) {
+  async function remoteEffect(stage, remote, { authority, identity, authorized, p, epoch }) {
     const refuse = refusal;
 
     // ── 9. The remote is observed, independently, in the approved pre-state ──
+    if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized });
     const before = await readRemoteRef(p.remote_url, p.target_ref, remote);
     if (!before.ok) return refuse(before.reason, before.detail, { ...identity, authorized });
     if (before.sha !== p.expected_old_sha) {
@@ -792,6 +811,7 @@ export function createGitPushExecutor(startup = {}) {
     }
 
     // ── 12. THE EFFECT ───────────────────────────────────────────────────────
+    if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized, claim: claimMeta });
     const pushed = await performPush(argv, remote, claim.ticket);
 
     // ── 13. Believe the remote, not the exit code ────────────────────────────
@@ -838,7 +858,13 @@ export function createGitPushExecutor(startup = {}) {
     };
   }
 
-  return Object.freeze({ executeGitPush, action: GIT_PUSH_ACTION });
+  async function readiness() {
+    const store = await claimStore;
+    try { return { ready: (await store.backend?.health())?.ok === true }; }
+    catch { return { ready: false }; }
+  }
+
+  return Object.freeze({ executeGitPush, readiness, action: GIT_PUSH_ACTION });
 }
 
 export default createGitPushExecutor;
