@@ -47,8 +47,8 @@ import { isProductionExecutionAuthority, verifyExecutionAuthority } from "../src
 import { KNOWN_NON_PRODUCTION_ROOT_FINGERPRINTS } from "../src/effects/git-push/startup.mjs";
 import { GIT_PUSH_ACTION, canonicalRepositoryIdentity, validateGitPushParameters } from "../src/effects/git-push/validate.mjs";
 import { canonicalizeJson } from "../shared/json.ts";
-import { RECEIPT_SIGNATURE_ALGORITHM } from "../shared/index.ts";
-import { buildPolicyReceiptPayload, canonicalPayloadWithoutSignature } from "../src/policy-engine/receipt.mjs";
+import { signPolicyPayload } from "../src/authority-signing/policy-payload.mjs";
+import { buildPolicyReceiptPayload } from "../src/policy-engine/receipt.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -165,18 +165,7 @@ export async function authorizeGitPush(input, env = process.env, { now = new Dat
     const payload = buildPolicyReceiptPayload(decisionRequest, GIT_PUSH_APPROVAL_POLICY, { now, executionStatus: null });
     if (payload.decision_output?.decision !== "ALLOW") return fail(`policy did not allow the push (${payload.decision_output?.reason_code ?? "?"})`);
 
-    const innerSignature = await signingConfig.provider.signReceipt(canonicalPayloadWithoutSignature(payload));
-    const inner = {
-      ...payload,
-      verifiable_signature: {
-        algorithm: RECEIPT_SIGNATURE_ALGORITHM,
-        authority_id: bundle.authority_id,
-        key_id: innerSignature.key_id,
-        public_key_fingerprint: innerSignature.fingerprint,
-        signed_at: now,
-        value: innerSignature.value
-      }
-    };
+    const inner = await signPolicyPayload(payload, signingConfig, bundle, now);
 
     const signed = await signLiveReceipt(inner, context.context, { now });
     if (!signed.ok) return fail(`envelope signing failed (${signed.reason_code})`);
