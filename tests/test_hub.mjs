@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import { startHub } from "../src/hub/service.mjs";
 import { createGitPushExecutor } from "../src/effects/git-push/index.mjs";
 import { loadGitPushStartup } from "../src/effects/git-push/startup.mjs";
+import { canonicalRepositoryIdentity } from "../src/effects/git-push/validate.mjs";
 import { openHubAuthorization } from "../src/hub/authorization.mjs";
 import { openHubState, readInterlock } from "../src/hub/state.mjs";
 import { verifyAnyReceiptObject } from "../tools/verify.mjs";
@@ -19,7 +20,9 @@ import { installClaimBackend } from "./support/claim_backend_double.mjs";
 
 // Real policy, signatures, executor and local file:// Git effect. ONLY the
 // PostgreSQL adapter is replaced by the existing test-only ESM preload.
-const dir = mkdtempSync(join(tmpdir(), "mnde-hub-test-"));
+// Always exercise URL encoding, even when the developer's temp directory lacks
+// a Windows short name such as RUNNER~1 (serialized by pathToFileURL as %7E).
+const dir = mkdtempSync(join(tmpdir(), "mnde-hub-test~encoded-"));
 const trust = await productionTrust(dir);
 const policyKey = { keyId: "hub-policy", ...generateAuthorityKeyPair() };
 const approvalKey = { keyId: "hub-approval", ...generateAuthorityKeyPair() };
@@ -54,6 +57,25 @@ const output = [];
 const stdout = process.stdout.write.bind(process.stdout);
 process.stdout.write = (chunk, ...args) => { output.push(String(chunk)); return stdout(chunk, ...args); };
 async function test(name, fn) { try { await fn(); passed++; console.log(`PASS ${name}`); } catch (error) { failed++; console.error(`FAIL ${name}: ${error.stack}`); } }
+
+async function waitForAcquisition(acquired, action, timeoutMs = 5000) {
+  let timer;
+  try {
+    await Promise.race([
+      acquired,
+      action.then(response => assert.fail(`action completed before credential acquisition: HTTP ${response.status} ${JSON.stringify(response.body)}`)),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new assert.AssertionError({ message: `credential acquisition was not reached within ${timeoutMs} ms` })), timeoutMs);
+      })
+    ]);
+  } finally { clearTimeout(timer); }
+}
+
+function actionRequest(repos, branch = "main") {
+  return { id: randomUUID(), action: "git.push", repository: canonicalRepositoryIdentity(repos.remoteUrl),
+    remote: "origin", remoteUrl: repos.remoteUrl, expectedOldSha: repos.commits[0], sourceCommit: repos.commits[1], targetRef: `refs/heads/${branch}` };
+}
+
 let count = 0;
 async function fixture(extra = {}) {
   globalThis.__hubObservation = { executions: 0, acquisitions: 0 };
@@ -71,12 +93,21 @@ async function fixture(extra = {}) {
       headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json" }, ...(input === undefined ? {} : { body: JSON.stringify(input) }) });
     const text = await response.text(); replies.push(text); return { status: response.status, body: JSON.parse(text) };
   }
-  const request = (branch = "main") => ({ id: randomUUID(), action: "git.push", repository: `file:${new URL(repos.remoteUrl).pathname.replace(/\.git$/, "")}`,
-    remote: "origin", remoteUrl: repos.remoteUrl, expectedOldSha: repos.commits[0], sourceCommit: repos.commits[1], targetRef: `refs/heads/${branch}` });
+  const request = branch => actionRequest(repos, branch);
   return { env, backend, hub, api, request, repos, data, replies };
 }
 
 await test("startup, health, readiness, authenticated controls, unlock and relock", async () => {
+  // Literal expectations cover Windows and POSIX on every host, including
+  // decoding exactly once. The fixture must not reimplement URL normalization.
+  for (const [remoteUrl, repository] of [
+    ["file:///C:/Users/RUNNER%7E1/Temp/remote.git", "file:/C:/Users/RUNNER~1/Temp/remote"],
+    ["file:///C:/Users/Runner%20Admin/Temp/remote.git", "file:/C:/Users/Runner Admin/Temp/remote"],
+    ["file:///tmp/mnde%7Etest/remote.git", "file:/tmp/mnde~test/remote"],
+    ["file:///tmp/mnde%2520test/remote.git/", "file:/tmp/mnde%20test/remote"]
+  ]) {
+    assert.equal(actionRequest({ remoteUrl, commits: ["a".repeat(40), "b".repeat(40)] }).repository, repository);
+  }
   const f = await fixture();
   try {
     assert.equal((await f.api("/healthz")).status, 200);
@@ -257,17 +288,23 @@ await test("credential-provider exception cannot leak through API, signed eviden
 });
 
 await test("lock during credential acquisition prevents dispatch and drains before acknowledgment", async () => {
+  // Guard the guard: a rejected prerequisite reports its HTTP result, and a
+  // request that never settles cannot leave this test waiting indefinitely.
+  await assert.rejects(waitForAcquisition(new Promise(() => {}), Promise.resolve({ status: 400, body: { reason_code: "ERR_HUB_INPUT" } })), /HTTP 400.*ERR_HUB_INPUT/);
+  await assert.rejects(waitForAcquisition(new Promise(() => {}), new Promise(() => {}), 25), /credential acquisition was not reached within 25 ms/);
   const f = await fixture();
+  let release, action, lock;
   try {
-    await f.api("/v1/unlock", {});
-    let entered, release;
+    const unlocked = await f.api("/v1/unlock", {});
+    assert.equal(unlocked.body.state, "ACTIVE", JSON.stringify(unlocked));
+    let entered;
     const acquired = new Promise(r => { entered = r; });
     const paused = new Promise(r => { release = r; });
     globalThis.__hubObservation.beforeAcquire = async () => { entered(); await paused; };
-    const action = f.api("/v1/actions", f.request());
-    await acquired;
+    action = f.api("/v1/actions", f.request());
+    await waitForAcquisition(acquired, action);
     let acknowledged = false;
-    const lock = f.api("/v1/lock", {}).then(value => { acknowledged = true; return value; });
+    lock = f.api("/v1/lock", {}).then(value => { acknowledged = true; return value; });
     for (let i = 0; i < 100 && JSON.parse(readFileSync(join(f.data, "lock.json"))).locked !== true; i++) await new Promise(r => setTimeout(r, 10));
     assert.equal(JSON.parse(readFileSync(join(f.data, "lock.json"))).locked, true);
     assert.equal(acknowledged, false);
@@ -278,7 +315,14 @@ await test("lock during credential acquisition prevents dispatch and drains befo
     globalThis.__hubObservation.beforeAcquire = undefined;
     await f.api("/v1/unlock", {});
     assert.equal((await f.api("/v1/actions", f.request())).body.execution.outcome, "EXECUTED");
-  } finally { await f.hub.close(); }
+  } finally {
+    // Always unblock the real executor, including when the lock assertions or
+    // prerequisite deadline fail, before draining the server and pending HTTP.
+    release?.();
+    globalThis.__hubObservation.beforeAcquire = undefined;
+    await f.hub.close();
+    await Promise.allSettled([action, lock].filter(Boolean));
+  }
 });
 
 await test("lock/unlock epoch invalidates an in-flight execution after its one-use claim", async () => {
