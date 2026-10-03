@@ -1,0 +1,16 @@
+{
+  "authority_id": "mnde-public-test-demo",
+  "authority_name": "MNDe Public Test Demo Authority",
+  "root_key_fingerprint": "6e987c47fe1144c9a9e957b1c9f45f50e37df8892e2f0b3ad80b6d2a20ec4efa",
+  "active_keys": [
+    {
+      "key_id": "receipt-key-local",
+      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAQHCSmg8YRDxQQSdp8berjv0i4ue2fP526REYRHT+v3g=\n-----END PUBLIC KEY-----\n",
+      "public_key_fingerprint": "6f1fb83d326c1a3f8ab5e6a4e67c8bed2121c68810cd6030d4a71ec397f8412f",
+      "valid_from": "2025-06-26T02:23:55.564Z",
+      "valid_to": "2036-06-26T02:23:55.564Z"
+    }
+  ],
+  "retired_keys": [],
+  "manifest_signature": "b4a978da715672eafe639af6f4f1f02af0c8fa3ed48b5bb37af8e701066a6e1725e567ffa04e265264e557cdada086b6a749fe657eb624f558f84a76bafe3603"
+}

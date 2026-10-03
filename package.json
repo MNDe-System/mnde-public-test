@@ -1,0 +1,69 @@
+{
+  "name": "mnde",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "mnde-hub": "./bin/mnde-hub.mjs",
+    "mnde-git-push": "./bin/mnde-git-push.mjs"
+  },
+  "scripts": {
+    "hub": "node ./bin/mnde-hub.mjs",
+    "git-push": "node ./bin/mnde-git-push.mjs",
+    "verify:authorization": "node ./tools/verify.mjs",
+    "verify:execution": "node ./scripts/verify-git-push-evidence.mjs",
+    "test": "node ./scripts/run-release-tests.mjs",
+    "test:postgres": "node ./deployment/freshness/claim-store-proof.mjs",
+    "check:imports": "node ./scripts/check-imports.mjs",
+    "build": "npm run check:imports && node ./scripts/check-release-package.mjs"
+  },
+  "files": [
+    "arm/engine.ts",
+    "authority/authority-manifest.json",
+    "authority/root_authority_public.pem",
+    "bin",
+    "conformance",
+    "deployment/freshness/postgres.sql",
+    "deployment/freshness/provision-executor-login.sql",
+    "deployment/freshness/claim.json.example",
+    "deployment/hub/hub.env.example",
+    "deployment/hub/mnde-hub.service",
+    "deployment/hub/git-credential.json.example",
+    "deployment/hub/api-tokens.json.example",
+    "docs",
+    "orbit/engine.ts",
+    "preflight/engine.ts",
+    "ram0na/engine.ts",
+    "scripts/authorize-git-push.mjs",
+    "scripts/prepare-git-push-trust.mjs",
+    "scripts/init-production-authority.mjs",
+    "scripts/trust-enroll-executor.mjs",
+    "scripts/verify-git-push-evidence.mjs",
+    "shared/authority-manifest.mjs",
+    "shared/contracts.ts",
+    "shared/decision-engine.mjs",
+    "shared/hash.ts",
+    "shared/index.ts",
+    "shared/json.ts",
+    "shared/policy-trust.ts",
+    "shared/receipt-replay.mjs",
+    "shared/receipt-signing.ts",
+    "shared/runtime-profile.mjs",
+    "shared/state.ts",
+    "shared/types.ts",
+    "src",
+    "tools",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "SECURITY_CLAIMS.md",
+    "CRYPTOGRAPHY.md",
+    "SUPPLY_CHAIN_SECURITY.md"
+  ],
+  "dependencies": {
+    "pg": "8.23.1"
+  }
+}

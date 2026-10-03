@@ -1,0 +1,38 @@
+[Unit]
+Description=MNDe Hub execution firewall
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=/mnt/mnde-data
+ConditionPathIsMountPoint=/mnt/mnde-data
+
+[Service]
+Type=simple
+User=mnde
+Group=mnde
+WorkingDirectory=/opt/mnde
+EnvironmentFile=/etc/mnde/hub.env
+ExecStart=/usr/bin/node --max-old-space-size=192 /opt/mnde/bin/mnde-hub.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=120
+KillMode=mixed
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+ReadWritePaths=/mnt/mnde-data /var/lib/mnde
+MemoryMax=512M
+TasksMax=32
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target

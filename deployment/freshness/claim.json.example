@@ -1,0 +1,9 @@
+{
+  "host": "REPLACE_WITH_TEST_OR_PRODUCTION_PRIMARY_HOST",
+  "port": 5432,
+  "database": "REPLACE_WITH_CLAIM_DATABASE",
+  "user": "REPLACE_WITH_RESTRICTED_EXECUTOR_USER",
+  "namespace": "REPLACE_WITH_EXECUTOR_NAMESPACE",
+  "passwordFile": "/etc/mnde/claim-password",
+  "caFile": "/etc/mnde/postgres-ca.pem"
+}

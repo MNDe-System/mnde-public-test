@@ -1,0 +1,45 @@
+{
+  "schema_version": "mnde.authority.bundle.v1",
+  "authority_id": "mnde-conformance-authority",
+  "issued_at": "2026-06-25T00:00:00.000Z",
+  "not_after": "2036-06-25T00:00:00.000Z",
+  "root_key": {
+    "key_id": "conformance-root-2026",
+    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAIwPSNAThCEm+Be5GcGLwJNAw2pWrWGZbWvhhlizJlAs=\n-----END PUBLIC KEY-----\n",
+    "fingerprint": "0c221b34dd8774140be53d3f23ffcafc95e418eecdbbc0a0d9ce8496adf49b2a"
+  },
+  "keys": {
+    "receipt": [
+      {
+        "key_id": "conformance-receipt-2026",
+        "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAubltt94ZGoQ6hxmDq+4vwB6Yn05kmlwT0f7/zRSr/Lo=\n-----END PUBLIC KEY-----\n",
+        "fingerprint": "d7cc747ccff23313996a7e272fa189ddb13944b12dcd758c4754d96c2262d805",
+        "valid_from": "2026-06-25T00:00:00.000Z",
+        "valid_until": "2036-06-25T00:00:00.000Z"
+      }
+    ],
+    "policy": [
+      {
+        "key_id": "conformance-policy-2026",
+        "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMxGKqH7qEb6RonYDf8sNx8YwenrHdZSBbxuQI6Vl0r4=\n-----END PUBLIC KEY-----\n",
+        "fingerprint": "ecfb19ba68cb564be5cb3bb6b24dd03024eb264bad6205af023bcee76ceb4750",
+        "valid_from": "2026-06-25T00:00:00.000Z",
+        "valid_until": "2036-06-25T00:00:00.000Z"
+      }
+    ],
+    "approval": [
+      {
+        "key_id": "conformance-approval-2026",
+        "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA5dUNG8Xt6q0nA9O6HwTfQT92UQhAnRPR5K1iqruN4U4=\n-----END PUBLIC KEY-----\n",
+        "fingerprint": "56820920cdcd98491edb98a6471c38eeada1a0a7e87860b5cdd9d82f99e68f3f",
+        "valid_from": "2026-06-25T00:00:00.000Z",
+        "valid_until": "2036-06-25T00:00:00.000Z"
+      }
+    ]
+  },
+  "revocation": [],
+  "signature": {
+    "algorithm": "ED25519",
+    "value": "b43ea0ddd4c33fb52c9e4ff14b6416e0bed02671256e9f72556309bab02f34068713ed8aef8683160e9582d7ae84cdba347dfc73e47054407faba1bddd43f006"
+  }
+}

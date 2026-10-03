@@ -1,0 +1,12 @@
+node_modules/
+*.tgz
+.mnde-test/
+shared/receipt_keys/
+grant-nonce-store.d/
+auth-nonce-cache.d/
+dist/
+coverage/
+*.log
+*.started.json
+*.signed.json
+*.tmp

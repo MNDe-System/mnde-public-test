@@ -1,0 +1,32 @@
+{
+  "schema_version": "mnde.authority.bundle.v1",
+  "authority_id": "mnde-conformance-authority-v2",
+  "issued_at": "2026-06-25T00:00:00.000Z",
+  "not_after": "2036-06-25T00:00:00.000Z",
+  "root_key": {
+    "key_id": "conformance-v2-root-2026",
+    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAzmgb7eDGqw1yANKGkwTJl5UMo/kkq0XKEWQxgoBcvME=\n-----END PUBLIC KEY-----\n",
+    "fingerprint": "5ff2454af2c26224c93e667c217a52b161e57ce0aa870cde6367a849244ca2e8"
+  },
+  "keys": {
+    "receipt": [
+      {
+        "key_id": "conformance-v2-receipt-2026",
+        "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAlxwNHa5FwVLyXVwtWL3wI4yax+rILXM3UDqQjAV6NBI=\n-----END PUBLIC KEY-----\n",
+        "fingerprint": "912d749fa2a5dcc3e911f02aaf66e5ea58f4f7366910053d450b32c084549a2a",
+        "valid_from": "2026-06-25T00:00:00.000Z",
+        "valid_until": "2036-06-25T00:00:00.000Z"
+      }
+    ],
+    "policy": [],
+    "approval": [],
+    "result": [],
+    "ledger": [],
+    "activation": []
+  },
+  "revocation": [],
+  "signature": {
+    "algorithm": "ED25519",
+    "value": "be96afd58e7c834a623245f37525a1c0c31219fc45eb27e57a047f6e87cf1711066a9244871a607be9a3afa0469a980f156901edc41dbeffd50e3f70cd8f160e"
+  }
+}

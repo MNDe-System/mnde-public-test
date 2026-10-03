@@ -1,0 +1,56 @@
+{
+  "schema_version": "mnde.signed-receipt.v1",
+  "receipt": {
+    "schema_version": "mnde.pe.receipt.v1",
+    "canonical_request": "{\"agent\":{\"id\":\"conformance-agent\"},\"context\":{\"purpose\":\"format-freeze\"},\"environment\":{\"region\":\"us-west-2\"},\"parameters\":{},\"principal\":{\"id\":\"conformance-user\"},\"request_id\":\"conformance-read-status-allow\",\"schema_version\":\"1.0\",\"timestamp\":\"2026-06-25T00:00:00.000Z\",\"tool\":{\"tool_name\":\"read_status\"}}",
+    "canonical_policy": "{\"policy_id\":\"conformance-policy\",\"rules\":[{\"effect\":\"ALLOW\",\"match\":{\"field\":\"tool.tool_name\",\"op\":\"eq\",\"value\":\"read_status\"},\"rule_id\":\"allow-read-status\"}],\"schema_version\":\"1.0\",\"state\":\"ACTIVE\",\"version\":\"2026.06.25\"}",
+    "authorities": [],
+    "trust_enforced": false,
+    "request_hash": "sha256:9eab3ec2847f3a691a8654445bd9995734bf6badd1525c82497758b8709da9f0",
+    "policy_hash": "sha256:5592d0be5f177f470bebaf8e860f890cafea2be186405af1997d945b216c6abd",
+    "authority_chain_hash": "sha256:0e67d38d9f7f4591e52cbb7e31f1dc9f755ff53ce6fedcc6f884317a98b4b7e9",
+    "policy_bundle_provenance": {
+      "bundle_id": "conformance-policy-serial-1",
+      "serial": 1,
+      "policy_hash": "sha256:5592d0be5f177f470bebaf8e860f890cafea2be186405af1997d945b216c6abd",
+      "signer_key_id": "conformance-policy-2026",
+      "activation_mode": "enforce",
+      "rollback_authorization_id": null
+    },
+    "decision_output": {
+      "schema_version": "1.0",
+      "decision": "ALLOW",
+      "reason_code": "OK_ALLOW",
+      "request_id": "conformance-read-status-allow",
+      "policy_id": "conformance-policy",
+      "policy_version": "2026.06.25",
+      "policy_hash": "sha256:5592d0be5f177f470bebaf8e860f890cafea2be186405af1997d945b216c6abd",
+      "authority_chain_hash": "sha256:0e67d38d9f7f4591e52cbb7e31f1dc9f755ff53ce6fedcc6f884317a98b4b7e9",
+      "decision_hash": "sha256:582cd2b1464b81aff6d94c1bc9cccc6ff8bc6788b40d9b8334bc6e9e605984d3",
+      "request_hash": "sha256:9eab3ec2847f3a691a8654445bd9995734bf6badd1525c82497758b8709da9f0",
+      "evaluated_at": "2026-06-25T00:00:00.000Z"
+    },
+    "verifiable_signature": {
+      "algorithm": "ED25519",
+      "authority_id": "mnde-conformance-authority",
+      "key_id": "conformance-receipt-2026",
+      "public_key_fingerprint": "d7cc747ccff23313996a7e272fa189ddb13944b12dcd758c4754d96c2262d805",
+      "signed_at": "2026-06-25T00:00:00.000Z",
+      "value": "edee0e0c3886002b238c3d39495a67d42f01b29e68d987dd5abb0a879f5086a429a1017203eafd9b09b93f97540fcbac75ad455840050ad4f304a3c2129f0c09"
+    }
+  },
+  "custody_attestation": {
+    "schema_version": "mnde.custody.attestation.v1",
+    "receipt_type": "mnde.pe.receipt.v1",
+    "receipt_version": "v1",
+    "decision": "ALLOW",
+    "receipt_hash": "9134728e44e7d647c1eae5c065b626a568ed7b612ec48a34f2321dee374bf1fb",
+    "authority_bundle_fingerprint": "0c221b34dd8774140be53d3f23ffcafc95e418eecdbbc0a0d9ce8496adf49b2a",
+    "signed_at": "2026-06-25T00:00:00.000Z",
+    "signing_key_id": "conformance-receipt-2026",
+    "signature": {
+      "algorithm": "ED25519",
+      "value": "7c324797e7bf4a3c192e7997e4fd8ba44192d9df017ac9e507e1dc9d6adc3b9568245b9aef4a917cc3a011ecf24b31eb5b26379513785b621f8533a94462910c"
+    }
+  }
+}

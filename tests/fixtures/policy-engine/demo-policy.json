@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "policy_id": "policy_demo_pe_001",
+  "version": "0.1.0",
+  "state": "ACTIVE",
+  "created_at": "2026-06-14T00:00:00Z",
+  "valid_from": "2026-06-14T00:00:00Z",
+  "valid_until": "2027-06-14T00:00:00Z",
+  "rules": [
+    {
+      "rule_id": "allow_read_status",
+      "effect": "ALLOW",
+      "description": "Allow operators to read status.",
+      "match": {
+        "all": [
+          { "field": "tool.tool_name", "op": "eq", "value": "read_status" },
+          { "field": "principal.roles", "op": "contains", "value": "operator" }
+        ]
+      }
+    },
+    {
+      "rule_id": "refuse_recursive_delete",
+      "effect": "REFUSE",
+      "description": "Refuse recursive deletion.",
+      "match": {
+        "all": [
+          { "field": "tool.tool_name", "op": "eq", "value": "recursive_delete" }
+        ]
+      }
+    },
+    {
+      "rule_id": "allow_tmp_delete",
+      "effect": "ALLOW",
+      "description": "Allow delete_file under /tmp/ with file delete authority.",
+      "match": {
+        "all": [
+          { "field": "tool.tool_name", "op": "eq", "value": "delete_file" },
+          { "field": "parameters.path", "op": "path_prefix", "value": "/tmp/" }
+        ]
+      },
+      "authority_required": ["tmp_file_delete_authority"]
+    },
+    {
+      "rule_id": "refuse_customer_data_delete",
+      "effect": "REFUSE",
+      "description": "Refuse delete_file under customer data.",
+      "match": {
+        "all": [
+          { "field": "tool.tool_name", "op": "eq", "value": "delete_file" },
+          { "field": "parameters.path", "op": "path_prefix", "value": "/customer-data/" }
+        ]
+      }
+    }
+  ],
+  "limits": {
+    "max_depth": 8
+  }
+}
