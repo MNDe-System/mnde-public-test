@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MNDe — Authority Console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230E1318'/%3E%3Cpolygon points='42.5,32 35.8,43.7 22.3,43.7 15.5,32 22.3,20.3 35.8,20.3' fill='none' stroke='%23fff' stroke-width='4'/%3E%3Cpolygon points='35,32 32,37.2 26,37.2 23,32 26,26.8 32,26.8' fill='%232563EB'/%3E%3Cline x1='44' y1='32' x2='52' y2='32' stroke='%232563EB' stroke-width='4'/%3E%3Cpolygon points='52,27.5 60,32 52,36.5' fill='%232563EB'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #0a0d10; --panel: #11161b; --panel-2: #0d1216; --line: #1d262e;
+    --ink: #d8e0e6; --muted: #7c8a96; --dim: #54616b;
+    --ok: #29d398; --warn: #e6b450; --bad: #e15b5b; --accent: #4aa3ff;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--mono); font-size: 14px; }
+  a { color: var(--accent); text-decoration: none; }
+  code { color: var(--muted); }
+  .topbar { display: flex; align-items: center; gap: 22px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel-2); position: sticky; top: 0; }
+  .brand { font-weight: 700; letter-spacing: 2px; display: flex; align-items: center; gap: 10px; color: var(--ink); }
+  .brand .logo { height: 22px; width: auto; display: block; }
+  .brand small { color: var(--dim); font-weight: 400; letter-spacing: 1px; }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; }
+  nav button { background: transparent; border: 1px solid transparent; color: var(--muted); font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+  nav button:hover { color: var(--ink); }
+  nav button.active { color: var(--ink); border-color: var(--line); background: var(--panel); }
+  .endpoint { margin-left: auto; color: var(--dim); font-size: 12px; display: flex; align-items: center; gap: 8px; }
+  .endpoint input { background: var(--bg); border: 1px solid var(--line); color: var(--muted); font-family: var(--mono); font-size: 12px; padding: 4px 8px; border-radius: 6px; width: 190px; }
+  .hub-select { width: 100%; margin-top: 10px; padding: 7px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 22px 20px 60px; }
+
+  .headline { border: 1px solid var(--line); border-radius: 12px; padding: 26px 28px; background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); margin-bottom: 22px; }
+  .headline .q { color: var(--muted); font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .headline .a { font-size: 30px; font-weight: 700; margin-top: 10px; display: flex; align-items: center; gap: 14px; }
+  .headline .sub { color: var(--dim); margin-top: 8px; font-size: 13px; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; box-shadow: 0 0 0 4px rgba(255,255,255,0.03); }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 14px var(--ok); }
+  .dot.warn { background: var(--warn); box-shadow: 0 0 14px var(--warn); }
+  .dot.bad { background: var(--bad); box-shadow: 0 0 14px var(--bad); }
+  .ok-t { color: var(--ok); } .warn-t { color: var(--warn); } .bad-t { color: var(--bad); } .dim { color: var(--dim); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .card { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 16px 18px; }
+  .card h3 { margin: 0 0 12px; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .card .big { font-size: 22px; font-weight: 700; }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-top: 1px solid var(--panel-2); }
+  .kv:first-of-type { border-top: 0; }
+  .kv .k { color: var(--dim); } .kv .v { color: var(--ink); text-align: right; word-break: break-all; }
+  .hash { color: var(--muted); }
+  .list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--line); border-radius: 20px; padding: 3px 10px; font-size: 12px; color: var(--ink); background: var(--panel-2); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--panel-2); }
+  th { color: var(--dim); font-weight: 600; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--line); }
+  .pill.ALLOW { color: var(--ok); border-color: rgba(41,211,152,0.4); }
+  .pill.REFUSE { color: var(--bad); border-color: rgba(225,91,91,0.4); }
+  .view { display: none; } .view.active { display: block; }
+  .note { color: var(--dim); font-size: 12px; margin-top: 14px; line-height: 1.6; }
+  .footer { color: var(--dim); font-size: 12px; margin-top: 26px; border-top: 1px solid var(--line); padding-top: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 120 100" fill="none" aria-label="MNDe">
+        <g stroke="currentColor" stroke-width="3.5">
+          <path d="M9 22 H26 L40 36 H46.5"/>
+          <path d="M9 42 H30 L34 46 H40.5"/>
+          <path d="M9 58 H30 L34 54 H40.5"/>
+          <path d="M9 78 H26 L40 64 H46.5"/>
+        </g>
+        <g fill="currentColor" stroke="none">
+          <rect x="4" y="19.5" width="5" height="5"/>
+          <rect x="4" y="39.5" width="5" height="5"/>
+          <rect x="4" y="55.5" width="5" height="5"/>
+          <rect x="4" y="75.5" width="5" height="5"/>
+        </g>
+        <polygon points="82,50 71,69 49,69 38,50 49,31 71,31" stroke="currentColor" stroke-width="5"/>
+        <polygon points="70,50 65,58.7 55,58.7 50,50 55,41.3 65,41.3" fill="#1E3A8A" stroke="none"/>
+        <line x1="84.5" y1="50" x2="105" y2="50" stroke="#2563EB" stroke-width="4.5"/>
+        <polygon points="105,43.5 117,50 105,56.5" fill="#2563EB" stroke="none"/>
+      </svg>
+      <span>MNDe</span> <small>AUTHORITY CONSOLE</small>
+    </div>
+    <nav id="nav">
+      <button data-view="status" class="active">Status</button>
+      <button data-view="decisions">Decisions</button>
+      <button data-view="policy">Policy</button>
+      <button data-view="audit">Audit</button>
+      <button data-view="settings">Settings</button>
+    </nav>
+    <div class="endpoint">
+      <span id="live" class="dot bad" title="connection"></span>
+      <input id="sidecar" placeholder="same origin" title="Sidecar endpoint (blank = this origin)" />
+    </div>
+  </div>
+
+  <main>
+    <div class="headline">
+      <div class="q">Is routed execution protected right now?</div>
+      <div class="a"><span id="hl-dot" class="dot bad"></span><span id="hl-text">Checking local runtime…</span></div>
+      <div class="sub" id="hl-sub">No account. No sign-in. No cloud. This reads the local sidecar only.</div>
+    </div>
+
+    <!-- STATUS -->
+    <section class="view active" id="view-status">
+      <div class="grid">
+        <div class="card"><h3>Protection Status</h3><div class="big" id="p-protect">—</div><div class="kv"><span class="k">reason</span><span class="v" id="p-protect-reason">—</span></div></div>
+        <div class="card"><h3>MNDe Hub</h3><div class="big" id="hub-status">Searching for MNDe Hub…</div><div class="note" id="hub-message">Looking for a nearby Hub.</div><select id="hub-choice" class="hub-select" aria-label="Choose a Hub to inspect" hidden></select><details><summary>Connection details</summary><div id="hub-details" class="note">No Hub found yet.</div><button id="hub-pair" hidden>Pair selected Hub</button></details></div>
+        <div class="card"><h3>Sidecar Status</h3><div class="big" id="p-sidecar">—</div>
+          <div class="kv"><span class="k">worker</span><span class="v" id="p-worker">—</span></div>
+          <div class="kv"><span class="k">event loop lag</span><span class="v" id="p-lag">—</span></div>
+          <div class="kv"><span class="k">durability</span><span class="v" id="p-durability">—</span></div>
+        </div>
+        <div class="card"><h3>Active Policy</h3><div class="big" id="p-policy">—</div>
+          <div class="kv"><span class="k">status</span><span class="v" id="p-policy-status">—</span></div>
+          <div class="kv"><span class="k">policy hash</span><span class="v hash" id="p-policy-hash">—</span></div>
+        </div>
+        <div class="card"><h3>Trust Status</h3><div class="big" id="p-trust">—</div>
+          <div class="kv"><span class="k">signatures</span><span class="v" id="p-trust-sig">—</span></div>
+          <div class="kv"><span class="k">replay</span><span class="v" id="p-trust-replay">—</span></div>
+        </div>
+        <div class="card"><h3>Last Decision</h3><div class="big" id="p-last-verdict">—</div>
+          <div class="kv"><span class="k">tool</span><span class="v" id="p-last-tool">—</span></div>
+          <div class="kv"><span class="k">reason</span><span class="v" id="p-last-reason">—</span></div>
+          <div class="kv"><span class="k">when</span><span class="v" id="p-last-when">—</span></div>
+        </div>
+        <div class="card"><h3>Receipt Count</h3><div class="big" id="p-receipts">—</div><div class="kv"><span class="k">cryptographically verified</span><span class="v" id="p-receipts-note">—</span></div></div>
+        <div class="card"><h3>Protected Sources</h3><div class="big" id="p-sources-n">—</div><div class="list" id="p-sources" style="margin-top:10px"></div></div>
+      </div>
+      <div class="note">Auto-refreshing every 2s. MNDe is local execution infrastructure — it protects execution before any identity exists.</div>
+    </section>
+
+    <!-- DECISIONS -->
+    <section class="view" id="view-decisions">
+      <div class="card">
+        <h3>Recent Decisions</h3>
+        <table><thead><tr><th>When</th><th>Decision</th><th>Tool</th><th>Reason</th><th>Decision hash</th></tr></thead>
+        <tbody id="de-rows"><tr><td colspan="5" class="dim">No decisions yet.</td></tr></tbody></table>
+      </div>
+      <div class="note">Every routed tool call is decided pre-execution. ALLOW runs once; REFUSE does not run through MNDe. Each decision emits a signed receipt when receipt creation succeeds.</div>
+    </section>
+
+    <!-- POLICY -->
+    <section class="view" id="view-policy">
+      <div class="grid">
+        <div class="card"><h3>Active Policy</h3>
+          <div class="kv"><span class="k">version</span><span class="v" id="po-version">—</span></div>
+          <div class="kv"><span class="k">status</span><span class="v" id="po-status">—</span></div>
+          <div class="kv"><span class="k">policy hash</span><span class="v hash" id="po-hash">—</span></div>
+        </div>
+        <div class="card"><h3>Enforcement</h3>
+          <div class="kv"><span class="k">model</span><span class="v">deterministic pre-execution</span></div>
+          <div class="kv"><span class="k">conflict</span><span class="v">REFUSE wins</span></div>
+          <div class="kv"><span class="k">default</span><span class="v">fail closed</span></div>
+        </div>
+      </div>
+      <div class="note">Activate a reviewed policy via <code>POST /policy/activate</code> (authority-gated). Candidate policies are validated before they take effect.</div>
+    </section>
+
+    <!-- AUDIT -->
+    <section class="view" id="view-audit">
+      <div class="grid">
+        <div class="card"><h3>Audit Integrity</h3>
+          <div class="kv"><span class="k">receipts</span><span class="v" id="au-count">—</span></div>
+          <div class="kv"><span class="k">signed</span><span class="v" id="au-signed">—</span></div>
+          <div class="kv"><span class="k">verification</span><span class="v">offline / independent</span></div>
+        </div>
+        <div class="card"><h3>Trust Anchor</h3>
+          <div class="kv"><span class="k">policy hash</span><span class="v hash" id="au-policy-hash">—</span></div>
+          <div class="kv"><span class="k">authority root</span><span class="v" id="au-root">—</span></div>
+        </div>
+      </div>
+      <div class="note">
+        Verify any receipt offline: <code>node tools/verify.mjs &lt;receipt.json&gt;</code>.
+        Replay the recent log: <code>POST /replay/recent</code>. Export an evidence bundle: <code>POST /audit/bundle</code>.
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="view-settings">
+      <div class="grid">
+        <div class="card"><h3>Runtime</h3>
+          <div class="kv"><span class="k">ready</span><span class="v" id="se-ready">—</span></div>
+          <div class="kv"><span class="k">degraded</span><span class="v" id="se-degraded">—</span></div>
+          <div class="kv"><span class="k">inflight</span><span class="v" id="se-inflight">—</span></div>
+          <div class="kv"><span class="k">max inflight</span><span class="v" id="se-max">—</span></div>
+          <div class="kv"><span class="k">process id</span><span class="v" id="se-pid">—</span></div>
+        </div>
+        <div class="card"><h3>Capabilities</h3><div class="list" id="se-caps" style="margin-top:4px"></div></div>
+        <div class="card"><h3>Enterprise Identity</h3>
+          <div class="kv"><span class="k">status</span><span class="v warn-t">optional · disabled</span></div>
+          <div class="note" style="margin-top:8px">Entra ID, Okta, SSO, centralized policy, fleet management, and shared audit are optional and off by default. Local protection requires none of them.</div>
+        </div>
+      </div>
+      <div class="footer">
+        MNDe is local execution infrastructure — a firewall/runtime component, not a SaaS product. No login, no signup, no account, no email, no forced cloud dependency.
+      </div>
+    </section>
+  </main>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const base = () => ($("sidecar").value || "").replace(/\/+$/, "");
+  const url = (p) => base() + p;
+  const short = (h) => (typeof h === "string" && h.length > 16 ? h.slice(0, 10) + "…" + h.slice(-6) : (h || "—"));
+  const ago = (ts) => { const t = Date.parse(ts); if (!Number.isFinite(t)) return "—"; const s = Math.max(0, Math.round((Date.now() - t) / 1000)); if (s < 60) return s + "s ago"; if (s < 3600) return Math.round(s/60) + "m ago"; return Math.round(s/3600) + "h ago"; };
+  const setDot = (el, cls) => { el.className = "dot " + cls; };
+  const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  async function getJSON(p) { const r = await fetch(url(p), { headers: { accept: "application/json" } }); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
+
+  let hubCandidates = [], hubStatus = "SEARCHING", hubRequestInFlight = false, hubDiagnostics = [], hubReasonCode = null,
+    hubHttpStatus = null, hubPairingRequestId = null, hubClientId = null, hubClientName = null;
+  function showHubDetails() {
+    const c = hubCandidates[Number($("hub-choice").value)] || hubCandidates[0];
+    const details = c ? [
+      "Name: " + (c.name || "MNDe Hub"), "Status: " + c.status,
+      "Hub ID: " + (c.hubId || "unavailable"), "Address: " + c.ip + ":" + c.port,
+      "Found by: " + c.method, "Protocol: " + (c.protocolVersion || "unavailable"),
+      "Version: " + (c.version || "unavailable"), "Last seen: " + c.lastSeen,
+      "Identity fingerprint: " + (c.fingerprint || "unavailable")
+    ].join("\n") : "No Hub found yet.";
+    const diagnostic = [hubClientId ? "This PC: " + (hubClientName || "Computer") + " (" + hubClientId + ")" : null,
+      hubPairingRequestId ? "Pairing request: " + hubPairingRequestId : null,
+      hubHttpStatus !== null ? "Hub HTTP status: " + hubHttpStatus : null,
+      hubReasonCode ? "Reason code: " + hubReasonCode : null,
+      ...hubDiagnostics.slice(-8).map(d => [d.at, d.event,
+        d.httpStatus !== undefined ? "HTTP " + d.httpStatus : null,
+        d.reasonCode || null, d.status || null, d.pairingRequestId || null].filter(Boolean).join(" "))].filter(Boolean);
+    $("hub-details").textContent = [details, diagnostic.length ? "Diagnostics:\n" + diagnostic.join("\n") : null].filter(Boolean).join("\n\n");
+    $("hub-details").style.whiteSpace = "pre-line";
+    $("hub-pair").hidden = !c || c.status !== "UNPAIRED"
+      || ["PAIRING", "WAITING_FOR_APPROVAL", "PAIRING_APPROVED", "AUTHENTICATING"].includes(hubStatus);
+  }
+  $("hub-choice").addEventListener("change", showHubDetails);
+  $("hub-pair").addEventListener("click", async () => {
+    const c = hubCandidates[Number($("hub-choice").value)] || hubCandidates[0];
+    if (!c || c.status !== "UNPAIRED") return;
+    let fingerprint = null;
+    if (c.fingerprint) {
+      fingerprint = prompt("Enter the identity fingerprint shown on the physical MNDe Hub:");
+      if (!fingerprint) return;
+      fingerprint = fingerprint.trim().toLowerCase();
+    }
+    hubReasonCode = null; hubHttpStatus = null; hubPairingRequestId = null;
+    hubRequestInFlight = true;
+    hubStatus = "PAIRING";
+    $("hub-status").textContent = "Pairing...";
+    $("hub-message").textContent = "Sending pairing request to the Hub.";
+    $("hub-pair").hidden = true;
+    try {
+      const r = await fetch("/hub/pair", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ hubId: c.hubId, ip: c.ip, ...(fingerprint ? { fingerprint } : {}) }) });
+      const result = await r.json();
+      hubRequestInFlight = false;
+      if (!r.ok) {
+        hubReasonCode = result.reason_code || "ERR_HUB_PAIRING_FAILED";
+        hubHttpStatus = result.hub_http_status ?? null;
+        throw new Error("Pairing request failed.");
+      }
+      await hubTick();
+    } catch {
+      hubRequestInFlight = false;
+      hubStatus = "PAIRING_FAILED";
+      $("hub-status").textContent = "Pairing failed";
+      $("hub-message").textContent = hubReasonCode ? "Hub reason code: " + hubReasonCode
+        : "Pairing request failed. Check the Hub and try again.";
+      showHubDetails();
+    }
+  });
+
+  async function hubTick() {
+    try {
+      const hub = await getJSON("/hub/discovery");
+      if (hubRequestInFlight && hub.status === "UNPAIRED") return;
+      hubStatus = hub.status;
+      hubDiagnostics = Array.isArray(hub.diagnostics) ? hub.diagnostics : [];
+      hubReasonCode = hub.reasonCode || hubReasonCode;
+      hubHttpStatus = hub.hubHttpStatus ?? hubHttpStatus;
+      hubPairingRequestId = hub.pairingRequestId || null;
+      hubClientId = hub.clientId || null; hubClientName = hub.clientName || null;
+      $("hub-status").textContent = hub.message || "Searching for MNDe Hub…";
+      $("hub-message").textContent = hub.status === "PAIRED" || hub.status === "CONNECTED" ? "Client authenticated. Execution still requires MNDe authorization." :
+        hub.status === "UNPAIRED" ? "Select this Hub, then approve the computer on the physical Hub." :
+        hub.status === "PAIRING" ? "Sending pairing request to the Hub." :
+        hub.status === "WAITING_FOR_APPROVAL" ? "Use the Hub's physical APPROVE or REFUSE control. This request expires in three minutes." :
+        hub.status === "PAIRING_APPROVED" ? "Paired. Authenticating this computer…" :
+        hub.status === "PAIRING_REFUSED" ? "The Hub refused this computer. You may request pairing again." :
+        hub.status === "PAIRING_EXPIRED" ? "The request expired. You may request pairing again." :
+        hub.status === "PAIRING_FAILED" || hub.status === "AUTHENTICATION_FAILED"
+          ? hubReasonCode ? "Hub reason code: " + hubReasonCode : "Pairing failed. Check the Hub and try again." :
+        "Local execution protection is reported separately.";
+      hubCandidates = Array.isArray(hub.candidates) ? hub.candidates : [];
+      const choice = $("hub-choice"), previous = choice.selectedOptions[0]?.textContent;
+      choice.replaceChildren(...hubCandidates.map((c, i) => new Option(c.name || "MNDe Hub " + (i + 1), String(i))));
+      choice.hidden = hubCandidates.length < 2;
+      if (previous) {
+        const index = hubCandidates.findIndex(c => c.name === previous);
+        if (index >= 0) choice.value = String(index);
+      }
+      showHubDetails();
+    } catch {
+      $("hub-status").textContent = "Hub status unavailable";
+      $("hub-details").textContent = "The local discovery service did not respond.";
+    }
+  }
+
+  document.querySelectorAll("#nav button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#nav button").forEach((x) => x.classList.remove("active"));
+    document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+    b.classList.add("active");
+    $("view-" + b.dataset.view).classList.add("active");
+  }));
+
+  function renderOffline() {
+    setDot($("live"), "bad"); setDot($("hl-dot"), "bad");
+    $("hl-text").textContent = "No — local sidecar is not reachable"; $("hl-text").className = "bad-t";
+    $("hl-sub").textContent = "Start MNDe (npm run sidecar) — execution is NOT being protected.";
+    $("p-protect").textContent = "OFFLINE"; $("p-protect").className = "big bad-t";
+    $("p-protect-reason").textContent = "sidecar unreachable";
+    $("p-sidecar").textContent = "DOWN"; $("p-sidecar").className = "big bad-t";
+  }
+
+  async function tick() {
+    let ready, health, receipts, policy, caps, identity;
+    try { [ready, health] = await Promise.all([getJSON("/readyz"), getJSON("/healthz")]); }
+    catch { renderOffline(); return; }
+    setDot($("live"), "ok");
+    try { receipts = await getJSON("/receipts/recent?limit=500"); } catch { receipts = []; }
+    try { policy = await getJSON("/policy/current"); } catch { policy = null; }
+    try { caps = await getJSON("/capabilities"); } catch { caps = null; }
+    try { identity = await getJSON("/identity"); } catch { identity = null; }
+
+    const degraded = !!ready.degraded || !!health.degraded || !!health.fatal;
+    const protecting = !!ready.ok && !health.fatal;
+
+    if (protecting && !degraded) {
+      setDot($("hl-dot"), "ok"); $("hl-text").textContent = "Yes — routed execution is protected"; $("hl-text").className = "ok-t";
+      $("hl-sub").textContent = "Every routed tool call is decided pre-execution and emits a signed receipt when receipt creation succeeds. No account. No cloud.";
+    } else if (protecting && degraded) {
+      setDot($("hl-dot"), "warn"); $("hl-text").textContent = "Degraded — protecting, with warnings"; $("hl-text").className = "warn-t";
+      $("hl-sub").textContent = ready.degraded_reason || "runtime degraded";
+    } else {
+      setDot($("hl-dot"), "bad"); $("hl-text").textContent = "No — routed execution is not protected"; $("hl-text").className = "bad-t";
+      $("hl-sub").textContent = ready.degraded_reason || "runtime fail-closed";
+    }
+
+    $("p-protect").textContent = protecting ? (degraded ? "DEGRADED" : "PROTECTED") : "FAIL-CLOSED";
+    $("p-protect").className = "big " + (protecting ? (degraded ? "warn-t" : "ok-t") : "bad-t");
+    $("p-protect-reason").textContent = ready.degraded_reason || (protecting ? "operational" : "fail-closed");
+
+    $("p-sidecar").textContent = health.fatal ? "FATAL" : (degraded ? "DEGRADED" : "HEALTHY");
+    $("p-sidecar").className = "big " + (health.fatal ? "bad-t" : (degraded ? "warn-t" : "ok-t"));
+    $("p-worker").textContent = "#" + (health.worker_id ?? ready.worker_id ?? 0);
+    $("p-lag").textContent = (health.event_loop_lag_ms ?? ready.event_loop_lag_ms ?? 0) + " ms";
+    $("p-durability").textContent = ready.durability_mode || "—";
+
+    const list = Array.isArray(receipts) ? receipts : [];
+    const last = list[0];
+    if (last) {
+      $("p-last-verdict").textContent = last.verdict; $("p-last-verdict").className = "big " + (last.verdict === "ALLOW" ? "ok-t" : "bad-t");
+      $("p-last-tool").textContent = last.action || "—"; $("p-last-reason").textContent = last.reason_code || "—"; $("p-last-when").textContent = ago(last.timestamp);
+    } else { $("p-last-verdict").textContent = "—"; $("p-last-tool").textContent = "no decisions yet"; }
+    // Only a verifier-proved VALID counts. UNKNOWN (nobody checked), INVALID
+    // (checked and failed), NOT_REPORTED, missing and malformed values are all
+    // absence of proof and must never increment this tally.
+    const signed = list.filter((r) => r.signature_status === "VALID").length;
+    $("p-receipts").textContent = String(list.length) + (list.length >= 500 ? "+" : "");
+    $("p-receipts-note").textContent = signed + " / " + list.length;
+
+    if (policy) {
+      $("p-policy").textContent = policy.policy || "—"; $("p-policy-status").textContent = policy.status || "—"; $("p-policy-hash").textContent = short(policy.policy_hash);
+      $("po-version").textContent = policy.policy || "—"; $("po-status").textContent = policy.status || "—"; $("po-hash").textContent = short(policy.policy_hash);
+      $("au-policy-hash").textContent = short(policy.policy_hash);
+    }
+
+    const tools = [...new Set(list.map((r) => r.action).filter((a) => a && a !== "not reported"))];
+    $("p-sources-n").textContent = String(tools.length);
+    $("p-sources").innerHTML = tools.length ? tools.slice(0, 12).map((t) => '<span class="chip">' + escapeHtml(t) + "</span>").join("") : '<span class="dim">No tool calls observed yet.</span>';
+
+    const anySigned = signed > 0;
+    $("p-trust").textContent = anySigned ? "VERIFIABLE" : (list.length ? "UNSIGNED" : "READY");
+    $("p-trust").className = "big " + (anySigned ? "ok-t" : (list.length ? "warn-t" : ""));
+    $("p-trust-sig").textContent = anySigned ? "Ed25519 present" : (list.length ? "missing" : "awaiting first decision");
+    $("p-trust-replay").textContent = "offline / deterministic";
+
+    if (list.length) {
+      $("de-rows").innerHTML = list.slice(0, 100).map((r) =>
+        "<tr><td>" + ago(r.timestamp) + '</td><td><span class="pill ' + (r.verdict === "ALLOW" ? "ALLOW" : "REFUSE") + '">' + r.verdict + "</span></td><td>" + escapeHtml(r.action || "—") + "</td><td>" + escapeHtml(r.reason_code || "—") + '</td><td class="hash">' + short(r.decision_hash) + "</td></tr>"
+      ).join("");
+    }
+
+    $("au-count").textContent = String(list.length); $("au-signed").textContent = signed + " / " + list.length;
+    if (identity) { $("au-root").textContent = identity.repo_root || "—"; }
+
+    $("se-ready").textContent = String(!!ready.ok); $("se-degraded").textContent = String(!!ready.degraded);
+    $("se-inflight").textContent = ready.inflight ?? "—"; $("se-max").textContent = ready.max_inflight ?? "—";
+    if (identity) $("se-pid").textContent = identity.process_id ?? "—";
+    if (caps) $("se-caps").innerHTML = Object.entries(caps).map(([k, v]) => '<span class="chip">' + (v ? "● " : "○ ") + escapeHtml(k) + "</span>").join("");
+  }
+
+  tick(); setInterval(tick, 2000);
+  hubTick(); setInterval(hubTick, 2000);
+})();
+</script>
+</body>
+</html>

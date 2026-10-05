@@ -1,0 +1,15 @@
+{
+  "name": "@mnde/executor",
+  "version": "0.1.0",
+  "description": "The layer between intent and execution. Ask MNDe before running a risky action: ALLOW runs it once, REFUSE never does.",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "README.md"
+  ],
+  "license": "SEE LICENSE IN ../LICENSE"
+}

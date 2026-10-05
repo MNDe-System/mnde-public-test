@@ -1,0 +1,30 @@
+{
+  "schema_version": "mnde.policy.bundle.v1",
+  "bundle_id": "conformance-policy-serial-1",
+  "policy_id": "conformance-policy",
+  "serial": 1,
+  "issued_at": "2026-06-25T00:00:00.000Z",
+  "policy_document": {
+    "schema_version": "1.0",
+    "policy_id": "conformance-policy",
+    "version": "2026.06.25",
+    "state": "ACTIVE",
+    "rules": [
+      {
+        "rule_id": "allow-read-status",
+        "effect": "ALLOW",
+        "match": {
+          "field": "tool.tool_name",
+          "op": "eq",
+          "value": "read_status"
+        }
+      }
+    ]
+  },
+  "policy_hash": "sha256:5592d0be5f177f470bebaf8e860f890cafea2be186405af1997d945b216c6abd",
+  "signing_key_id": "conformance-policy-2026",
+  "signature": {
+    "algorithm": "ED25519",
+    "value": "d8011fe440bbce170cd456c6a135f1b8baa2c891342134e6c95ab33e33302bbeef6e5f0575d14fcf7295be172c0403c0e7c8082eaf3039949a5cc7d7aed2f403"
+  }
+}

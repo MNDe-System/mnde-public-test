@@ -1,0 +1,18 @@
+{
+  "schema_version": "ecs.policy.v1",
+  "policy_version": "policy.v1",
+  "rules": {
+    "max_total_cost_cents": 10000,
+    "allow_auto_scale": false,
+    "max_gpu_count": 4,
+    "max_hours": 8,
+    "require_manual_approval_above_cents": 5000,
+    "max_retry_count": 1
+  },
+  "trust": {
+    "key_version": "ed25519.v1",
+    "key_id": "85535d7b96bdd743",
+    "public_key": "55ddc014f25e30d393b6ef3057c5df5f8394cb1c466d4c1e9d9ef1e00d4e53f5",
+    "signature": "91d19e35fe5158b0154bc8516946ad1111d8abb49002b5048e1af12cac6367b8906bfe6e21c54fb731fc19a080e4a52ddd48e5bb887ac6eed99a938e92ed6a0d"
+  }
+}

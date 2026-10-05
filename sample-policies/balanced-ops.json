@@ -1,0 +1,7 @@
+{
+  "name": "Balanced Ops",
+  "risk_level": "medium",
+  "allows": ["read_status", "inspect_logs", "restart_service"],
+  "requires_approval": ["deploy_update", "modify_config"],
+  "refuses": ["recursive_delete", "delete_backups", "export_customer_data", "stop_database"]
+}

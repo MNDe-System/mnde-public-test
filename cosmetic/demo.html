@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>MNDe feline-input easter egg (cosmetic demo)</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 640px; margin: 48px auto; padding: 0 16px; color: #222; }
+  textarea, input { width: 100%; box-sizing: border-box; padding: 10px; font: 14px/1.4 ui-monospace, monospace; }
+  p.note { color: #666; font-size: 13px; }
+</style>
+
+<h1>Feline input — cosmetic demo</h1>
+<p>Type a normal sentence: nothing happens. Now mash the keyboard
+(<code>asdasdasdasd</code>, <code>jjjjjjjj</code>, random symbols): a small message
+appears in the corner and dismisses itself.</p>
+
+<p><label>Text field<br><input type="text" placeholder="type here"></label></p>
+<p><label>Text area<br><textarea rows="4" placeholder="…or here"></textarea></label></p>
+
+<p class="note">This page exists only to preview the cosmetic easter egg for a future
+desktop/dashboard UI. It is not part of the product and does nothing security-related.</p>
+
+<script type="module">
+  import { enableFelineInputEasterEgg } from "./feline-input.mjs";
+  // Demo settings: short cooldown so it can be tried repeatedly.
+  enableFelineInputEasterEgg({ minIntervalMs: 1500, maxPerSession: 999 });
+</script>

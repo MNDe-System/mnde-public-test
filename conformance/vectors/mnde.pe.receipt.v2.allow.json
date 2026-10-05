@@ -1,0 +1,32 @@
+{
+  "schema_version": "mnde.pe.receipt.v2",
+  "canonical_request": "{\"agent\":{\"id\":\"conformance-agent\"},\"context\":{\"purpose\":\"format-freeze\"},\"environment\":{\"region\":\"us-west-2\"},\"parameters\":{},\"principal\":{\"id\":\"conformance-user\"},\"request_id\":\"conformance-read-status-allow\",\"schema_version\":\"1.0\",\"timestamp\":\"2026-06-25T00:00:00.000Z\",\"tool\":{\"tool_name\":\"read_status\"}}",
+  "canonical_policy": "{\"policy_id\":\"conformance-policy\",\"rules\":[{\"effect\":\"ALLOW\",\"match\":{\"field\":\"tool.tool_name\",\"op\":\"eq\",\"value\":\"read_status\"},\"rule_id\":\"allow-read-status\"}],\"schema_version\":\"1.0\",\"state\":\"ACTIVE\",\"version\":\"2026.06.25\"}",
+  "authorities": [],
+  "trust_enforced": false,
+  "request_hash": "sha256:9eab3ec2847f3a691a8654445bd9995734bf6badd1525c82497758b8709da9f0",
+  "policy_hash": "sha256:5592d0be5f177f470bebaf8e860f890cafea2be186405af1997d945b216c6abd",
+  "authority_chain_hash": "sha256:0e67d38d9f7f4591e52cbb7e31f1dc9f755ff53ce6fedcc6f884317a98b4b7e9",
+  "decision_output": {
+    "schema_version": "2.0",
+    "decision": "ALLOW",
+    "reason_code": "OK_ALLOW",
+    "rule_id": "allow-read-status",
+    "request_id": "conformance-read-status-allow",
+    "policy_id": "conformance-policy",
+    "policy_version": "2026.06.25",
+    "policy_hash": "sha256:5592d0be5f177f470bebaf8e860f890cafea2be186405af1997d945b216c6abd",
+    "authority_chain_hash": "sha256:0e67d38d9f7f4591e52cbb7e31f1dc9f755ff53ce6fedcc6f884317a98b4b7e9",
+    "decision_hash": "sha256:154d1cafe21b04557eae708a21121c3e3691adcd45b8bb326287736c0a181961",
+    "request_hash": "sha256:9eab3ec2847f3a691a8654445bd9995734bf6badd1525c82497758b8709da9f0",
+    "evaluated_at": "2026-06-25T00:00:00.000Z"
+  },
+  "verifiable_signature": {
+    "algorithm": "ED25519",
+    "authority_id": "mnde-conformance-authority-v2",
+    "key_id": "conformance-v2-receipt-2026",
+    "public_key_fingerprint": "912d749fa2a5dcc3e911f02aaf66e5ea58f4f7366910053d450b32c084549a2a",
+    "signed_at": "2026-06-25T00:00:00.000Z",
+    "value": "f7308f348275893075ecfe04b5a378eeaa82e40d26784922240558d4b3e66c9c7b637c7fa7369e759f6a04ac39bf5d68166fe044be0f74c6dc41ecfd2e938a04"
+  }
+}

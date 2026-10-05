@@ -1,0 +1,24 @@
+<svg width="120" height="100" viewBox="0 0 120 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MNDe mark">
+  <!-- Mark only, transparent background. Traces + node outline use currentColor
+       and self-adapt: ink on light schemes, white on dark (prefers-color-scheme).
+       Node core stays navy, output arrow stays MNDe blue.
+       Meaning: inputs converge -> authority node evaluates -> allowed execution out.
+       Inline embeds can still override via the CSS `color`. -->
+  <style>:root{color:#0E1318}@media(prefers-color-scheme:dark){:root{color:#FFFFFF}}</style>
+  <g fill="none" stroke="currentColor" stroke-width="3.5">
+    <path d="M9 22 H26 L40 36 H46.5"/>
+    <path d="M9 42 H30 L34 46 H40.5"/>
+    <path d="M9 58 H30 L34 54 H40.5"/>
+    <path d="M9 78 H26 L40 64 H46.5"/>
+  </g>
+  <g fill="currentColor">
+    <rect x="4" y="19.5" width="5" height="5"/>
+    <rect x="4" y="39.5" width="5" height="5"/>
+    <rect x="4" y="55.5" width="5" height="5"/>
+    <rect x="4" y="75.5" width="5" height="5"/>
+  </g>
+  <polygon points="82,50 71,69 49,69 38,50 49,31 71,31" fill="none" stroke="currentColor" stroke-width="5"/>
+  <polygon points="70,50 65,58.7 55,58.7 50,50 55,41.3 65,41.3" fill="#1E3A8A"/>
+  <line x1="84.5" y1="50" x2="105" y2="50" stroke="#2563EB" stroke-width="4.5"/>
+  <polygon points="105,43.5 117,50 105,56.5" fill="#2563EB"/>
+</svg>

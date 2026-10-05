@@ -1,0 +1,7 @@
+{
+  "name": "Strict Production",
+  "risk_level": "low",
+  "allows": ["read_status", "inspect_logs"],
+  "requires_approval": ["restart_service", "deploy_update", "modify_config"],
+  "refuses": ["recursive_delete", "delete_backups", "export_customer_data", "stop_database", "disable_monitoring"]
+}
