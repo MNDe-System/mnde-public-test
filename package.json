@@ -11,7 +11,8 @@
     "mnde-git-push": "./dist/bin/mnde-git-push.mjs",
     "mnde-sidecar": "./dist/bin/mnde-sidecar.mjs",
     "sidecar": "./dist/bin/mnde-sidecar.mjs",
-    "mnde-hub": "./dist/bin/mnde-hub.mjs"
+    "mnde-hub": "./dist/bin/mnde-hub.mjs",
+    "mnde-git-push-doctor": "./dist/bin/mnde-git-push-doctor.mjs"
   },
   "files": [
     "dist",
@@ -164,6 +165,7 @@
     "test:git-push-cli": "node ./tests/test_git_push_cli.mjs",
     "test:git-push-credential-custody": "node ./tests/test_git_push_credential_custody.mjs",
     "test:git-push-effect": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_effect.mjs",
+    "test:git-push-doctor": "node ./tests/test_git_push_doctor.mjs",
     "test:git-push-first-run": "node ./tests/test_git_push_first_run.mjs",
     "test:git-push-execution-evidence": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_execution_evidence.mjs",
     "test:git-push-isolation": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_isolation.mjs",
@@ -171,6 +173,7 @@
     "test:git-push-single-route": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_single_route.mjs",
     "test:decision-not-execution": "node ./tests/test_decision_not_execution.mjs",
     "hub": "node ./bin/mnde-hub.mjs",
+    "git-push-doctor": "node ./bin/mnde-git-push-doctor.mjs",
     "test:hub": "node --import ./tests/support/hub_observation_hooks.mjs ./tests/test_hub.mjs"
   },
   "devDependencies": {

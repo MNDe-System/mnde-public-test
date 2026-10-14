@@ -43,6 +43,7 @@
   "test:freshness-boundary",
   "test:git-push-cli",
   "test:git-push-credential-custody",
+  "test:git-push-doctor",
   "test:git-push-effect",
   "test:git-push-execution-evidence",
   "test:git-push-first-run",
