@@ -576,8 +576,10 @@ async function main() {
     const files = execFileSync("git", ["ls-files", "-co", "--exclude-standard", "-z"], { cwd: ROOT, encoding: "utf8" })
       .split("\0").filter((f) => /\.(mjs|js|cjs|ts)$/.test(f) && !f.startsWith("tests/") && !f.startsWith("dist/") && !f.startsWith("node_modules/"));
     const callers = files.filter((f) => /createGitPushExecutor/.test(stripComments(readFileSync(join(ROOT, f), "utf8"))));
-    // Hub is the reviewed long-lived adapter to the SAME typed executor.
-    assert.deepEqual(callers.sort(), ["bin/mnde-git-push.mjs", "src/effects/git-push/index.mjs", "src/hub/service.mjs"]);
+    // Hub is the reviewed long-lived adapter to the SAME typed executor. The
+    // doctor constructs it only to read readiness(); tests/test_git_push_doctor.mjs
+    // asserts it never reaches executeGitPush, a spawn, a write or the network.
+    assert.deepEqual(callers.sort(), ["bin/mnde-git-push.mjs", "src/effects/git-push/doctor.mjs", "src/effects/git-push/index.mjs", "src/hub/service.mjs"]);
     const hub = stripComments(readFileSync(join(ROOT, "src/hub/service.mjs"), "utf8"));
     assert.equal((hub.match(/createGitPushExecutor\s*\(/g) ?? []).length, 1);
     assert.equal((hub.match(/\.executeGitPush\s*\(/g) ?? []).length, 1);

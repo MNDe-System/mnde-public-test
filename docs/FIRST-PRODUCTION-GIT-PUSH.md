@@ -254,6 +254,17 @@ cd C:\mnde-src
 $env:MNDE_GIT_PUSH_REPO_PATH = "C:\mnde-work\mnde-public-test"
 ```
 
+Before step 6, check the setup without spending an authorization:
+
+```powershell
+node bin\mnde-git-push-doctor.mjs
+```
+
+It is read-only (see [GIT-PUSH-CLI.md](GIT-PUSH-CLI.md#diagnosing-your-setup-mnde-git-push-doctor)).
+Fix anything marked `FAILED` or `NOT_CONFIGURED`. A pass means the local checks
+succeeded; it does not test the GitHub App or whether other credentials can
+push to the repository.
+
 ## 6. Approve the push
 
 This is the human authorization step. Running it means you approve moving

@@ -109,6 +109,37 @@ others, or for the executor key, readable by others
 (`ERR_GIT_PUSH_TRUST_FILE_INSECURE`). On Windows the permission part is not
 checked; see `docs/PRODUCTION-TRUST-BOUNDARY.md`.
 
+## Diagnosing your setup: `mnde-git-push-doctor`
+
+Run this in the shell where you would run `mnde-git-push`, before you approve
+anything:
+
+```
+mnde-git-push-doctor          # readable report
+mnde-git-push-doctor --json   # one JSON line, schema mnde.git-push-doctor.v1
+```
+
+It runs the same startup path as the CLI and the Hub (trust files, trust root,
+executor identity, push-credential configuration) and the executor's own
+claim-store health query, then reports one line per component: `READY`,
+`ATTENTION`, `FAILED`, `NOT_CONFIGURED`, `NOT_VERIFIED` or `SKIPPED`, with the
+evidence and, for a problem, the fix. Exit code 0 means the local checks passed;
+1 means something would stop a push; 3 is a usage error; 5 an internal error.
+
+**What it can never do.** It never calls `executeGitPush()`, so it cannot push,
+write a claim or write evidence. It never requests a push credential, starts a
+process, writes a file or makes a network request of its own. A test asserts all
+of this from outside the process. Its output contains variable names, ids, a
+short root-fingerprint prefix and expiry times; never a value from the
+environment or a key file.
+
+**What a pass does not mean.** `READY` means the named test succeeded. Doctor
+does not test that the GitHub App can authenticate (that would mean minting a
+token) and cannot see whether another credential can push to the repository, so
+it reports both as `NOT_VERIFIED`. A passing run is not a statement that the
+repository is protected; protection requires the executor's credential to be the
+only one that can push (see "Security boundary" below).
+
 ## Production invocation
 
 ```

@@ -8,6 +8,7 @@ import { verifyExecutionAuthority } from "../execution-authority/index.mjs";
 import { verifyExecutorCredential } from "../custody/executor-credential.mjs";
 import { verifyAuthorityBundle } from "../custody/bundle.mjs";
 import { sha256 } from "../crypto/provider.mjs";
+import { now as clockNow } from "./clock.mjs";
 
 export async function openHubAuthorization(env, startup) {
   const config = await loadPolicyEngineConfig(env);
@@ -50,8 +51,9 @@ export async function openHubAuthorization(env, startup) {
   }
   async function decide(request, approvals = []) {
     if (!(await readiness())) throw new Error("ERR_HUB_SIGNING");
-    const now = new Date().toISOString();
-    if (Date.parse(request.expires_at) <= Date.now()) throw new Error("ERR_HUB_EXPIRED");
+    const decidedAt = clockNow();
+    const now = new Date(decidedAt).toISOString();
+    if (Date.parse(request.expires_at) <= decidedAt) throw new Error("ERR_HUB_EXPIRED");
     const payload = buildPolicyReceiptPayload(request, config.policy, {
       now, executionStatus: null, caller: { id: request.principal.id },
       trustAnchors: config.trustAnchors, rejectLegacyAuthorities: true,
