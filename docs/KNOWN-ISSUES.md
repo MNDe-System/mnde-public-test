@@ -238,6 +238,32 @@ that weaken nothing are to have the sidecar harness record the runtime-health
 transition and report it, so a red run says "the runner stalled" in one line
 instead of needing a log read, or to carry it as it is. Neither is authorised.
 
+**Addendum, 2026-10-15: two more occurrences, with one new reason code.** Run 287
+on `mnde/sleepy-brown-2kbsuy` (head `224ec7a`, a Hub-only change that no sidecar
+suite imports) went red on both of its attempts, with a different set each time:
+
+| Run / attempt | Failing suites | Score |
+| --- | --- | --- |
+| 287, attempt 1 | `test:sidecar-pe` (6/8), `test:executor-live-sidecar` (10/12) | 108/110 |
+| 287, attempt 2 | `test:ledger-auth` (20/22) | 109/110 |
+
+The same branch passed on its two previous heads (runs 285 and 286), and the full
+suite passes 110/110 on Linux, Node 24.14.1, at `224ec7a`.
+
+Two things are new. In `test:sidecar-pe` the two failing assertions asked for
+`APPROVAL_SIGNATURE_INVALID` and `APPROVAL_EXPIRED` and got
+`ERR_SYSTEM_SATURATED`, not `ERR_RUNTIME_DEGRADED`. That is the receipt
+persistence queue's back-pressure refusal (`sidecar/receipt_persistence_queue.mjs`),
+which fires on either an in-flight limit or event-loop lag. The test does not
+print `saturation_signal`, so which of the two tripped is not known; this is the
+same family of cause as the watchdog, not a confirmed identical one. And
+`test:executor-live-sidecar` joins the set, with `false !== true` and no reason
+code, so it is consistent with the mechanism and does not prove it. `test:ledger-auth`
+repeats the signature above: decision 2 carried no ledger metadata and the
+proof read returned 404 (`404 !== 200`).
+
+Nothing in this addendum changes the entry's conclusions or its safety argument.
+
 **Target release:** unscheduled.
 
 ---
