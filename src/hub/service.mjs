@@ -10,6 +10,7 @@ import { validateGitPushParameters } from "../effects/git-push/validate.mjs";
 import { inspectSecretFile } from "../effects/git-push/secret-files.mjs";
 import { openHubState, randomId } from "./state.mjs";
 import { openHubAuthorization } from "./authorization.mjs";
+import { now as clockNow } from "./clock.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -17,6 +18,13 @@ const fields = ["action", "expectedOldSha", "id", "remote", "remoteUrl", "reposi
 const object = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const exact = (v, keys) => object(v) && JSON.stringify(Object.keys(v).sort()) === JSON.stringify([...keys].sort());
 const fail = code => ({ decision: "REFUSE", reason_code: code });
+// A review request is open for ten minutes from creation. Viewing it, or sending
+// an invalid approval, never extends this.
+const REQUEST_LIFETIME_MS = 10 * 60_000;
+const expiredAt = record => Date.parse(record.request.expires_at) <= clockNow();
+// Expiry is an expected terminal outcome of a review, not a service failure.
+// Nothing was attempted, so this is never INDETERMINATE.
+const expiredBody = record => ({ id: record.id, decision: "REFUSE", phase: "EXPIRED", reason_code: "ERR_HUB_EXPIRED", retryPermitted: false });
 
 async function body(req) {
   if (req.headers["content-type"]?.split(";")[0] !== "application/json") throw new Error("input");
@@ -34,7 +42,10 @@ async function body(req) {
 
 function view(record) {
   return {
-    id: record.id, decision: record.decision, phase: record.phase === "EXECUTING" ? "INDETERMINATE" : record.phase,
+    id: record.id, decision: record.decision,
+    // A review nobody touched after its deadline reads as EXPIRED. Reading does
+    // not write; the next approve or refuse persists the transition.
+    phase: record.phase === "EXECUTING" ? "INDETERMINATE" : record.phase === "REVIEW" && expiredAt(record) ? "EXPIRED" : record.phase,
     execution: record.result ?? null, receiptId: record.receipt ? record.id : null,
     retryPermitted: false
   };
@@ -92,7 +103,16 @@ export async function startHub(env = process.env) {
   }
   async function run(record, approvals) {
     try {
-      const decision = await authorization.decide(record.request, approvals);
+      let decision;
+      try { decision = await authorization.decide(record.request, approvals); }
+      catch (error) {
+        // The deadline passed between the pre-check and the decision. Expected,
+        // pre-execution, nothing sent: persist it and keep the Hub serving.
+        if (error?.message !== "ERR_HUB_EXPIRED") throw error;
+        record.phase = "EXPIRED"; record.decision = "REFUSE"; save(record);
+        event("action.expired", record.id);
+        return expiredBody(record);
+      }
       record.decision = decision.decision;
       if (record.receipt) record.previousReceipts = [...(record.previousReceipts ?? []), record.receipt];
       record.receipt = decision.receipt;
@@ -179,7 +199,14 @@ export async function startHub(env = process.env) {
         if (control) {
           if (!operator) return reply(res, 403, fail("ERR_FORBIDDEN"));
           record = storage.read(control[1]);
+          if (record.phase === "EXPIRED") return reply(res, 410, expiredBody(record));
           if (record.phase !== "REVIEW") return reply(res, 409, fail("ERR_HUB_FINAL"));
+          // Checked before anything else, including the Hub's lock state: recording
+          // that a review lapsed sends nothing and is safe while LOCKED.
+          if (expiredAt(record)) {
+            record.phase = "EXPIRED"; record.decision = "REFUSE"; save(record); event("action.expired", record.id);
+            return reply(res, 410, expiredBody(record));
+          }
           if (control[2] === "refuse") {
             if (!exact(input, [])) return reply(res, 400, fail("ERR_HUB_INPUT"));
             record.phase = "REFUSED"; record.decision = "REFUSE"; save(record); event("action.refused", record.id);
@@ -196,16 +223,18 @@ export async function startHub(env = process.env) {
           if (!validateGitPushParameters(parameters, { allowedSchemes: loaded?.startup?.allowedSchemes }).ok) return reply(res, 400, fail("ERR_HUB_INPUT"));
           try { storage.read(input.id); return reply(res, 409, fail("ERR_HUB_DUPLICATE")); }
           catch (error) { if (error.code !== "ENOENT") throw error; }
-          const now = new Date().toISOString();
+          const created = clockNow();
+          const now = new Date(created).toISOString();
           record = { id: input.id, owner: identity.caller.id, phase: "REQUESTED", decision: null,
             request: { schema_version: "1.0", request_id: input.id, grant_id: randomId(), timestamp: now,
-              expires_at: new Date(Date.now() + 5 * 60_000).toISOString(), principal: { id: identity.caller.id },
+              expires_at: new Date(created + REQUEST_LIFETIME_MS).toISOString(), principal: { id: identity.caller.id },
               agent: { id: "mnde-hub" }, tool: { tool_name: "git.push" }, parameters, environment: {}, context: {} } };
         }
         if ((await status()).state !== "ACTIVE") return reply(res, 503, fail("ERR_HUB_NOT_READY"));
         save(record); event("action.requested", record.id);
         active = run(record, approvals);
-        return reply(res, 200, await active);
+        const outcome = await active;
+        return reply(res, outcome.phase === "EXPIRED" ? 410 : 200, outcome);
       } finally { busy = false; active = null; }
     } catch {
       reply(res, 400, fail("ERR_HUB_REQUEST_FAILED"));

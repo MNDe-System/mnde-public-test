@@ -108,7 +108,7 @@ The example SHA placeholders must be replaced before submitting. Objects for
 both commits must already exist in the configured Hub repository. Repository
 synchronization/upload is outside this PR. Unknown fields/actions and invalid
 JSON (including duplicate keys) fail closed. The principal is the authenticated
-caller, not request data. The Hub generates a grant ID and a five-minute expiry.
+caller, not request data. The Hub generates a grant ID and a ten-minute expiry.
 A duplicate UUID returns 409 and never creates fresh authority. A lost response
 must be followed by `GET /v1/receipts/:id`; **do not automatically submit a new
 UUID**. Hub metadata is not the at-most-once effect guarantee: the existing
@@ -130,8 +130,20 @@ existing approval verifier checks signature, trust, scope, time and threshold.
 The Hub does not mint approvals or hold the approval private key. Changing a
 boolean or clicking an unauthenticated UI button cannot approve. A new policy
 decision/receipt is issued after approval; a final request cannot be approved
-again. The original five-minute expiry is preserved. Operator refusal is a
+again. The original ten-minute expiry is preserved. Operator refusal is a
 workflow cancellation; it does not forge a new policy refusal signature.
+
+**Expiry.** A review request is open for ten minutes from creation; viewing it or
+sending an invalid approval does not extend that. An approve or refuse that
+arrives at or after the deadline records the request as `EXPIRED`, answers
+`410` with `{"decision":"REFUSE","phase":"EXPIRED","reason_code":"ERR_HUB_EXPIRED","retryPermitted":false}`,
+never invokes the executor, spends no claim, and leaves the Hub in its previous
+state (ACTIVE stays ACTIVE, LOCKED stays LOCKED). It is not `INDETERMINATE`:
+nothing was attempted. A review nobody touched reads as `EXPIRED` from the
+receipts routes; the stored record changes on the next approve or refuse. To
+continue, submit a new request with a new UUID. Before this change an expired
+approval latched the Hub DEGRADED and reported `INDETERMINATE`
+(`docs/APPROVAL-WORKFLOW-AUDIT.md`, F1).
 
 Verify the returned `authorization` with `tools/verify.mjs`, passing the existing
 authority bundle, root fingerprint, executor/environment, approval anchors and
@@ -257,7 +269,7 @@ Production credential acquisition is not mocked by the service. No production
 GitHub push or real credential provisioning was performed in this validation.
 
 The event stream vocabulary includes hub.started/ready/locked/unlocked,
-action.requested/review_required/allowed/refused, execution.started/completed/
+action.requested/review_required/allowed/refused/expired, execution.started/completed/
 failed, receipt.signed and storage.degraded. Events are observational and may
 be lost on restart; they are not execution authority. A future OLED process
 should display a read-only status feed and hold no control credentials or

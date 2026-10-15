@@ -78,6 +78,8 @@ Severity is for the approval workflow specifically.
 
 ### F1. High: approving after the request expires degrades the Hub and misreports the outcome
 
+**Status: fixed in PR 0** (expiry is checked before the execution path, recorded as `EXPIRED`, answered `410`, and no longer latches the Hub; request lifetime is now ten minutes). The text below is the finding as reproduced against the earlier code.
+
 Reproduced in-process. Hub requests expire five minutes after creation
 (`service.mjs`, `expires_at`). When an approval arrives after that, `decide()`
 throws `ERR_HUB_EXPIRED` (`src/hub/authorization.mjs`), which lands in the

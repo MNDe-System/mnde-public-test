@@ -5,6 +5,11 @@ import { registerHooks } from "node:module";
 registerHooks({
   load(url, context, nextLoad) {
     const result = nextLoad(url, context);
+    // Lets a test move the Hub's own clock (request creation and expiry) without
+    // patching Date for the executor, the claim store or the HTTP stack.
+    if (url.endsWith("/src/hub/clock.mjs")) {
+      return { ...result, source: String(result.source).replace("return Date.now();", "return globalThis.__hubClock ? globalThis.__hubClock() : Date.now();") };
+    }
     if (!url.endsWith("/src/effects/git-push/index.mjs") && !url.endsWith("/src/effects/git-push/credential-provider.mjs")) return result;
     let source = String(result.source);
     source = source.replace("async function executeGitPush(request = {}) {", "async function executeGitPush(request = {}) { if (globalThis.__hubObservation) globalThis.__hubObservation.executions++; ");

@@ -199,6 +199,173 @@ await test("signed approval re-enters existing policy and reaches executor only 
   } finally { await f.hub.close(); }
 });
 
+// ── Review expiry (PR 0) ─────────────────────────────────────────────────────
+// Hub time is moved through src/hub/clock.mjs by the test preload. Only request
+// creation and expiry decisions use it; the executor and claim store keep real
+// time, so these cases also prove expiry never reaches them.
+const T0 = Date.now();
+const REQUEST_LIFETIME = 10 * 60_000;
+function clockAt(offsetMs) { globalThis.__hubClock = () => T0 + offsetMs; }
+function approvalFor(request, offsetMs, ttlMs = 120_000) {
+  return signApproval({ approval_id: randomUUID(), approver: "operator", issuer: "operator",
+    issued_at: new Date(T0 + offsetMs - 1000).toISOString(), expires_at: new Date(T0 + offsetMs + ttlMs).toISOString(),
+    scope: { tool_name: "git.push", request_id: request.id } }, { keyId: approvalKey.keyId, privateKeyPem: approvalKey.privatePem });
+}
+async function reviewRequest(f, offsetMs = 0) {
+  execFileSync("git", ["--git-dir", f.repos.barePath, "update-ref", "refs/heads/review", f.repos.commits[0]], { stdio: "pipe" });
+  clockAt(offsetMs);
+  const request = f.request("review");
+  const created = await f.api("/v1/actions", request);
+  assert.equal(created.body.decision, "REVIEW", JSON.stringify(created.body));
+  return request;
+}
+const expiredShape = (id) => ({ id, decision: "REFUSE", phase: "EXPIRED", reason_code: "ERR_HUB_EXPIRED", retryPermitted: false });
+const noEffect = (f) => { assert.equal(globalThis.__hubObservation.executions, 0); assert.equal(f.backend.claimed().length, 0); };
+
+await test("a review request lives exactly ten minutes from creation", async () => {
+  const f = await fixture();
+  try {
+    await f.api("/v1/unlock", {});
+    const request = await reviewRequest(f);
+    const stored = JSON.parse(readFileSync(join(f.data, `action-${request.id}.json`), "utf8")).request;
+    assert.equal(Date.parse(stored.expires_at) - Date.parse(stored.timestamp), REQUEST_LIFETIME);
+  } finally { globalThis.__hubClock = undefined; await f.hub.close(); }
+});
+
+await test("an approval just before the deadline executes; at and after the deadline it is EXPIRED with no effect", async () => {
+  const f = await fixture();
+  try {
+    await f.api("/v1/unlock", {});
+    const early = await reviewRequest(f);
+    clockAt(REQUEST_LIFETIME - 1000);
+    const ok = await f.api(`/v1/actions/${early.id}/approve`, { approvals: [approvalFor(early, REQUEST_LIFETIME - 1000)] });
+    assert.equal(ok.body.decision, "ALLOW", JSON.stringify(ok.body));
+    assert.equal(ok.body.execution.outcome, "EXECUTED");
+
+    for (const [label, at] of [["at the deadline", REQUEST_LIFETIME], ["after the deadline", REQUEST_LIFETIME + 1]]) {
+      const f2 = await fixture();
+      try {
+        await f2.api("/v1/unlock", {});
+        const request = await reviewRequest(f2);
+        clockAt(at);
+        const late = await f2.api(`/v1/actions/${request.id}/approve`, { approvals: [approvalFor(request, at)] });
+        assert.equal(late.status, 410, `${label}: ${JSON.stringify(late.body)}`);
+        assert.deepEqual(late.body, expiredShape(request.id), label);
+        noEffect(f2);
+      } finally { globalThis.__hubClock = undefined; await f2.hub.close(); }
+    }
+  } finally { globalThis.__hubClock = undefined; await f.hub.close(); }
+});
+
+await test("expiry is persisted, survives a restart, leaves the Hub ACTIVE and other requests working", async () => {
+  const f = await fixture();
+  let second;
+  try {
+    await f.api("/v1/unlock", {});
+    const request = await reviewRequest(f);
+    clockAt(REQUEST_LIFETIME + 5000);
+    const late = await f.api(`/v1/actions/${request.id}/approve`, { approvals: [approvalFor(request, REQUEST_LIFETIME + 5000)] });
+    assert.equal(late.status, 410);
+    assert.equal(JSON.parse(readFileSync(join(f.data, `action-${request.id}.json`), "utf8")).phase, "EXPIRED");
+    const status = (await f.api("/v1/status")).body;
+    assert.equal(status.state, "ACTIVE", JSON.stringify(status));
+    assert.equal(status.receiptSigning, "ready");
+    // A repeat is the same terminal answer, never a second transition and never a retry.
+    const again = await f.api(`/v1/actions/${request.id}/approve`, { approvals: [approvalFor(request, REQUEST_LIFETIME + 5000)] });
+    assert.equal(again.status, 410);
+    assert.deepEqual(again.body, expiredShape(request.id));
+    assert.equal((await f.api(`/v1/receipts/${request.id}`)).body.phase, "EXPIRED");
+
+    // An unrelated request still completes on the same Hub.
+    clockAt(REQUEST_LIFETIME + 6000);
+    const fresh = f.request("main");
+    const done = await f.api("/v1/actions", fresh);
+    assert.equal(done.body.decision, "ALLOW", JSON.stringify(done.body));
+    assert.equal(done.body.execution.outcome, "EXECUTED");
+
+    // Restart on the same data directory: the record is still EXPIRED, the Hub boots LOCKED.
+    await f.hub.close();
+    second = await startHub(f.env);
+    const api = async (path, input) => {
+      const response = await fetch(`http://127.0.0.1:${second.address.port}${path}`, { method: input === undefined ? "GET" : "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, ...(input === undefined ? {} : { body: JSON.stringify(input) }) });
+      return { status: response.status, body: JSON.parse(await response.text()) };
+    };
+    assert.equal((await api("/v1/status")).body.state, "LOCKED");
+    const afterRestart = await api(`/v1/actions/${request.id}/approve`, { approvals: [approvalFor(request, REQUEST_LIFETIME + 6000)] });
+    assert.equal(afterRestart.status, 410);
+    assert.deepEqual(afterRestart.body, expiredShape(request.id));
+  } finally { globalThis.__hubClock = undefined; await second?.close(); try { await f.hub.close(); } catch {} }
+});
+
+await test("a LOCKED Hub still records expiry, stays LOCKED, and refusing an expired review is also EXPIRED", async () => {
+  const f = await fixture();
+  try {
+    await f.api("/v1/unlock", {});
+    const a = await reviewRequest(f);
+    clockAt(1000);
+    const b = f.request("review");
+    assert.equal((await f.api("/v1/actions", b)).body.decision, "REVIEW");
+    await f.api("/v1/lock", {});
+    clockAt(REQUEST_LIFETIME + 2000);
+    const late = await f.api(`/v1/actions/${a.id}/approve`, { approvals: [approvalFor(a, REQUEST_LIFETIME + 2000)] });
+    assert.equal(late.status, 410);
+    assert.equal((await f.api("/v1/status")).body.state, "LOCKED");
+    const refused = await f.api(`/v1/actions/${b.id}/refuse`, {});
+    assert.equal(refused.status, 410);
+    assert.deepEqual(refused.body, expiredShape(b.id));
+    assert.equal(JSON.parse(readFileSync(join(f.data, `action-${b.id}.json`), "utf8")).phase, "EXPIRED");
+    noEffect(f);
+  } finally { globalThis.__hubClock = undefined; await f.hub.close(); }
+});
+
+await test("a review nobody touched reads as EXPIRED without a write", async () => {
+  const f = await fixture();
+  try {
+    await f.api("/v1/unlock", {});
+    const request = await reviewRequest(f);
+    clockAt(REQUEST_LIFETIME + 1000);
+    assert.equal((await f.api(`/v1/receipts/${request.id}`)).body.phase, "EXPIRED");
+    assert.equal(JSON.parse(readFileSync(join(f.data, `action-${request.id}.json`), "utf8")).phase, "REVIEW", "reading must not write");
+  } finally { globalThis.__hubClock = undefined; await f.hub.close(); }
+});
+
+await test("concurrent approvals at expiry produce one durable EXPIRED outcome and no effect", async () => {
+  const f = await fixture();
+  try {
+    await f.api("/v1/unlock", {});
+    const request = await reviewRequest(f);
+    clockAt(REQUEST_LIFETIME + 1);
+    const approval = approvalFor(request, REQUEST_LIFETIME + 1);
+    const results = await Promise.all([1, 2, 3].map(() => f.api(`/v1/actions/${request.id}/approve`, { approvals: [approval] })));
+    assert.ok(results.every(r => [410, 409].includes(r.status)), JSON.stringify(results.map(r => r.status)));
+    assert.ok(results.some(r => r.status === 410));
+    assert.equal(JSON.parse(readFileSync(join(f.data, `action-${request.id}.json`), "utf8")).phase, "EXPIRED");
+    assert.equal((await f.api("/v1/status")).body.state, "ACTIVE");
+    noEffect(f);
+  } finally { globalThis.__hubClock = undefined; await f.hub.close(); }
+});
+
+await test("expected pre-execution authorization failures do not degrade the Hub", async () => {
+  const f = await fixture();
+  try {
+    await f.api("/v1/unlock", {});
+    const request = await reviewRequest(f);
+    const untrusted = signApproval({ approval_id: randomUUID(), approver: "operator", issuer: "operator",
+      issued_at: new Date(T0 - 1000).toISOString(), expires_at: new Date(T0 + 60_000).toISOString(),
+      scope: { tool_name: "git.push", request_id: request.id } }, { keyId: "not-a-trusted-key", privateKeyPem: approvalKey.privatePem });
+    const refused = await f.api(`/v1/actions/${request.id}/approve`, { approvals: [untrusted] });
+    assert.equal(refused.body.decision, "REFUSE");
+    assert.notEqual(refused.body.phase, "INDETERMINATE");
+    const expiredApproval = approvalFor(request, 0, 1);
+    clockAt(5000);
+    const stale = await f.api(`/v1/actions/${request.id}/approve`, { approvals: [expiredApproval] });
+    assert.equal(stale.body.decision, "REFUSE");
+    assert.equal((await f.api("/v1/status")).body.state, "ACTIVE");
+    noEffect(f);
+  } finally { globalThis.__hubClock = undefined; await f.hub.close(); }
+});
+
 await test("missing data directory degrades; health stays up and unlock fails", async () => {
   const f = await fixture({ MNDE_HUB_DATA_DIR: join(dir, "missing") });
   try {
