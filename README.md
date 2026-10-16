@@ -377,3 +377,7 @@ These exist as architecture or concepts in the repository but are not claimed as
 - [Security review checklist](docs/security-review-checklist.md)
 - [Known issues](docs/KNOWN-ISSUES.md)
 - [Next milestones (ranked assessment)](docs/NEXT-MILESTONES.md)
+- [UC-002 security review (guarded issuance)](docs/UC-002-SECURITY-REVIEW.md)
+- [F-001 acceptance matrix](docs/F001-ACCEPTANCE-MATRIX.md)
+- [F-001 proof protocol](docs/F001-PROOF-PROTOCOL.md)
+- [Authority bundle publication plan](docs/AUTHORITY-BUNDLE-PUBLICATION-PLAN.md)

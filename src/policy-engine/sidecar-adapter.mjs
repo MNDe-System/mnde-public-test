@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 
 import { buildPolicyReceipt } from "./receipt.mjs";
+import { checkIssuanceConfiguration } from "./issuance-guard.mjs";
 import { loadSignedPolicyBundleConfig } from "../policy-bundles/index.mjs";
 import { parseRuntimeProfile } from "../../shared/runtime-profile.mjs";
 import { DEFAULT_DENY_POLICY, POLICY_CONFIGURATION_STATE_NO_POLICY, POLICY_SOURCE_BUILTIN } from "./default-deny.mjs";
@@ -39,33 +40,21 @@ function loadOptionalTrustConfig(env) {
   return { ok: true, trustAnchors, approvalTrustAnchors };
 }
 
-// Reason returned when a policy declares `approval_required` but nothing is
-// configured to verify approvals. See docs/KNOWN-ISSUES.md (UC-002).
-export const ERR_PE_APPROVAL_REQUIRED_WITHOUT_ANCHORS = "ERR_PE_APPROVAL_REQUIRED_WITHOUT_TRUST_ANCHORS";
-
-// True when any rule in the policy declares `approval_required`, whatever its
-// value. A malformed value counts: the point is that the policy author asked for
-// a human gate, and the engine must not silently skip it.
-export function policyDeclaresApprovalRequired(policy) {
-  return Array.isArray(policy?.rules) && policy.rules.some((rule) => rule && typeof rule === "object" && rule.approval_required !== undefined);
-}
+// Re-exported for callers that already import it from here.
+export { policyDeclaresApprovalRequired, ERR_APPROVAL_REQUIRED_WITHOUT_ANCHORS as ERR_PE_APPROVAL_REQUIRED_WITHOUT_ANCHORS } from "./issuance-guard.mjs";
 
 // Load decision-engine config. Fails closed (ok:false) on any malformed/missing
 // configured file, so the sidecar can refuse rather than silently run unprotected.
 //
-// It also refuses a policy that declares `approval_required` when no approval
-// trust anchors are configured. The engine only enforces `approval_required`
-// when anchors are present, so without this check the field would silently do
-// nothing and the rule would ALLOW with no human sign-off. The check lives here,
-// at configuration load, and deliberately NOT in the evaluator: the receipt
-// verifier replays the evaluator, so changing evaluation would make every
-// receipt issued before this change fail replay with "decision drift".
+// It also applies the issuance guard (./issuance-guard.mjs) so a configuration the
+// guard would refuse fails at startup with a clear reason instead of on the first
+// decision. The guard, not this function, is the authority: buildPolicyReceiptPayload
+// enforces the same rule for every direct caller.
 export async function loadPolicyEngineConfig(env) {
   const config = await loadPolicyEngineConfigUnchecked(env);
-  if (config.ok && !config.approvalTrustAnchors && policyDeclaresApprovalRequired(config.policy)) {
-    return { ok: false, reason: ERR_PE_APPROVAL_REQUIRED_WITHOUT_ANCHORS };
-  }
-  return config;
+  if (!config.ok) return config;
+  const issuable = checkIssuanceConfiguration(config.policy, { approvalTrustAnchors: config.approvalTrustAnchors });
+  return issuable.ok ? config : { ok: false, reason: issuable.code, detail: issuable.detail };
 }
 
 async function loadPolicyEngineConfigUnchecked(env) {

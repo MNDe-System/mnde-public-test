@@ -1,191 +1,124 @@
-# What MNDe needs next — assessment of 2026-10-16
+# What MNDe needs next
 
-This is an engineering and strategy assessment, not a specification. Every
-statement is tagged by how it is known:
+First written 2026-10-16 (after PR #58); revised the same day after the guarded-issuance
+review and the F-001 acceptance assessment. Tags: **Fact** (read or run, and I can point at
+it), **Judgment** (my conclusion), **Speculation** (market or future, no evidence here).
+Claims live in `README.md`, `SECURITY_CLAIMS.md` and `docs/F001-REASSESSMENT.md`; where this
+document disagrees with them, they win and this one has a bug.
 
-- **Fact** — read in this repository or observed by running it on 2026-10-16.
-- **Judgment** — my conclusion from the facts. Argued, not proven.
-- **Speculation** — about the market or the future. No evidence in this repo.
+## 1. Where MNDe is
 
-Nothing here changes what MNDe claims. Claims are in `README.md`,
-`SECURITY_CLAIMS.md` and `docs/F001-REASSESSMENT.md`; where this document
-disagrees with those, they win and this document has a bug.
+**Fact.** MNDe decides, signs and records; protected execution is held off everywhere except
+one typed effect, `git.push`, which has a production CLI and a Hub prototype. The claim that
+matters ("an agent cannot push except through the boundary") has **never been demonstrated on
+independent infrastructure**, and in the environment this assessment ran in, the agent itself
+holds an admin GitHub token (`docs/F001-ACCEPTANCE-MATRIX.md`, C2). On Node 24.22.0 the full
+suite passes; exact commands and results are in `docs/evidence/f001/2026-10-16/README.md`.
 
-## 1. Where MNDe actually is
+**Judgment.** The engineering discipline (claims written beside the evidence that does and does
+not support them) is the product's best asset and the cheapest thing to lose. The weakest point
+is not a missing feature. It is that the strongest claim is unproven and one environment
+contradicts its premise.
 
-**Fact.** At `178342b` MNDe decides and records; it does not execute. The README
-opens with the execution hold: protected execution is disabled in the generic
-executor and the MCP proxy. One typed effect, `git.push`, has a production path
-(`bin/mnde-git-push.mjs`, `src/effects/git-push/`) with an executor-owned push
-credential, a durable claim before the effect, and signed evidence afterwards.
-`docs/F001-REASSESSMENT.md` scores it six of nine questions established and says
-plainly: *"no deployment has ever run this"*, so F-001 is not closed.
+## 2. What the 2026-10-16 passes changed
 
-**Fact.** With dependencies installed (`npm ci`), the full suite passes: 109 of
-109 test scripts. Run on Node 22.22.0, although `package.json` requires Node 24
-or later; nothing in the suite failed for that reason, but it was not run on 24
-here, and the Windows CI flake in KI-005 cannot be reproduced on this machine.
-Without `npm ci`, five suites fail with `Cannot find package 'typescript'`
-because the packaging tests build `dist/`. That is an environment gap, not a
-defect, but it is also a first-run trap (see item 8 below).
-
-**Judgment.** The engineering discipline is unusually strong for the stage:
-claims are written next to the evidence that does and does not support them,
-known issues carry a "why is this safe to defer" argument, and fixed findings
-stay on record. That discipline is itself a trust asset, and the cheapest way to
-lose it is to let a doc say something the code does not do. Protect it.
-
-**Judgment.** The product's real position is narrower than the category name
-"execution firewall" suggests, and the repo is honest about it. Enforcement is
-cooperative for everything except effects where MNDe's executor holds the
-credential, which today means `git.push` only. The distinction that matters to a
-buyer is not "MNDe can refuse" (any policy engine can) but "the agent never
-holds the credential, so it cannot do the thing without MNDe". That property
-exists in one place. Everything below is ranked by how fast it turns that one
-place into something operated, verifiable by outsiders, and then repeatable.
-
-## 2. What was done in this session
-
-**Fixed UC-002** (`docs/KNOWN-ISSUES.md`, Resolved): a policy declaring
-`approval_required` silently allowed with no approval whenever
-`MNDE_PE_APPROVAL_TRUST_ANCHORS` was unset. It now refuses at configuration load
-(`ERR_PE_APPROVAL_REQUIRED_WITHOUT_TRUST_ANCHORS`) in the sidecar and in
-`mnde decide`.
-
-Why this one, ahead of anything else I could have built:
-
-- It was the only open finding that is a *fail-open on the control whose entire
-  purpose is to hold an action for a human*. Everything else open is either
-  infrastructure, a human decision, or CI cost.
-- It could be fixed completely and tested in this sandbox, so the result is
-  verified, not described.
-- **The repository's own example demonstrated the bug.** The shipped
-  `sample-policy.json` declares `approval_required`, and eight test suites plus
-  `reviewer-kit:pe` booted it with no anchors, so none of them was enforcing the
-  approval they appeared to define. Fixing the loader surfaced that immediately.
-
-Two decisions inside the fix that are worth a reviewer's attention:
-
-1. **The check is at configuration load, not in the evaluator.** The receipt
-   verifier replays the evaluator; making it refuse without anchors would turn
-   every previously issued receipt into "decision drift" on replay. Breaking
-   verification of historical evidence is a worse failure for this product than
-   the gap being fixed. The evaluator's old behaviour is frozen and a test pins it.
-2. **It is a behaviour change.** Anyone running a policy with `approval_required`
-   and no anchors now gets a startup refusal naming the cause. I believe that is
-   correct (it is the fix the finding itself proposed) but it is a decision, and
-   the doc says so.
-
-Also: added `examples/policy-engine/sample-policy-no-approval.json`, pointed the
-eight suites, `reviewer-kit:pe` and three spec snippets at it, and added tests
-(`test:approvals` 20/20, `test:sidecar-pe` 9/9 including a real-process refusal).
+1. **UC-002** (an `approval_required` gate silently skipped without anchors): fixed in PR #58
+   for two callers, then fixed at the issuance chokepoint with one validation routine
+   (`docs/UC-002-SECURITY-REVIEW.md`). Replay of historical receipts is preserved and proven with a
+   fixture issued by pre-guard code. A mutation checker shows 11 removals of the fix are caught.
+2. **A way to find old exposure:** `npm run audit:unenforced-approvals`.
+3. **Three new findings, recorded and unclassified** (`KNOWN-ISSUES.md`): UC-003 (unverified
+   authority grants without anchors), UC-004 (no `exports` map), UC-005 (approvals bound to a tool
+   name, not the action; confirmed by running it).
+4. **A read-only F-001 toolkit** (`scripts/f001/`) and an operator protocol, with the pending action
+   prepared and **not** executed.
+5. **One flaky test fixed** (`TF-001`) and **one guard respected, not weakened** (the
+   git-push reachability test: the new tools are kept out of the package, as the repo does for its
+   other operator tools).
 
 ## 3. Ranked work
 
-Ranked by expected long-term return to the goal of MNDe becoming trusted
-infrastructure. "Effort" is engineering time, excluding waiting on people or
-infrastructure, and is an estimate.
+**Required security work.** Ordered by dependency, then impact. Effort excludes waiting on people
+and infrastructure and is an estimate.
 
-| # | Work | Impact | Difficulty | Risk | Depends on | Effort |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | Operate `git.push` once, end to end, against a real independent PostgreSQL claim primary (F-001 blocker 1) | Highest. The only item that changes what MNDe may claim. | Medium | Will find real bugs; that is the point | An independent infrastructure operator and a restricted claim login; `docs/FIRST-PRODUCTION-GIT-PUSH.md` is the runbook | 2–5 days plus provisioning wait |
-| 2 | Publish a stable MNDe authority bundle with a documented rotation story | High. Without it, third-party verification is repo-local, which the README states as the pilot's main gap. This is where "verify without trusting the operator" becomes true for outsiders. | Low–medium in code; the key ceremony is the hard part | A published root is a long-lived commitment | A decision on root custody and who holds it | 3–5 days |
-| 3 | Write down the F-001 limits you will ship with (question 6 restore, power loss) | High for credibility, tiny to build | Low | None | Item 1 for the power-loss evidence | 0.5 day |
-| 4 | Cut one release through the approval-gated workflow (KI-004) | Medium. Releases are currently hand-tagged, the opposite of what the repo argues for. | Low | None | A GitHub Environment with a required reviewer, a version bump | 0.5 day |
-| 5 | Authenticated approver binding for the legacy path (`hold_state`) and verification of `orbit_intent.signatures` | Medium. Closes two README "Limitations" bullets. UC-002's fix covers the policy-engine path only. | Medium | Touches the legacy engine; backwards compatibility matters | Decide whether the legacy engine is being retired instead | 3–4 days |
-| 6 | Make the sidecar test harness report runtime-health transitions (KI-005) | Low–medium. A red Windows run says "runner stalled" in one line instead of a log read. Does not touch the watchdog threshold, which is the control. | Low | Low | KI-005 says it is unauthorised; needs a yes | 1 day |
-| 7 | A second typed effect | Potentially high, but only after item 1 | Medium each | Doubles the surface that was never operated | Item 1 done and stable | 1–2 weeks each |
+| # | Work | Security impact | Depends on | Independently verifiable? | Operational risk | Effort | First-customer value |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| R1 | Review and merge PR #58, then the stacked guarded-issuance PR (authorized reviewers only) | High: closes UC-002 end to end | human review | yes: tests + mutation checker | Low; startup refusals are intended | review time | High: an approval gate that cannot silently vanish |
+| R2 | **Separate the agent from push credentials** and re-run `check-agent-environment.mjs` as the agent | Highest: without it F-001's premise is false | operator decision on topology | yes: the checker exits 0 or it does not | Low | 0.5-1 day | Highest |
+| R3 | **Independent claim database** (an operator who is not the executor operator) and run the 22-case harness against it | Highest: Q1, Q4 (partly), C9, database criteria | an independent DB operator | yes: harness output + operator's observation | Medium: rows are permanent | 1-2 days | Highest |
+| R4 | **Operate the end-to-end protocol once** (`F001-PROOF-PROTOCOL.md`) | Highest: moves Q8, C3-C6 | R2, R3, an Approver on separate hardware, an App installation | yes: collector, offline verification, GitHub's activity record | Medium: the protected-ref push is **permanent** | 1-2 days | Highest |
+| R5 | Decide and state the two limits: Q4 (accept `-m immediate` or test power loss) and Q6 (owner can restore; or design a witness) | High for honesty of the claim | R3 for Q4 evidence | partly | Low | 0.5 day to decide | High |
+| R6 | Publish a stable authority bundle and root fingerprint (`AUTHORITY-BUNDLE-PUBLICATION-PLAN.md`) | High: makes third-party verification real | key ceremony; owner decisions | yes, by design | Medium: a published root is a long commitment | 3-5 days | High |
+| R7 | Decide UC-005: action-bound approvals (additive, optional scope field, required for new issuance) | High on the sidecar path | a contract decision | yes | Low if additive | 3-4 days | Medium-high |
+| R8 | Decide UC-003 (apply the UC-002 treatment to `authority_required`) | Medium | a contract decision | yes | Breaks non-production demos | 1-2 days | Medium |
+| R9 | Name the credential in signed evidence (or accept GitHub's record as corroboration) | Medium: closes C6's gap | schema decision | yes | Schema change | 2 days | Medium |
+| R10 | Add a package `exports` map (UC-004) | Medium | decide supported entry points | yes | Breaking for deep importers | 1 day | Low now |
+
+**Optional product work** (do not start until R2-R4 are done):
+
+| # | Work | Why it waits |
+| --- | --- | --- |
+| P1 | A second typed effect | Doubles the surface that was never operated |
+| P2 | Hosted/central service | Concentrates the trust the receipt design avoids |
+| P3 | Dashboard / policy editor / installer polish | Optimizes the demo, not the trust |
+| P4 | Sidecar harness reports runtime-health transitions (KI-005) | Reduces CI cost only; marked unauthorised |
+| P5 | `license` field (KI-003), release workflow (KI-004) | Maintainer decisions; KI-004 is release hygiene that undercuts the "approval-gated" story if left |
 
 ### Why the alternatives lose
 
-- **More effects before item 1 (item 7 first).** This feels like progress and
-  adds the most risk. A second effect on top of a claim path nobody has operated
-  doubles the unproven surface. Breadth does not make an unoperated design more
-  trusted; one operated effect does.
-- **A hosted/central MNDe service now.** The Hub prototype exists
-  (`docs/MNDE-HUB.md`), but a hosted service concentrates trust in the operator,
-  which is the thing the receipt design exists to avoid. Judgment: it should
-  follow, not precede, an outsider being able to verify without it.
-- **A dashboard / policy editor / installer.** `installer/README.md` and the
-  README say there is no installer. Polishing the surface around a decision engine
-  that cannot yet execute optimises the demo, not the trust. Skip for now.
-- **Raising the CI watchdog threshold to quiet KI-005.** KI-005 is explicit that
-  the threshold is the control. This would trade a real property for green builds.
+- **More effects before R4.** Breadth does not make an unoperated design more trusted; one operated
+  effect does.
+- **A local container as the "independent" database.** It would produce a green result the written
+  criteria say not to count. It is useful only as a rehearsal, and only if labelled one.
+- **Fixing UC-002 in the evaluator.** That breaks replay of every historical receipt. The fix belongs
+  at issuance.
+- **Raising the CI watchdog threshold for KI-005.** The threshold is the control.
 
-## 4. The strategic questions, answered
+## 4. The strategy questions
 
-**Does the work above strengthen the execution firewall category?** Item 1 does,
-more than anything else, because it is the difference between "a policy engine
-that signs receipts" and "a boundary the agent cannot cross". Judgment.
+**Does this strengthen the execution-firewall category?** R2-R4 do, more than anything else:
+they are the difference between "a policy engine that signs receipts" and "a boundary the agent
+cannot cross". Judgment.
 
-**Network effects.** Honestly, almost none exist today. Receipts are per
-deployment. The nearest candidate is the conformance material
-(`conformance/`, `tests/vectors/`): if third-party verifiers and other tools
-produce or consume MNDe receipts against those vectors, the *format* becomes
-the shared asset, not the product. That is a plausible moat and it depends on
-item 2 (a stable anchor others can trust). Speculation on whether anyone will
-adopt a format from a pilot.
+**Network effects.** Almost none today; receipts are per deployment. The nearest candidate is the
+receipt format plus a published trust root plus conformance vectors others can verify against
+(R6). Speculation on whether anyone adopts a format from a pilot.
 
-**Trust.** Items 1, 2, 3 and the UC-002 fix all move it. A trusted-infrastructure
-buyer reads the claims-versus-evidence discipline first; every doc/code mismatch
-costs more than any feature earns.
+**Trust.** R1-R6 and R9 move it. Each doc/code mismatch costs more than a feature earns; this pass
+found one: PR #58 described itself as closing UC-002, but its check did not cover direct callers of
+`buildPolicyReceipt*` and accepted unusable anchors.
 
-**Switching costs.** Weak today, and arguably correct for a pilot. The durable
-form is signed history: a ledger of receipts, policies and anchors that an
-auditor needs the matching verifier to read. That accrues only if deployments run
-long enough to have history, which again points at item 1.
+**Switching costs.** Weak, and arguably correct for a pilot. Signed history accrues only if a
+deployment runs long enough to have history, which points again at R3-R4.
 
-**Simplifies adoption?** Mixed. `npm run sidecar` on a fresh clone is a good
-story. The first-run trap in item 8 and the new approval-anchor refusal both cost
-a newcomer a minute; the refusal at least names its cause.
-
-**Reduces operational complexity?** No, and it should not claim to. Item 1
-requires an independently administered database. That is a real operating burden
-and the honest price of the single-use guarantee. Better to state the cost in the
-adoption docs than discover a buyer resents it.
+**Operational complexity.** R3 requires an independently administered database. That is the honest
+price of the single-use guarantee; state it in adoption docs rather than let a buyer discover it.
 
 ## 5. What I did not do, and why
 
-- **Did not provision or test against PostgreSQL (item 1).** There is no
-  independent infrastructure available from this sandbox, and the freshness audit
-  is explicit that a same-machine database proves nothing about administrative
-  independence. Doing it against a local container would have produced a
-  green-looking result that the repo's own rules say not to count.
-- **Did not touch `package.json` `license` (KI-003).** The entry records it as a
-  legal-facing string that is the maintainer's call. I agree.
-- **Did not change the evaluator, receipt format, or any signed fixture.** See
-  section 2 for why.
-- **Did not touch the CI watchdog or KI-005.** Its remediation is marked
-  unauthorised.
-- **Did not enable execution or edit the execution hold.**
+- Did not run the F-001 demonstration: it needs an Approver's key, an App installation, an executor
+  OS identity and an independent database, and the final push to the protected ref is permanent.
+- Did not attempt a direct push to test denial, in a session whose token has admin rights.
+- Did not generate, rotate or publish any key or bundle.
+- Attempted to rehearse the claim-store harness against the sandbox's local PostgreSQL; the permission
+  classifier denied the `npm install` of the `pg` driver it needed. I did not work around it and
+  restored every sandbox change. A rehearsal would not have counted for independence anyway.
+- Did not merge, approve or mark ready any PR.
 
-## 6. Unknowns and risks to watch
+## 6. Unknowns and risks
 
-- **Unknown:** whether any deployment outside this repository runs a policy with
-  `approval_required` and no anchors. If one does, the UC-002 fix is a startup
-  failure for them. I cannot see that from here. Confidence it affects anyone:
-  low, since the project is a pilot with a source-checkout-only install, but I
-  have no data.
-- **Unknown:** Node 24 behaviour and the Windows flake; neither exercised here.
-- **Risk:** `approval_required` is still inert for any code that calls the
-  evaluator directly without anchors. Four in-repo callers were checked (listed
-  in `KNOWN-ISSUES.md` UC-002); a future fifth is where this regresses. A cheap
-  guard is a test that fails when a new caller of `buildPolicyReceipt*` appears
-  without being on an allowlist. Not built; noted.
-- **Risk:** the documentation-truth tests (`test:release-documentation-truth`)
-  guard some claims, not all. Prose like this file is not machine-checked.
+- **Unknown:** whether anyone outside this repository runs `approval_required` without anchors
+  (the new startup refusal would affect them), and how many historical receipts the audit tool will flag.
+- **Unknown:** the MNDe-side artifacts of the 2026-10-01/02 `mnde-execution-gate[bot]` pushes; if the
+  operator supplies them, `collect-evidence.mjs` can bind them to GitHub's record.
+- **Risk:** the physical-hub rulesets (created 2026-10-04) are editable by a repository admin, and this
+  session's token is one.
+- **Risk:** Windows CI flake (KI-005) and Windows directory-flush durability are unexercised here.
 
-## 7. Suggested next milestone
+## 7. Next three actions
 
-**Milestone: "F-001 operated once."** Provision the claim primary under an
-independent operator, run `docs/FIRST-PRODUCTION-GIT-PUSH.md` start to finish
-once, record the real result (including failures) as an addendum to
-`F001-REASSESSMENT.md`, and write down the question-6 and power-loss limits
-(item 3). Everything else on the list is either blocked by it or smaller than it.
-
-## 8. Small things noticed
-
-- **First-run trap.** A fresh clone running `npm test` without `npm install`
-  fails five packaging suites with a missing-`typescript` error that reads like a
-  defect. A preflight message ("run `npm ci` first; the packaging tests build
-  `dist/`") would cost a few lines. Not done; low priority.
+1. **R2 + R3 in parallel** (they are independent): remove admin/push tokens from agent sessions, and
+   stand up the claim database under an operator who is not the executor operator.
+2. **R4:** run the protocol once, with the Approver on separate hardware, and collect with
+   `collect-evidence.mjs`.
+3. **R1** whenever reviewers are available; it does not block the others.
