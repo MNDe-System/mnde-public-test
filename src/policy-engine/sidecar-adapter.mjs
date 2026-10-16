@@ -39,9 +39,36 @@ function loadOptionalTrustConfig(env) {
   return { ok: true, trustAnchors, approvalTrustAnchors };
 }
 
+// Reason returned when a policy declares `approval_required` but nothing is
+// configured to verify approvals. See docs/KNOWN-ISSUES.md (UC-002).
+export const ERR_PE_APPROVAL_REQUIRED_WITHOUT_ANCHORS = "ERR_PE_APPROVAL_REQUIRED_WITHOUT_TRUST_ANCHORS";
+
+// True when any rule in the policy declares `approval_required`, whatever its
+// value. A malformed value counts: the point is that the policy author asked for
+// a human gate, and the engine must not silently skip it.
+export function policyDeclaresApprovalRequired(policy) {
+  return Array.isArray(policy?.rules) && policy.rules.some((rule) => rule && typeof rule === "object" && rule.approval_required !== undefined);
+}
+
 // Load decision-engine config. Fails closed (ok:false) on any malformed/missing
 // configured file, so the sidecar can refuse rather than silently run unprotected.
+//
+// It also refuses a policy that declares `approval_required` when no approval
+// trust anchors are configured. The engine only enforces `approval_required`
+// when anchors are present, so without this check the field would silently do
+// nothing and the rule would ALLOW with no human sign-off. The check lives here,
+// at configuration load, and deliberately NOT in the evaluator: the receipt
+// verifier replays the evaluator, so changing evaluation would make every
+// receipt issued before this change fail replay with "decision drift".
 export async function loadPolicyEngineConfig(env) {
+  const config = await loadPolicyEngineConfigUnchecked(env);
+  if (config.ok && !config.approvalTrustAnchors && policyDeclaresApprovalRequired(config.policy)) {
+    return { ok: false, reason: ERR_PE_APPROVAL_REQUIRED_WITHOUT_ANCHORS };
+  }
+  return config;
+}
+
+async function loadPolicyEngineConfigUnchecked(env) {
   const profileResult = parseRuntimeProfile(env.MNDE_PROFILE);
   if (!profileResult.ok) return { ok: false, reason: profileResult.detail };
   const production = profileResult.profile === "production";

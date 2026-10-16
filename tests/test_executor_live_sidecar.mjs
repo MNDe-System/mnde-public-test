@@ -16,7 +16,7 @@ import { verifyProofBundle } from "../src/execution-ledger/proof.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const verifierPath = join(repoRoot, "tools", "verify.mjs");
-const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy.json");
+const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy-no-approval.json");
 const EXECUTOR_ID = "mnde:local:prod:executor:codex:01";
 const ENVIRONMENT_ID = "prod";
 

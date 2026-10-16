@@ -28,7 +28,7 @@ import { verifyAnyReceiptObject, verifyAnyReceiptFile } from "../tools/verify.mj
 import { startMndeSidecar } from "../executor/sidecar-harness.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy.json");
+const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy-no-approval.json");
 bootstrapReceiptKeys({ repoRoot });
 
 const results = [];

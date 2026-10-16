@@ -1245,9 +1245,27 @@ npm run verify receipt.json --approval-trust-anchors approval-anchors.json
 A receipt produced under approval enforcement is `approval_enforced: true` and
 records, per approval, the approver, issuer, approval id, validity window, and
 verification result. It can only be verified by a verifier that supplies approval
-trust anchors; a verifier with the wrong anchors does not accept it. With no
-approval trust anchors the engine is unchanged and `approval_required` has no
-effect, so existing behavior and tests are byte-for-byte preserved.
+trust anchors; a verifier with the wrong anchors does not accept it.
+
+**A policy that declares `approval_required` requires approval trust anchors.**
+The sidecar (`loadPolicyEngineConfig`) refuses to load such a policy when
+`MNDE_PE_APPROVAL_TRUST_ANCHORS` is unset, with
+`ERR_PE_APPROVAL_REQUIRED_WITHOUT_TRUST_ANCHORS`, and `mnde decide` exits non-zero
+with the same code when `--approval-trust-anchors` is missing. A refused sidecar
+configuration answers every decision with `REFUSE` / `ERR_PE_CONFIG_INVALID`.
+Before this check, a policy with `approval_required` and no anchors loaded
+normally and ALLOWed without any approval (KNOWN-ISSUES UC-002).
+
+The check is at configuration load, not in the evaluator. The evaluator itself is
+unchanged: called directly (as a library) with no `approvalTrustAnchors`, it still
+treats `approval_required` as inert. That is deliberate and frozen, because the
+receipt verifier replays the evaluator and any change would make receipts issued
+before it fail replay with "decision drift". Code that calls
+`evaluatePolicyRequest` / `buildPolicyReceipt` directly owns this check; the
+sidecar, `mnde decide` and the Hub (which always requires anchors) already do it.
+`examples/policy-engine/sample-policy.json` declares `approval_required`, so it
+needs anchors; `sample-policy-no-approval.json` is the same policy without the
+approval rule, for running a sidecar with no anchors.
 
 ## Decision Engine Modes
 
@@ -1274,7 +1292,7 @@ request body** — only from the configuration above.
 
 ```bash
 MNDE_DECISION_ENGINE=policy-engine \
-MNDE_PE_POLICY=examples/policy-engine/sample-policy.json \
+MNDE_PE_POLICY=examples/policy-engine/sample-policy-no-approval.json \
   npm run sidecar
 # in another terminal:
 npm run reviewer-kit:pe        # optional policy-engine-mode reviewer kit
@@ -1311,7 +1329,7 @@ Configuration (env/file only — never the request body):
 MNDE_SIDECAR_AUTH=bearer \
 MNDE_SIDECAR_AUTH_TOKENS='{"local-pilot-token":"pilot-caller"}' \
 MNDE_DECISION_ENGINE=policy-engine \
-MNDE_PE_POLICY=examples/policy-engine/sample-policy.json \
+MNDE_PE_POLICY=examples/policy-engine/sample-policy-no-approval.json \
   npm run sidecar
 ```
 
@@ -1345,7 +1363,7 @@ stored in receipts, or included in error output.
 MNDE_SIDECAR_AUTH=bearer \
 MNDE_SIDECAR_AUTH_TOKENS='{"local-pilot-token":"pilot-caller"}' \
 MNDE_DECISION_ENGINE=policy-engine \
-MNDE_PE_POLICY=examples/policy-engine/sample-policy.json \
+MNDE_PE_POLICY=examples/policy-engine/sample-policy-no-approval.json \
   npm run sidecar
 
 # proxy in front of an upstream MCP server (terminal 2)

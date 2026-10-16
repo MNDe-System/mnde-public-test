@@ -15,7 +15,7 @@ import { startMndeSidecar } from "../executor/sidecar-harness.mjs";
 import { verifyAnyReceiptFile } from "../tools/verify.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy.json");
+const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy-no-approval.json");
 
 function peReq(tool) {
   return {

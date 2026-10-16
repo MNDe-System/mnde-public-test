@@ -375,3 +375,5 @@ These exist as architecture or concepts in the repository but are not claimed as
 - [Tester ID implementation](docs/tester-id-implementation.md)
 - [Release checklist](docs/release-checklist.md)
 - [Security review checklist](docs/security-review-checklist.md)
+- [Known issues](docs/KNOWN-ISSUES.md)
+- [Next milestones (ranked assessment)](docs/NEXT-MILESTONES.md)

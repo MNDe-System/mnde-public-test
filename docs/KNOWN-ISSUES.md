@@ -253,30 +253,7 @@ is safe to defer written out. A finding leaves this section in one of two ways:
 it is classified, with that reason written out, or it is fixed — and a fixed one
 moves to [Resolved](#resolved), not out of the file.
 
-UC-001 left by the second route. See [Resolved](#resolved).
-
-### UC-002 — `approval_required` is inert without configured trust anchors
-
-**Recorded:** 2026-09-21 · **Component:** `src/policy-engine/index.mjs`
-
-A rule's `approval_required` is enforced only when approval trust anchors are
-configured (`approvalEnforced = Boolean(approvalTrustAnchors)`), and anchors come
-from one place, `MNDE_PE_APPROVAL_TRUST_ANCHORS`. With that unset, every
-`approval_required` has no effect and the request is allowed, and the receipt
-carries no `approval_enforced` field to mark the omission.
-
-The source documents this as deliberate and a test asserts it as intended
-behaviour.
-
-**Why it is unclassified:** it is a configuration-dependent fail-open on the one
-field whose purpose is to hold an action until a human signs off, which is a
-Category A shape. It is also documented, tested and intentional, which is not.
-Whether v1.0 may ship a policy field that silently does nothing when
-unconfigured is a contract decision, not an engineering one.
-
-The fix, if it is wanted, fails closed at startup rather than per decision:
-refuse to load a policy that declares `approval_required` when no approval trust
-anchors are configured.
+UC-001 and UC-002 both left by the second route. See [Resolved](#resolved).
 
 ---
 
@@ -364,3 +341,90 @@ signature may be presented twice.
 decision that has since been made: v1.0 will include a real production execution
 path, so the finding was Category A rather than deferrable, and it was built
 instead of classified.
+
+### UC-002 — `approval_required` is inert without configured trust anchors
+
+**Recorded:** 2026-09-21 · **Resolved:** 2026-10-16 · **Component:**
+`src/policy-engine/sidecar-adapter.mjs`, `bin/mnde.mjs`
+
+#### The finding, as recorded
+
+A rule's `approval_required` is enforced only when approval trust anchors are
+configured (`approvalEnforced = Boolean(approvalTrustAnchors)`), and anchors come
+from one place, `MNDE_PE_APPROVAL_TRUST_ANCHORS`. With that unset, every
+`approval_required` has no effect and the request is allowed, and the receipt
+carries no `approval_enforced` field to mark the omission.
+
+The source documents this as deliberate and a test asserts it as intended
+behaviour.
+
+**Why it is unclassified:** it is a configuration-dependent fail-open on the one
+field whose purpose is to hold an action until a human signs off, which is a
+Category A shape. It is also documented, tested and intentional, which is not.
+Whether v1.0 may ship a policy field that silently does nothing when
+unconfigured is a contract decision, not an engineering one.
+
+The fix, if it is wanted, fails closed at startup rather than per decision:
+refuse to load a policy that declares `approval_required` when no approval trust
+anchors are configured.
+
+#### What closed it
+
+The fail-closed-at-startup fix the finding proposed, in the two places that issue
+receipts from a configured policy:
+
+- `loadPolicyEngineConfig` (`src/policy-engine/sidecar-adapter.mjs`) now refuses
+  any policy that declares `approval_required` on any rule when no approval trust
+  anchors are configured, with `ERR_PE_APPROVAL_REQUIRED_WITHOUT_TRUST_ANCHORS`.
+  This covers all three load paths (signed bundle, `MNDE_PE_POLICY` file, and the
+  built-in default-deny policy, which has no approval rule). A refused
+  configuration makes the sidecar answer every decision `REFUSE` /
+  `ERR_PE_CONFIG_INVALID`, the same as any other config error.
+- `mnde decide` (`bin/mnde.mjs`) exits 1 with the same code, and writes no
+  receipt, when the policy declares `approval_required` and
+  `--approval-trust-anchors` is missing.
+- Any value of `approval_required` counts as a declaration, including `0`,
+  `false` and malformed values. The test is "the author asked for a human gate",
+  not "the value is valid".
+
+The Hub already required anchors unconditionally (`ERR_HUB_APPROVAL_ANCHORS`).
+
+**Why it is not in the evaluator.** The obvious fix — make
+`evaluatePolicyRequest` refuse when anchors are absent — was rejected. The receipt
+verifier replays the evaluator, so that change would make every receipt issued
+before it fail verification with "decision drift". For an audit product, breaking
+verification of historical evidence is worse than the gap. The evaluator's
+no-anchors behaviour is therefore frozen, and a test says so
+(`test:approvals`, "frozen for replay").
+
+**What it does not do.**
+
+- It does not protect code that calls `evaluatePolicyRequest` or
+  `buildPolicyReceipt` / `buildPolicyReceiptPayload` directly. Those callers still
+  get an inert `approval_required` if they pass no anchors, and own the check.
+  Verified 2026-10-16, the repository's callers are: the sidecar adapter and
+  `mnde decide` (both now covered), the Hub (requires anchors unconditionally),
+  and `scripts/authorize-git-push.mjs`, which signs a fixed constant policy
+  (`GIT_PUSH_APPROVAL_POLICY`) that contains no `approval_required` rule.
+- It does not change `approval_enforced` on receipts. A deployment that has
+  anchors configured is unchanged.
+- It does not give `hold_state` (the legacy shell/legacy-engine approval field)
+  any authentication. That is a separate, documented limitation in the README.
+
+**Behaviour change, and what it broke.** A configuration that used to boot now
+does not. In this repository that was `examples/policy-engine/sample-policy.json`
+(it declares `approval_required` for `deploy`): eight test suites and
+`reviewer-kit:pe` booted it with no anchors, relying on the silent no-op. That is
+the finding demonstrated by the repository's own examples. They now use
+`examples/policy-engine/sample-policy-no-approval.json`; `sample-policy.json` is
+unchanged because its content is hashed into receipts and fixtures, and the suites
+that test approvals still use it with anchors. The three sidecar snippets in
+`docs/mnde-policy-engine-production-spec-v1.md` were updated the same way. Anyone
+outside this repository running a policy with `approval_required` and no anchors
+will see a refusal at startup naming the missing anchors; that refusal is the fix
+working.
+
+**Tests.** `test:approvals` (loader on all branches, malformed values, CLI exit
+code and no receipt file, evaluator semantic frozen) and `test:sidecar-pe`
+(real sidecar process refuses `deploy` and `read_status` under the sample policy
+with no anchors).
