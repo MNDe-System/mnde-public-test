@@ -200,7 +200,10 @@ async function main() {
   await test("receipt fails against an invalid signature (tampered attestation)", async () => {
     const { provider, bundle } = await makeProvider();
     const out = await signReceiptForDelivery(sampleInner(), { mode: "custody", provider }, { now: NOW });
-    out.receipt.custody_attestation.signature.value = out.receipt.custody_attestation.signature.value.replace(/^../, "00");
+    // Guaranteed to change the signature: overwriting with a fixed "00" left it valid
+    // (and the test failed) on the ~1 in 256 runs where it already started with "00".
+    const original = out.receipt.custody_attestation.signature.value;
+    out.receipt.custody_attestation.signature.value = original.replace(/^../, original.startsWith("00") ? "ff" : "00");
     assert.equal((await verifyCustodyAttestation(out.receipt, { authorityBundle: bundle, trustedRootFingerprint: bundle.root_key.fingerprint, now: NOW })).reason, "SIGNATURE_INVALID");
   });
 
