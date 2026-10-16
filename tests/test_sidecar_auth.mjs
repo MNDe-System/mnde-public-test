@@ -20,7 +20,7 @@ import { buildAuthorityBundle, generateAuthorityKeyPair } from "../src/custody/i
 import { signPolicyBundle } from "../src/policy-bundles/index.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy.json");
+const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy-no-approval.json");
 const TOKEN = "good-token-123";
 const TOKENS_JSON = JSON.stringify({ [TOKEN]: "svc-caller" });
 

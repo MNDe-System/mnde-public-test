@@ -47,7 +47,7 @@ async function revokedLedgerCustody() {
 }
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy.json");
+const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy-no-approval.json");
 const CREATED_AT = "2026-06-29T00:00:00.000Z";
 const ISSUED_AT = "2026-06-29T00:05:00.000Z";
 

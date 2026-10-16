@@ -43,7 +43,7 @@ import {
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 bootstrapReceiptKeys({ repoRoot });
 
-const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy.json");
+const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy-no-approval.json");
 const EXECUTOR_ID = "mnde:test:prod:executor:posture:01";
 const ENVIRONMENT_ID = "prod";
 

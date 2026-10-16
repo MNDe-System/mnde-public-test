@@ -36,7 +36,7 @@ import { bootstrapReceiptKeys } from "../scripts/bootstrap_dev_receipt_keys.mjs"
 import { startMndeSidecar } from "../executor/sidecar-harness.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy.json");
+const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy-no-approval.json");
 
 // Ledger signing custody for the tests. SIGN_LEDGER mints signed v2 entries;
 // TRUSTED_BUNDLE is the public bundle the verifier checks them against.

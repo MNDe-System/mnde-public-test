@@ -1,0 +1,17 @@
+{
+  "status": "PENDING_APPROVAL_NOT_EXECUTED",
+  "repository": "https://github.com/MNDe-System/mnde-public-test",
+  "remote_url": "https://github.com/MNDe-System/mnde-public-test.git",
+  "target_ref": "refs/heads/mnde-proof/physical-hub",
+  "expected_old_sha": "dec31d90dc8dd129533e37b5d86cdeddde7dac5e",
+  "source_commit": "2b88c631448714b5830224b2cdfbf4f2c0e14e0c",
+  "payload": {
+    "path": "proofs/f001-acceptance-payload.txt",
+    "sha256": "20117c2c55626bf94cfc19096d0d91fd15b00f944d8a8e68f0aedc7e6a84b50e",
+    "git_blob": "b1525e866cb61380417ce38c264821b94f8fc2a9"
+  },
+  "local_clone_for_executor": "<scratch directory on the machine that prepared this; the operator re-runs scripts/f001/prepare-pending-action.mjs to get their own>",
+  "approval_required_from": "the repository operator who holds the approval (receipt-signing) key",
+  "approver_command": "node scripts/authorize-git-push.mjs --remote-url https://github.com/MNDe-System/mnde-public-test.git --target-ref refs/heads/mnde-proof/physical-hub --expected-old-sha dec31d90dc8dd129533e37b5d86cdeddde7dac5e --source-commit 2b88c631448714b5830224b2cdfbf4f2c0e14e0c --subject <approver> --out <request.json>",
+  "note": "Nothing has been pushed. The executor needs the operator's trust material, a GitHub App credential and the independent claim store; none exist in this environment."
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": "mnde.authority.bundle.v1",
+  "authority_id": "legacy-fixture-authority",
+  "issued_at": "2026-01-01T00:00:00.000Z",
+  "not_after": "2099-01-01T00:00:00.000Z",
+  "root_key": {
+    "key_id": "legacy-fixture-root",
+    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAzYgEIml0dIoA6jmtxskKZXTHAjZO2vYB4OOSkVxQT7w=\n-----END PUBLIC KEY-----\n",
+    "fingerprint": "0686cca934c81215695b589d8673e7341ab6d42c502510f1252fc4a9508bd863"
+  },
+  "keys": {
+    "receipt": [
+      {
+        "key_id": "legacy-fixture-receipt",
+        "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAXrsgyehDpVm1yqLN7ZZRsJININIYEW+DxJsT033SQT8=\n-----END PUBLIC KEY-----\n",
+        "fingerprint": "4ef8b1daaad3ee32597b81740c621d27a69b516c074d6f43228dbfd4f9c3d3ce",
+        "valid_from": "2026-01-01T00:00:00.000Z",
+        "valid_until": "2099-01-01T00:00:00.000Z"
+      }
+    ],
+    "policy": [],
+    "approval": [],
+    "result": [],
+    "ledger": [],
+    "activation": []
+  },
+  "revocation": [],
+  "signature": {
+    "algorithm": "ED25519",
+    "value": "fa2f4b003d5a645f1131d9e5ac62d9bac1c9eaf63854adb490b3693ba00ee3e75b6e94cdcad79b8e5e6894c457b257fcb3132dd2b94a3a699bfe2463df2d5602"
+  }
+}

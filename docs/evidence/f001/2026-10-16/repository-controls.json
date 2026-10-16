@@ -1,0 +1,52 @@
+{
+  "tool": "check-repository-controls",
+  "generated_at": "2026-10-16T04:17:16.394Z",
+  "ok": true,
+  "observed": {
+    "repository": "MNDe-System/mnde-public-test",
+    "proof_ref": "refs/heads/mnde-proof/physical-hub",
+    "proof_ref_controls": {
+      "rulesets_applying": [
+        "F-001.1 App-only proof updates",
+        "F-001.1 proof safety"
+      ],
+      "rule_types_applying": [
+        "deletion",
+        "non_fast_forward",
+        "update"
+      ],
+      "missing_required_rule_types": [],
+      "bypass_actors": [
+        {
+          "ruleset": "F-001.1 App-only proof updates",
+          "actor_type": "Integration",
+          "actor_id": 5105189,
+          "bypass_mode": "always"
+        }
+      ],
+      "unexpected_bypass_actors": [],
+      "human_bypass_actors": [],
+      "ok": true
+    },
+    "default_branch_controls": {
+      "rule_types_applying": [
+        "deletion",
+        "non_fast_forward",
+        "pull_request",
+        "required_status_checks"
+      ],
+      "bypass_actor_count": 0,
+      "ok": true
+    },
+    "calling_token_has_admin": true
+  },
+  "inferred": [
+    "Per configuration, only the named App can advance the proof ref and no one can delete or force-move it."
+  ],
+  "cannot_observe": [
+    "A denied push. This is a configuration read; no push was attempted.",
+    "Whether repository or organization administrators can edit or disable these rulesets. They can, so the control holds against non-admin identities only.",
+    "Rulesets inherited from the organization, if the token cannot see them.",
+    "Who holds the named App's private key."
+  ]
+}

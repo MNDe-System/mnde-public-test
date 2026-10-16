@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 
 import { buildPolicyReceipt } from "./receipt.mjs";
+import { checkIssuanceConfiguration } from "./issuance-guard.mjs";
 import { loadSignedPolicyBundleConfig } from "../policy-bundles/index.mjs";
 import { parseRuntimeProfile } from "../../shared/runtime-profile.mjs";
 import { DEFAULT_DENY_POLICY, POLICY_CONFIGURATION_STATE_NO_POLICY, POLICY_SOURCE_BUILTIN } from "./default-deny.mjs";
@@ -39,9 +40,24 @@ function loadOptionalTrustConfig(env) {
   return { ok: true, trustAnchors, approvalTrustAnchors };
 }
 
+// Re-exported for callers that already import it from here.
+export { policyDeclaresApprovalRequired, ERR_APPROVAL_REQUIRED_WITHOUT_ANCHORS as ERR_PE_APPROVAL_REQUIRED_WITHOUT_ANCHORS } from "./issuance-guard.mjs";
+
 // Load decision-engine config. Fails closed (ok:false) on any malformed/missing
 // configured file, so the sidecar can refuse rather than silently run unprotected.
+//
+// It also applies the issuance guard (./issuance-guard.mjs) so a configuration the
+// guard would refuse fails at startup with a clear reason instead of on the first
+// decision. The guard, not this function, is the authority: buildPolicyReceiptPayload
+// enforces the same rule for every direct caller.
 export async function loadPolicyEngineConfig(env) {
+  const config = await loadPolicyEngineConfigUnchecked(env);
+  if (!config.ok) return config;
+  const issuable = checkIssuanceConfiguration(config.policy, { approvalTrustAnchors: config.approvalTrustAnchors });
+  return issuable.ok ? config : { ok: false, reason: issuable.code, detail: issuable.detail };
+}
+
+async function loadPolicyEngineConfigUnchecked(env) {
   const profileResult = parseRuntimeProfile(env.MNDE_PROFILE);
   if (!profileResult.ok) return { ok: false, reason: profileResult.detail };
   const production = profileResult.profile === "production";

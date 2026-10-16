@@ -120,7 +120,16 @@ const EXCLUDE_FILES = new Set([
   // surface. prepare-git-push-trust spawns the enrolment script.
   join(repoRoot, "scripts", "prepare-git-push-trust.mjs"),
   join(repoRoot, "scripts", "authorize-git-push.mjs"),
-  join(repoRoot, "scripts", "verify-git-push-evidence.mjs")
+  join(repoRoot, "scripts", "verify-git-push-evidence.mjs"),
+  // F-001 proof toolkit (docs/F001-PROOF-PROTOCOL.md). Read-only checks and an
+  // evidence collector, run by an operator from a source checkout. They read
+  // GitHub (GET only), run `git` against a scratch directory, and verify evidence;
+  // none belongs in a deployed executor or in the tarball's spawn / API surface.
+  join(repoRoot, "scripts", "f001", "lib.mjs"),
+  join(repoRoot, "scripts", "f001", "check-agent-environment.mjs"),
+  join(repoRoot, "scripts", "f001", "check-repository-controls.mjs"),
+  join(repoRoot, "scripts", "f001", "prepare-pending-action.mjs"),
+  join(repoRoot, "scripts", "f001", "collect-evidence.mjs")
 ].map((p) => p.toLowerCase()));
 
 function isExcluded(absPath) {

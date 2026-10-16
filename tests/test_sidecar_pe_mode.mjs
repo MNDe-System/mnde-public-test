@@ -23,6 +23,10 @@ import { verifyAnyReceiptFile } from "../tools/verify.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const samplePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy.json");
+// Phase 1 boots without approval trust anchors. A policy that declares
+// approval_required is refused at config load in that case (UC-002), so phase 1
+// uses the variant with no approval rule; phase 2 uses the real sample WITH anchors.
+const samplePolicyNoApproval = join(repoRoot, "examples", "policy-engine", "sample-policy-no-approval.json");
 
 const results = [];
 async function test(name, fn) {
@@ -54,7 +58,7 @@ async function main() {
   // ── Phase 1: PE mode, policy only (receipts non-enforced) ──────────────────
   // Dedicated port: 8787 is the sidecar's real default, so a developer's live
   // sidecar may legitimately own it while tests run.
-  const a = await startMndeSidecar({ url: "http://127.0.0.1:8809", env: { MNDE_DECISION_ENGINE: "policy-engine", MNDE_PE_POLICY: samplePolicy } });
+  const a = await startMndeSidecar({ url: "http://127.0.0.1:8809", env: { MNDE_DECISION_ENGINE: "policy-engine", MNDE_PE_POLICY: samplePolicyNoApproval } });
   try {
     await test("PE mode ALLOW returns a policy-engine receipt that verifies offline", async () => {
       const res = await decide(a.url, peReq("read_status"));
@@ -160,6 +164,23 @@ async function main() {
     });
   } finally {
     await c.stop();
+  }
+
+  // ── Phase 4: UC-002 — approval_required with no approval anchors is refused ─
+  // The sample policy declares approval_required. Booting it with no approval
+  // trust anchors used to load fine and ALLOW `deploy` with no approval at all.
+  const d = await startMndeSidecar({ url: "http://127.0.0.1:8797", env: { MNDE_DECISION_ENGINE: "policy-engine", MNDE_PE_POLICY: samplePolicy, MNDE_BIND_PORT: "8797", MNDE_RECEIPT_LOG: join(mkdtempSync(join(tmpdir(), "mnde-pe-d-")), "r.jsonl") } });
+  try {
+    await test("PE mode: approval_required policy with no approval anchors REFUSES everything (UC-002)", async () => {
+      for (const tool of ["deploy", "read_status"]) {
+        const res = await decide(d.url, peReq(tool));
+        assert.equal(res.decision, "REFUSE", `${tool} must not be allowed under a policy whose approval gate cannot be verified`);
+        assert.equal(res.reason_code, "ERR_PE_CONFIG_INVALID");
+        assert.match(JSON.stringify(res), /ERR_PE_APPROVAL_REQUIRED_WITHOUT_TRUST_ANCHORS/);
+      }
+    });
+  } finally {
+    await d.stop();
   }
 
   const failed = results.filter((ok) => !ok).length;

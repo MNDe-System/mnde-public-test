@@ -304,7 +304,7 @@ async function main() {
   const { dirname, join } = await import("node:path");
   const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
   const PE_URL = "http://127.0.0.1:8811";
-  const pePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy.json");
+  const pePolicy = join(repoRoot, "examples", "policy-engine", "sample-policy-no-approval.json");
   const peSidecar = await startMndeSidecar({ url: PE_URL, testerId: "EXEC-FC-PE", env: { MNDE_DECISION_ENGINE: "policy-engine", MNDE_PE_POLICY: pePolicy } });
   let peReceipt = null;
   const PE_ID = "fc-pe-allow-001";

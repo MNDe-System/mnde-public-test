@@ -467,7 +467,7 @@ if (DECISION_ENGINE === "policy-engine") {
       policyConfigurationState = peConfig.policy_configuration_state ?? null;
     }
     const stateNote = policyConfigurationState ? ` (${policyConfigurationState}: built-in default-deny policy active; every decision REFUSES until a policy is installed)` : "";
-    process.stdout.write(`MNDe decision engine: policy-engine${policyEngineConfigError ? ` (CONFIG ERROR: ${policyEngineConfigError})` : stateNote}\n`);
+    process.stdout.write(`MNDe decision engine: policy-engine${policyEngineConfigError ? ` (CONFIG ERROR: ${policyEngineConfigError}${peConfig.detail ? ` - ${peConfig.detail}` : ""})` : stateNote}\n`);
   } catch (error) {
     policyEngineConfigError = error instanceof Error ? error.message : String(error);
     process.stderr.write(`MNDe policy-engine adapter failed to load: ${policyEngineConfigError}\n`);

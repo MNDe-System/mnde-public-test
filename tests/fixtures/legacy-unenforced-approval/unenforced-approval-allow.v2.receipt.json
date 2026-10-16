@@ -1,0 +1,33 @@
+{
+  "schema_version": "mnde.pe.receipt.v2",
+  "canonical_request": "{\"agent\":{\"id\":\"agent-1\"},\"context\":{},\"environment\":{},\"parameters\":{},\"principal\":{\"id\":\"alice\"},\"request_id\":\"legacy-deploy-1\",\"schema_version\":\"1.0\",\"timestamp\":\"2026-06-14T12:00:00.000Z\",\"tool\":{\"tool_name\":\"deploy\"}}",
+  "canonical_policy": "{\"policy_id\":\"legacy-approval-policy\",\"rules\":[{\"effect\":\"ALLOW\",\"match\":{\"field\":\"tool.tool_name\",\"op\":\"eq\",\"value\":\"read_status\"},\"rule_id\":\"allow-read-status\"},{\"approval_required\":1,\"effect\":\"ALLOW\",\"match\":{\"field\":\"tool.tool_name\",\"op\":\"eq\",\"value\":\"deploy\"},\"rule_id\":\"allow-deploy-with-approval\"}],\"schema_version\":\"1.0\",\"state\":\"ACTIVE\",\"version\":\"1\"}",
+  "authorities": [],
+  "trust_enforced": false,
+  "request_hash": "sha256:4a7df6b21d644b00a6b26c26d847a769c08d499d42b52e9215848f3462c0bcad",
+  "policy_hash": "sha256:fd3b0726f5659af20758ffce5649812f4e28e7d5011ac7969c07e10ea48c6cb2",
+  "authority_chain_hash": "sha256:0e67d38d9f7f4591e52cbb7e31f1dc9f755ff53ce6fedcc6f884317a98b4b7e9",
+  "execution_status": "DISABLED",
+  "decision_output": {
+    "schema_version": "2.0",
+    "decision": "ALLOW",
+    "reason_code": "OK_ALLOW",
+    "rule_id": "allow-deploy-with-approval",
+    "request_id": "legacy-deploy-1",
+    "policy_id": "legacy-approval-policy",
+    "policy_version": "1",
+    "policy_hash": "sha256:fd3b0726f5659af20758ffce5649812f4e28e7d5011ac7969c07e10ea48c6cb2",
+    "authority_chain_hash": "sha256:0e67d38d9f7f4591e52cbb7e31f1dc9f755ff53ce6fedcc6f884317a98b4b7e9",
+    "decision_hash": "sha256:f8385a61615b74f3c4c33a7ddf54355ba53054122e51f7e6e50fa71cadb3a4fd",
+    "request_hash": "sha256:4a7df6b21d644b00a6b26c26d847a769c08d499d42b52e9215848f3462c0bcad",
+    "evaluated_at": "2026-06-14T12:00:00.000Z"
+  },
+  "verifiable_signature": {
+    "algorithm": "ED25519",
+    "authority_id": "legacy-fixture-authority",
+    "key_id": "legacy-fixture-receipt",
+    "public_key_fingerprint": "4ef8b1daaad3ee32597b81740c621d27a69b516c074d6f43228dbfd4f9c3d3ce",
+    "signed_at": "2026-06-14T12:00:00.000Z",
+    "value": "1f47ecd11a189648716aaccfcc5e1189e771615557a9137f5284eb353b35bc27704ad67ecab69e9407c80f2f03abc9c74687e6b9eaa5d7b3c10828c12158cb00"
+  }
+}
