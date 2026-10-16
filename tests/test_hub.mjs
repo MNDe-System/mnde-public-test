@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, readdirSync, renameSync, rmdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { generateKeyPairSync, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { startHub } from "../src/hub/service.mjs";
 import { createGitPushExecutor } from "../src/effects/git-push/index.mjs";
@@ -388,6 +388,27 @@ await test("failed durable lock write latches refusal even if old unlocked bytes
     assert.equal((await f.api("/readyz")).body.state, "DEGRADED");
     assert.equal((await f.api("/v1/unlock", {})).status, 503);
   } finally { await f.hub.close(); }
+});
+
+await test("unusable approval anchors never unlock the Hub or reach the executor (UC-002)", async () => {
+  // The Hub starts LOCKED and opens its authorization on unlock, so the refusal is
+  // observed there. Before the issuance guard it only checked that the anchors value
+  // was truthy: `{}` or an empty key set was accepted and the Hub went ACTIVE with an
+  // approval_required rule nothing could ever satisfy, and no startup error.
+  const rsa = generateKeyPairSync("rsa", { modulusLength: 2048 }).publicKey.export({ type: "spki", format: "pem" });
+  for (const [label, anchors] of [["empty object", {}], ["empty key set", { approval_keys: [] }], ["RSA key", { approval_keys: [{ key_id: "x", public_key: rsa }] }], ["null", null]]) {
+    const f = await fixture({ MNDE_PE_APPROVAL_TRUST_ANCHORS: file(`bad-anchors-${count}.json`, JSON.stringify(anchors)) });
+    try {
+      const unlock = await f.api("/v1/unlock", {});
+      assert.notEqual(unlock.status, 200, `unlock succeeded with unusable approval anchors (${label})`);
+      assert.notEqual(unlock.body.state, "ACTIVE", label);
+      assert.notEqual((await f.api("/readyz")).status, 200, label);
+      const action = await f.api("/v1/actions", f.request("main"));
+      assert.notEqual(action.status, 200, `an action was accepted with unusable approval anchors (${label})`);
+      assert.equal(globalThis.__hubObservation.executions, 0, `the executor ran (${label})`);
+      assert.equal(globalThis.__hubObservation.acquisitions, 0, `a credential was acquired (${label})`);
+    } finally { await f.hub.close(); }
+  }
 });
 
 await test("normal logs contain no API credential or private key", async () => {

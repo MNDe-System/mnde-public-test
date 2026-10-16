@@ -14,7 +14,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { buildContext, discover, planDeployment, buildDraft, apply, uninstall, status } from "../src/onboarding/index.mjs";
 import { buildPolicyReceipt, verifyPolicyReceipt } from "../src/policy-engine/receipt.mjs";
-import { policyDeclaresApprovalRequired } from "../src/policy-engine/sidecar-adapter.mjs";
+import { checkIssuanceConfiguration } from "../src/policy-engine/issuance-guard.mjs";
 import { getReleaseIdentity, formatReleaseIdentity } from "../src/release/identity.mjs";
 
 const argv = process.argv.slice(2);
@@ -184,12 +184,12 @@ async function main() {
     const trustAnchors = trustAnchorsPath ? JSON.parse(readFileSync(trustAnchorsPath, "utf8")) : undefined;
     const approvals = approvalsPath ? JSON.parse(readFileSync(approvalsPath, "utf8")) : undefined;
     const approvalTrustAnchors = approvalAnchorsPath ? JSON.parse(readFileSync(approvalAnchorsPath, "utf8")) : undefined;
-    if (!approvalTrustAnchors && policyDeclaresApprovalRequired(policy)) {
-      // Same refusal as the sidecar's configuration load (UC-002): without approval
-      // trust anchors the engine would skip `approval_required` and ALLOW unapproved.
-      line("REFUSED: the policy declares approval_required but no --approval-trust-anchors were given,");
-      line("so approvals cannot be verified and the gate would silently do nothing.");
-      line("Error: ERR_PE_APPROVAL_REQUIRED_WITHOUT_TRUST_ANCHORS");
+    // Same routine as the sidecar and every other issuer (issuance-guard.mjs), run
+    // here so the operator gets the code and a non-zero exit with no receipt written.
+    const issuable = checkIssuanceConfiguration(policy, { approvalTrustAnchors });
+    if (!issuable.ok) {
+      line(`REFUSED: ${issuable.detail}.`);
+      line(`Error: ${issuable.code}`);
       process.exitCode = 1;
       return;
     }

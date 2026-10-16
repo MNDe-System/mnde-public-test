@@ -53,6 +53,7 @@
   "test:historical-policy-bundle",
   "test:hub",
   "test:identity-assertion",
+  "test:issuance-guard",
   "test:layered-receipt-verification",
   "test:ledger-anchor",
   "test:ledger-auth",

@@ -18,6 +18,7 @@ import { RECEIPT_SIGNATURE_ALGORITHM, signReceiptPayload, verifyReceiptPayloadSi
 import { findAuthorityReceiptKey, loadAuthorityBundle, loadAuthorityBundleForReceipt, REPO_LOCAL_TRUST_SOURCE } from "../../shared/authority-manifest.mjs";
 import { findBundleKey, fingerprintOf, verifyAuthorityBundle } from "../custody/index.mjs";
 import { evaluatePolicyRequest } from "./index.mjs";
+import { assertIssuanceConfiguration } from "./issuance-guard.mjs";
 import { EXECUTION_STATUS_DISABLED, receiptExecutionStatus } from "../execution-availability/index.mjs";
 import { verifyHistoricalPolicyBundleProvenance } from "../policy-bundles/index.mjs";
 
@@ -94,6 +95,12 @@ async function verifyReceiptSignatureWithAuthorityBundle(receipt, signature, opt
 // the repo-local authority; a production issuer signs it with its own custody key
 // (scripts/authorize-git-push.mjs). The payload is identical either way.
 export function buildPolicyReceiptPayload(request, policy, options = {}) {
+  // NEW issuance only. Refuses, before anything is evaluated, a configuration that
+  // would let an approval-controlled action be authorized without a working
+  // approval gate (docs/KNOWN-ISSUES.md UC-002). Verification and replay do not
+  // pass through here (`verifyPolicyReceipt` calls the evaluator directly), so
+  // receipts issued before this check still verify. Do not add an opt-out.
+  assertIssuanceConfiguration(policy, { approvalTrustAnchors: options.approvalTrustAnchors });
   // Default to the frozen v1 receipt format; v2 is opt-in via options.receiptSchema.
   const receiptSchema = options.receiptSchema ?? SCHEMA;
   const decisionSchemaVersion = RECEIPT_TO_DECISION_SCHEMA.get(receiptSchema);
