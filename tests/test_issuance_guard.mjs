@@ -470,6 +470,67 @@ test("coverage: the evaluator is called by new-issuance code only through the ch
   assert.deepEqual(callers.sort(), ["src/policy-engine/index.mjs", "src/policy-engine/receipt.mjs"]);
 });
 
+// ── 7b. exposure audit: find receipts issued while the gate was off ─────────
+import { classifyReceipt } from "../tools/audit-unenforced-approvals.mjs";
+test("audit: both pre-guard fixtures are flagged as ALLOWED_WITHOUT_ENFORCED_APPROVAL", () => {
+  const v2 = classifyReceipt(legacy("v2"));
+  assert.equal(v2.finding, "ALLOWED_WITHOUT_ENFORCED_APPROVAL");
+  assert.equal(v2.certainty, "CONFIRMED_FROM_RECEIPT_CONTENT");
+  assert.equal(v2.rule_id, "allow-deploy-with-approval");
+  const v1 = classifyReceipt(legacy("v1"));
+  assert.equal(v1.finding, "ALLOWED_WITHOUT_ENFORCED_APPROVAL");
+  assert.match(v1.certainty, /^POSSIBLE/, "a v1 receipt does not name the deciding rule, so it cannot be confirmed");
+});
+test("audit: an approval-enforced receipt, a plain-policy receipt, and non-receipts are not flagged", () => {
+  const enforced = buildPolicyReceiptPayload(request(), approvalPolicy(), { now: NOW, approvalTrustAnchors: goodAnchors() });
+  assert.equal(classifyReceipt(enforced), null);
+  assert.equal(classifyReceipt(buildPolicyReceiptPayload(request("read_status"), plainPolicy(), { now: NOW })), null);
+  for (const junk of [null, 5, "x", {}, { canonical_policy: "{not json", schema_version: "mnde.pe.receipt.v1" }, { canonical_policy: "{}", schema_version: "other" }]) assert.equal(classifyReceipt(junk), null);
+});
+test("audit: a gate-off receipt whose decision was a REFUSE is reported as GATE_NOT_ENFORCED, not as an unauthorized ALLOW", () => {
+  const r = JSON.parse(JSON.stringify(legacy("v2")));
+  r.decision_output.decision = "REFUSE";
+  assert.equal(classifyReceipt(r).finding, "GATE_NOT_ENFORCED");
+});
+test("audit: the CLI scans a directory, JSONL logs and custody envelopes; exits 1 on findings, 0 on none", () => {
+  const dir2 = scratch();
+  try {
+    writeFileSync(join(dir2, "log.jsonl"), `${JSON.stringify(legacy("v2"))}\n${JSON.stringify({ unrelated: true })}\n`);
+    writeFileSync(join(dir2, "envelope.json"), JSON.stringify({ receipt: legacy("v1"), custody_attestation: {} }));
+    const hit = spawnSync(process.execPath, [join(repoRoot, "tools", "audit-unenforced-approvals.mjs"), dir2], { encoding: "utf8" });
+    assert.equal(hit.status, 1);
+    const report = JSON.parse(hit.stdout);
+    assert.equal(report.flagged, 2);
+    assert.equal(report.allowed_without_enforced_approval, 2);
+    const clean = scratch();
+    writeFileSync(join(clean, "ok.json"), JSON.stringify(buildPolicyReceiptPayload(request("read_status"), plainPolicy(), { now: NOW })));
+    assert.equal(spawnSync(process.execPath, [join(repoRoot, "tools", "audit-unenforced-approvals.mjs"), clean], { encoding: "utf8" }).status, 0);
+    rmSync(clean, { recursive: true, force: true });
+  } finally { rmSync(dir2, { recursive: true, force: true }); }
+});
+
+// ── 8. KNOWN LIMIT (UC-005): approvals are not action-bound ─────────────────
+// Characterization, not endorsement. These cases pin what the approval verifier does
+// TODAY so that tightening it is a deliberate, visible change. The Hub path is safe
+// from this in practice (it only accepts approvals whose scope.request_id is its own
+// action record, and keeps the request server-side); the sidecar policy-engine path
+// is not, because the caller supplies both request_id and parameters.
+import { signApproval } from "../src/policy-engine/authenticated-approvals.mjs";
+test("UC-005 (known limit): an approval scoped to a tool name is reusable across requests and parameters until it expires", () => {
+  const a = signApproval({ approval_id: "ap1", approver: { id: "carol" }, issuer: { id: "svc" }, issued_at: "2026-06-14T11:00:00.000Z", expires_at: "2026-06-14T13:00:00.000Z", scope: { tool_name: "deploy" } }, { keyId: "approval-key-1", privateKeyPem: goodKey.priv });
+  const run = (r) => evaluatePolicyRequest(r, approvalPolicy(), { now: NOW, approvals: [a], approvalTrustAnchors: goodAnchors() }).decision;
+  assert.equal(run({ ...request("deploy"), request_id: "A", parameters: { target: "staging" } }), "ALLOW");
+  assert.equal(run({ ...request("deploy"), request_id: "B", parameters: { target: "prod" } }), "ALLOW", "UC-005: not bound to parameters or request");
+});
+test("UC-005 (known limit): a request_id-bound approval still does not bind the parameters, and '*' is an accepted tool scope", () => {
+  const sign = (scope) => signApproval({ approval_id: "ap2", approver: { id: "carol" }, issuer: { id: "svc" }, issued_at: "2026-06-14T11:00:00.000Z", expires_at: "2026-06-14T13:00:00.000Z", scope }, { keyId: "approval-key-1", privateKeyPem: goodKey.priv });
+  const run = (a, r) => evaluatePolicyRequest(r, approvalPolicy(), { now: NOW, approvals: [a], approvalTrustAnchors: goodAnchors() }).decision;
+  const bound = sign({ tool_name: "deploy", request_id: "A" });
+  assert.equal(run(bound, { ...request("deploy"), request_id: "B" }), "REFUSE", "a different request_id is refused");
+  assert.equal(run(bound, { ...request("deploy"), request_id: "A", parameters: { target: "prod" } }), "ALLOW", "UC-005: same request_id, different parameters");
+  assert.equal(run(sign({ tool_name: "*" }), { ...request("deploy"), request_id: "C" }), "ALLOW", "UC-005: wildcard scope");
+});
+
 await chain;
 const failed = results.filter((ok) => !ok).length;
 console.log("");

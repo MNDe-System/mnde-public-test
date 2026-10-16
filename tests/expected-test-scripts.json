@@ -38,6 +38,7 @@
   "test:executor-readiness",
   "test:executor-signer-load",
   "test:external-signer",
+  "test:f001-proof-tools",
   "test:feline",
   "test:fresh-setup",
   "test:freshness-boundary",

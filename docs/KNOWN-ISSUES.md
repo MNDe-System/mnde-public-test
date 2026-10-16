@@ -253,7 +253,59 @@ is safe to defer written out. A finding leaves this section in one of two ways:
 it is classified, with that reason written out, or it is fixed — and a fixed one
 moves to [Resolved](#resolved), not out of the file.
 
-UC-001 and UC-002 both left by the second route. See [Resolved](#resolved).
+UC-001 and UC-002 both left by the second route. See [Resolved](#resolved). UC-003 to UC-005 below are new and unclassified.
+
+### UC-003 — Request-body authority grants are accepted unverified without trust anchors
+
+**Recorded:** 2026-10-16 · **Component:** `src/policy-engine/index.mjs` (`effectiveAuthorities`, the `!trustAnchors` branch)
+
+When `trustAnchors` is absent, a legacy authority grant attached to the request is
+pushed into `effectiveAuthorities` without checking its signature ("inert —
+unchanged legacy behavior"). A rule with `authority_required` is then satisfied by
+an unsigned grant the caller wrote. Production sets `rejectLegacyAuthorities` and is
+guarded (`test:signed-policy-bundle`: "production refuses request-body legacy
+authority without trusted anchors"); non-production and `mnde decide` are not. It is
+the same fail-open shape as UC-002 on a different field.
+
+**Why it is unclassified:** it is documented, tested, and guarded where it matters, but
+the contract question is the same one UC-002 asked: may a policy field silently do
+nothing when its trust configuration is absent? Applying the UC-002 treatment (refuse
+issuance when a policy declares `authority_required` and no `trustAnchors` are
+configured) is a small change to the issuance guard, but it would break the
+non-production demos that rely on unsigned grants. That is a product decision.
+
+### UC-004 — The package has no `exports` map, so internals can be deep-imported
+
+**Recorded:** 2026-10-16 · **Component:** `package.json`
+
+`files` is `["dist", "README.md"]` and there is no `main` or `exports`. Any file under
+`dist/` can be imported directly, including `dist/src/policy-engine/index.mjs`, whose
+`evaluatePolicyRequest` returns a decision object without any issuance guard. MNDe's own
+executors accept only signed receipts, but a third-party integration could treat that
+decision as permission. The package is `private: true` and installed from a source
+checkout, so no external consumer is known.
+
+**Why it is unclassified:** adding an `exports` map is a breaking change for anyone
+deep-importing, and which entry points are "supported" has not been decided.
+
+### UC-005 — Approvals are bound to a tool name, not to the action
+
+**Recorded:** 2026-10-16 · **Component:** `src/policy-engine/authenticated-approvals.mjs` (`scopeMatches`)
+
+An approval's scope is `tool_name` (`"*"` is accepted) and an optional `request_id`.
+Parameters are not bound, and an approval is reusable until `expires_at`. Observed by
+running it: one approval scoped to `deploy` allowed both a `staging` and a `prod`
+request under different request ids; a `request_id`-bound approval allowed the same id
+with different parameters. The Hub path is protected in practice (it accepts only
+approvals scoped to its own action record and keeps the request server-side). The
+sidecar policy-engine path is not, because the caller supplies the request id and the
+parameters. Pinned by the `UC-005 (known limit)` cases in `test:issuance-guard`.
+
+**Why it is unclassified:** the fix (an optional, additive scope field such as a
+request hash, enforced when present, and required for new issuance) changes what an
+approver signs and so what tooling must produce. Whether v1.0 requires it is a contract
+decision. It must stay additive or historical approvals embedded in receipts will fail
+replay.
 
 ---
 
@@ -399,13 +451,11 @@ no-anchors behaviour is therefore frozen, and a test says so
 
 **What it does not do.**
 
-- It does not protect code that calls `evaluatePolicyRequest` or
-  `buildPolicyReceipt` / `buildPolicyReceiptPayload` directly. Those callers still
-  get an inert `approval_required` if they pass no anchors, and own the check.
-  Verified 2026-10-16, the repository's callers are: the sidecar adapter and
-  `mnde decide` (both now covered), the Hub (requires anchors unconditionally),
-  and `scripts/authorize-git-push.mjs`, which signs a fixed constant policy
-  (`GIT_PUSH_APPROVAL_POLICY`) that contains no `approval_required` rule.
+- (As of PR #58 alone.) It did not protect code that called `evaluatePolicyRequest` or
+  `buildPolicyReceipt` / `buildPolicyReceiptPayload` directly. **Superseded by the
+  guarded-issuance follow-up below**, which moves the check into
+  `buildPolicyReceiptPayload` itself. Calling the evaluator directly is still
+  unguarded by design (see "Guarded issuance").
 - It does not change `approval_enforced` on receipts. A deployment that has
   anchors configured is unchanged.
 - It does not give `hold_state` (the legacy shell/legacy-engine approval field)
@@ -428,3 +478,33 @@ working.
 code and no receipt file, evaluator semantic frozen) and `test:sidecar-pe`
 (real sidecar process refuses `deploy` and `read_status` under the sample policy
 with no anchors).
+
+#### Guarded issuance (follow-up to PR #58, 2026-10-16)
+
+Reviewing PR #58 as a security change found it incomplete: anchors were never
+validated (`{}`, an empty key set and RSA/EC keys counted as "configured", so the
+Hub went ACTIVE with a gate nothing could satisfy); a malformed `approval_required`
+was caught only at decision time and only with anchors; direct callers of
+`buildPolicyReceipt*` bypassed the check; and an unknown rule key (a typo'd gate,
+for example `requires_approval`) was ignored.
+
+`src/policy-engine/issuance-guard.mjs` is now the single routine for new issuance,
+called from `buildPolicyReceiptPayload` (the chokepoint), `loadPolicyEngineConfig`
+and `mnde decide`. The evaluator and `verifyPolicyReceipt` are untouched, and a
+fixture issued by pre-guard code (`tests/fixtures/legacy-unenforced-approval/`) still
+verifies. Full review, caller matrix, API contract, migration plan and the evidence:
+[UC-002-SECURITY-REVIEW.md](UC-002-SECURITY-REVIEW.md). Exposure of already-issued
+receipts: `npm run audit:unenforced-approvals`.
+
+Still open after this entry: UC-003, UC-004 and UC-005 below.
+
+### TF-001 — A signature-tamper test could pass vacuously (1 run in 256)
+
+**Recorded and resolved:** 2026-10-16 · **Component:** `tests/test_production_signing.mjs`
+
+The case "receipt fails against an invalid signature (tampered attestation)" overwrote
+the first two hex characters of an Ed25519 signature with `00`. When the signature
+already began with `00` nothing changed, the signature stayed valid and the assertion
+saw no failure reason. Seen once in a full `npm run ci` on Node 24.22.0; the suite passed
+3/3 re-run alone. It is not KI-005 (that is about runtime-health stalls on Windows), and
+it is not the product. The tamper now always changes the value. No assertion was weakened.

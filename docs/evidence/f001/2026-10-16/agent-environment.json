@@ -1,0 +1,37 @@
+{
+  "tool": "check-agent-environment",
+  "generated_at": "2026-10-16T04:17:14.787Z",
+  "ok": false,
+  "observed": {
+    "credential_like_items": [
+      {
+        "kind": "environment_variable",
+        "name": "GH_TOKEN",
+        "push_capable_by_name": true
+      },
+      {
+        "kind": "environment_variable",
+        "name": "GITHUB_TOKEN",
+        "push_capable_by_name": true
+      }
+    ],
+    "git_credential_helper_configured": false,
+    "github_probe": {
+      "performed": true,
+      "http_status": 200,
+      "token_permissions_on_repository": {
+        "push": true,
+        "admin": true
+      }
+    },
+    "other_credential_like_items_withheld": 5
+  },
+  "inferred": [
+    "At least one item is named like a GitHub/git credential. Whether it is valid is not tested."
+  ],
+  "cannot_observe": [
+    "Credentials held outside this process's environment and home directory (other users, a keychain, a secrets agent, a network proxy that injects credentials).",
+    "Whether a credential-shaped variable is actually valid. Only the optional GitHub probe tests one token, and only for the repository named."
+  ],
+  "redaction": "Committed copy: names of credential-shaped variables unrelated to GitHub were withheld (host internals; values were never recorded). Count preserved above."
+}
