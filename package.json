@@ -170,6 +170,7 @@
     "test:git-push-credential-custody": "node ./tests/test_git_push_credential_custody.mjs",
     "test:git-push-effect": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_effect.mjs",
     "test:git-push-first-run": "node ./tests/test_git_push_first_run.mjs",
+    "test:git-push-evidence-v2": "node --import ./tests/support/witness_hooks.mjs ./tests/test_git_push_evidence_v2.mjs",
     "test:git-push-execution-evidence": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_execution_evidence.mjs",
     "test:git-push-isolation": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_isolation.mjs",
     "test:git-push-reachability": "node ./tests/test_git_push_reachability.mjs",

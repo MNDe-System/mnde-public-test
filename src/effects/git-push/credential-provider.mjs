@@ -392,7 +392,7 @@ export function openPushCredentialProvider(config, { forbiddenRoots = [], http =
       return Object.freeze({
         env: Object.freeze({}),
         allowProtocol,
-        metadata: Object.freeze({ ...baseMeta, credential_issuance_id: null, credential_expires_at: null, credential_fingerprint: null }),
+        metadata: Object.freeze({ ...baseMeta, credential_issuance_id: null, credential_app_id: null, credential_installation_id: null, credential_expires_at: null, credential_fingerprint: null }),
         redact: (text) => text,
         release: async () => ({ released: true })
       });
@@ -408,7 +408,7 @@ export function openPushCredentialProvider(config, { forbiddenRoots = [], http =
       return Object.freeze({
         env: Object.freeze({ GIT_SSH_COMMAND: argv.map(shellQuote).join(" "), GIT_SSH_VARIANT: "ssh" }),
         allowProtocol,
-        metadata: Object.freeze({ ...baseMeta, credential_issuance_id: null, credential_expires_at: null, credential_fingerprint: fingerprint }),
+        metadata: Object.freeze({ ...baseMeta, credential_issuance_id: null, credential_app_id: null, credential_installation_id: null, credential_expires_at: null, credential_fingerprint: fingerprint }),
         redact: (text) => text,
         release: async () => ({ released: true })
       });
@@ -443,6 +443,8 @@ export function openPushCredentialProvider(config, { forbiddenRoots = [], http =
       metadata: Object.freeze({
         ...baseMeta,
         credential_issuance_id: parsed.kind === "github-app" ? `github-app:${parsed.app_id}/installation:${parsed.installation_id}` : null,
+        credential_app_id: parsed.kind === "github-app" ? String(parsed.app_id) : null,
+        credential_installation_id: parsed.kind === "github-app" ? String(parsed.installation_id) : null,
         credential_expires_at: expiresAt,
         credential_fingerprint: fingerprint
       }),

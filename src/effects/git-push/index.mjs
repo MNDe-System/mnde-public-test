@@ -60,7 +60,7 @@ import {
   GIT_PUSH_ACTION,
   validateGitPushParameters
 } from "./validate.mjs";
-import { buildExecutionEvidenceBody, signExecutionEvidence } from "./evidence.mjs";
+import { buildExecutionEvidenceBodyV2, signExecutionEvidence } from "./evidence.mjs";
 import {
   ERR_CREDENTIAL_SUBSTITUTION,
   ERR_CREDENTIAL_UNAVAILABLE,
@@ -426,7 +426,7 @@ export function createGitPushExecutor(startup = {}) {
     if (!evidence.authorized || !nonEmptyString(evidence.execution_id)) {
       return { envelope: null, reason: "no verified authorization to bind evidence to" };
     }
-    const built = buildExecutionEvidenceBody({
+    const built = buildExecutionEvidenceBodyV2({
       execution_id: evidence.execution_id,
       grant_id: evidence.grant_id,
       authorization_receipt_hash: evidence.receipt_hash ?? null,
@@ -452,7 +452,23 @@ export function createGitPushExecutor(startup = {}) {
       effect_attempted: evidence.effect_attempted === true,
       outcome: evidence.outcome,
       reason_code: evidence.reason_code ?? null,
-      recorded_at: evidence.recorded_at
+      recorded_at: evidence.recorded_at,
+      // v2: the durable start record, the credential last used (metadata only, never a token) and the witness entry.
+      execution_start: evidence.execution_start ?? null,
+      push_credential: evidence.push_credential ? {
+        kind: evidence.push_credential.credential_provider_kind,
+        access: evidence.push_credential.credential_access,
+        scope: evidence.push_credential.credential_scope,
+        app_id: evidence.push_credential.credential_app_id ?? null,
+        installation_id: evidence.push_credential.credential_installation_id ?? null,
+        expires_at: evidence.push_credential.credential_expires_at ?? null
+      } : null,
+      witness: evidence.claim?.witness ? {
+        witness_id: evidence.claim.witness.witness_id,
+        key_id: evidence.claim.witness.key_id,
+        n: evidence.claim.witness.n,
+        entry_digest: evidence.claim.witness.entry_digest
+      } : null
     });
     if (!built.ok) return { envelope: null, reason: built.detail ?? built.reason_code };
 
@@ -521,7 +537,8 @@ export function createGitPushExecutor(startup = {}) {
       ensureEvidenceDirectory();
       const path = join(evidenceDir, startRecordName(execution_id));
       fd = openSync(path, "wx");
-      writeFileSync(fd, `${JSON.stringify({
+      const startedAt = new Date().toISOString();
+      const text = `${JSON.stringify({
         schema: EXECUTION_START_SCHEMA,
         execution_id,
         grant_id: grant_id ?? null,
@@ -529,14 +546,16 @@ export function createGitPushExecutor(startup = {}) {
         namespace: ns,
         authorized,
         witness: witnessRef,
-        started_at: new Date().toISOString()
-      }, null, 2)}\n`, "utf8");
+        started_at: startedAt
+      }, null, 2)}\n`;
+      writeFileSync(fd, text, "utf8");
       fsyncSync(fd);
       const writtenFd = fd;
       fd = null; // Do not retry close after an error: descriptor state is unknown.
       closeSync(writtenFd);
       syncDirectory(dirname(path));
-      return { ok: true, path };
+      // The signed evidence references this exact file by digest, so the record cannot be swapped afterwards.
+      return { ok: true, path, record_sha256: sha256(text), started_at: startedAt };
     } catch (error) {
       return { ok: false, detail: String(error?.code ?? error?.message ?? error) };
     } finally {
@@ -954,8 +973,10 @@ export function createGitPushExecutor(startup = {}) {
         { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
     }
 
+    const startRef = { record_sha256: started.record_sha256, started_at: started.started_at };
+
     // ── 12. THE EFFECT ───────────────────────────────────────────────────────
-    if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized, claim: claimMeta });
+    if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized, claim: claimMeta, execution_start: startRef });
     const pushed = await performPush(argv, writeContext, claim.ticket);
 
     // ── 13. Believe the remote, not the exit code ────────────────────────────
@@ -978,6 +999,7 @@ export function createGitPushExecutor(startup = {}) {
         stderr: (pushed.stderr ?? "").slice(0, 4096)
       },
       effect_attempted: true,
+      execution_start: startRef,
       observed: { before: before.sha, after: after.ok ? after.sha : null },
       recorded_at: new Date().toISOString()
     };
