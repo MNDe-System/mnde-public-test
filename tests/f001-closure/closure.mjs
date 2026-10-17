@@ -666,9 +666,13 @@ if (emu) await emu.close();
 
 // ── report ──────────────────────────────────────────────────────────────────
 const file = join(OUT, SRC === ROOT ? "results.json" : `results-control-preremediation-${[...only].join("-") || "all"}.json`);
-let head = "";
-try { head = git(["rev-parse", "HEAD"], SRC); } catch { head = "unknown"; }
-writeFileSync(file, `${JSON.stringify({ generated_at: new Date().toISOString(), tree: SRC, tree_head: head, node: process.version,
+let head = "", dirty = "unknown";
+try {
+  head = git(["rev-parse", "HEAD"], SRC);
+  // Anything modified or untracked outside the evidence directory means the results do not describe `head`.
+  dirty = git(["status", "--porcelain", "--", ".", ":(exclude)docs/evidence"], SRC).split("\n").filter(Boolean);
+} catch { head = "unknown"; }
+writeFileSync(file, `${JSON.stringify({ generated_at: new Date().toISOString(), tree: SRC, tree_head: head, tree_dirty_paths: dirty, node: process.version,
   postgres: sql("show server_version"), results }, null, 2)}\n`);
 const failed = results.filter((r) => r.status !== "PASS");
 console.log(`\n${failed.length ? "FAIL" : "PASS"} f001 closure (${results.length - failed.length}/${results.length}) -> ${file}`);
