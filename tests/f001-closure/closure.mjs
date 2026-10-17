@@ -716,8 +716,8 @@ await scenario("D1", "executor database login cannot administer: roles, replicat
     // Topology facts about THIS rig (honest limits, not security properties):
     const dataOwner = execFileSync("stat", ["-c", "%U", join(PG, "data")], { encoding: "utf8" }).trim();
     return { statements_refused: refused, legitimate_bound_namespace: legit.stdout.trim(), executor_role_flags_super_createrole_createdb_replication_bypassrls_inherit: role,
-      rig_topology_NOT_independent: { postgres_data_dir_owner_os_user: dataOwner, harness_and_executor_os_user: process.env.USER ?? "root",
-        note: "executor and database share one machine and the harness runs as root, which can read, replace and restore the data directory; administrative independence is NOT demonstrated by this rig" } };
+      rig_topology_NOT_independent: { postgres_data_dir_owner_os_user: dataOwner, executor_os_user: RUN_AS || "root (F001_RUN_AS unset)", harness_os_user: process.env.USER ?? "root",
+        note: "executor and database share one machine and root can read, replace and restore the data directory; the executor OS identity is unprivileged (see S1) but administrative independence is NOT demonstrated by this rig" } };
   });
 
 const blockedUnless = (cond, why) => { if (!cond) throw Object.assign(new Error(why), { blocked: true }); };
