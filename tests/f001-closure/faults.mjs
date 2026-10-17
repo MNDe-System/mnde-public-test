@@ -32,7 +32,13 @@ import { registerHooks, syncBuiltinESMExports } from "node:module";
 
 const fault = process.env.MNDE_F001_FAULT ?? "";
 const log = (line) => { try { if (process.env.MNDE_F001_LOG) fs.appendFileSync(process.env.MNDE_F001_LOG, `${line}\n`); } catch { /* best effort */ } };
-export const die = (where) => { log(`SIGKILL@${where}`); process.kill(process.pid, "SIGKILL"); };
+// MNDE_F001_PAUSE=1 turns every injected death into a PAUSE: the process logs PAUSED@<where> and blocks
+// forever with every durable write up to that boundary already done. A human then cuts real power
+// (docs/F001-POWER-LOSS-RUNBOOK.md). A SIGKILL is not a power cut; this exists so the cut lands on a known boundary.
+export const die = (where) => {
+  if (process.env.MNDE_F001_PAUSE === "1") { log(`PAUSED@${where}`); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0); }
+  log(`SIGKILL@${where}`); process.kill(process.pid, "SIGKILL");
+};
 
 if (fault.startsWith("sql-")) {
   const wrapper = new URL("./pg_wrapper.mjs", import.meta.url).href;

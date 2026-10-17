@@ -56,3 +56,43 @@ Approval of one run does not extend to another, and I will not hold the approval
 **Power-loss test (Executor operator, on the real Hub hardware).** Not testable from inside a VM. Minimum: (a) on the production storage and filesystem, run the closure harness cases C4–C9 against the real device; (b) repeat C6 and C8 but cut power (hard power-off, not shutdown) at the pause points (`fs-after-start-record`, and the held post-receive hook), then boot and confirm: the claim row, the ledger entries and the start record are present or absent exactly as the harness predicts, the replay is refused, and the remote matches reconciliation; (c) run `pg_test_fsync` on the database volume and record it. Record the result as the Q4 decision (accept or reject `-m immediate` plus this test as sufficient).
 
 **Independent PostgreSQL verification (Database operator).** A primary administered by someone who is not the executor operator and cannot be restored by them: apply `postgres.sql` and `provision-executor-login.sql`; write down who can restore, promote or alter; run `claim-store-proof.mjs` (21 cases + the restart case with `MNDE_CLAIM_PROOF_RESTART_COMMAND`); run `tests/f001-closure/closure.mjs T01–T04 C1–C3 R1` pointing `F001_PG_DIR` at it (R1 needs the operator to supply a snapshot/restore step in place of `pg_basebackup`); provide the section-3 privilege query and `SHOW fsync; SHOW synchronous_commit; SELECT pg_is_in_recovery();`.
+
+---
+
+## Addendum (2026-10-17, after the witness and evidence v2 work)
+
+Still **not executed**. What changed for the live run:
+
+1. **A spend witness must be deployed first** in an administrative domain the executor and database operators do not control
+   (`F001-WITNESS-DEPLOYMENT.md`). The Hub's executor environment must carry `MNDE_WITNESS_CONFIG` and `MNDE_WITNESS_REQUIRED=true`.
+   Without it requirement F is not met for the live system, whatever the harness shows.
+2. **Evidence is v2.** Step L6 verifies with `scripts/verify-git-push-evidence.mjs`, which now also prints `evidence_version`, `execution_start`,
+   `push_credential` (kind, access, scope, GitHub App id, installation id, expiry) and `witness`. Check by hand that `push_credential.app_id` and
+   `installation_id` are the MNDe App's, that `execution_start.record_sha256` equals `sha256sum` of the start file, and that the witness's own
+   signed `scripts/f001/witness-lookup.mjs` answer for this grant is `FOUND` with the same `entry_digest`.
+3. **Run the executor as its own OS user**, not the operator's login, and check `S1`-style isolation on the real host (the executor user cannot read the
+   database owner password, the witness data, or the Hub's approval key).
+4. **Agent identity must pass `check-agent-environment.mjs` with exit 0 and a positive (non-401) probe.** In this sandbox it does not
+   (`preflight/agent-credential-exposure.json`), so G stays BLOCKED until the run is done from the deployed agent environment.
+5. **Power loss** now has tooling: `F001-POWER-LOSS-RUNBOOK.md`.
+
+### Approval request: fill in, then reply in your own words naming this run
+
+| Field | Value |
+| --- | --- |
+| Commit under test | the PR #60 head you approve (record `git rev-parse HEAD` on the Hub host; it must equal `tree_head` in the harness `results.json`) |
+| Hub hostname and identity | **OPERATOR TO SUPPLY** |
+| Repository | `https://github.com/MNDe-System/mnde-public-test.git` (canonical identity `https:github.com/MNDe-System/mnde-public-test`) |
+| Target ref (protected, App-only update, no deletion or force-move; **the push is permanent**) | `refs/heads/mnde-proof/physical-hub` (a proof ref, not a production branch), plus a sacrificial `mnde-proof/replay-<id>` and `mnde-proof/denial-<id>` created by a repository admin |
+| Expected old SHA | `dec31d90dc8dd129533e37b5d86cdeddde7dac5e` as read on 2026-10-17; **re-read immediately before approving** |
+| Intended new SHA | `2b88c631448714b5830224b2cdfbf4f2c0e14e0c` (one harmless payload commit, `proofs/f001-acceptance-payload.txt`, fixed author/date, direct descendant of the old SHA); reproduce with `scripts/f001/prepare-pending-action.mjs` |
+| Canonical action digest | computed by the approver's `scripts/authorize-git-push.mjs` (`authority_digest`); the approver must read the six values and the digest on their own device |
+| GitHub App id / installation id | **OPERATOR TO SUPPLY** (also appears in the evidence `push_credential`) |
+| Executor identity | **OPERATOR TO SUPPLY** (`MNDE_EXECUTOR_ID`, its OS user, its key id) |
+| Witness identity and operator | **OPERATOR TO SUPPLY** (`witness_id`, pinned key id, who administers it) |
+| PostgreSQL primary and its administrator | **OPERATOR TO SUPPLY** (host, administrator, restore authority) |
+| Maximum remote mutations | exactly **1** on `physical-hub`; at most 1 on each sacrificial ref per authorization; **0** for every replay, substituted-parameter and denied attempt |
+| Rollback plan | `physical-hub` cannot be rolled back by design. If anything but `EXECUTED` is reported: stop, do not resubmit, reconcile from the remote ref and the witness `lookup`, and issue a new authorization only after that. Sacrificial refs are reset by their owner. |
+| Expected signed evidence | v2, outcome `EXECUTED`, `observed_after_sha` = intended new SHA, `execution_start` present, `push_credential.access = write` with the App ids, `witness.n >= 1`, verifying offline against the pinned root |
+
+Until this table is complete and you approve the named run, no live push, no ruleset change and no credential change will be made from this session.

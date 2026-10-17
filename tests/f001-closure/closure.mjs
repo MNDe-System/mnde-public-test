@@ -21,7 +21,7 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { generateKeyPairSync, randomUUID } from "node:crypto";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { classifyGitPushExecution } from "../../src/effects/git-push/index.mjs";
@@ -44,6 +44,9 @@ const FAULTS = pathToFileURL(join(HERE, "faults.mjs")).href;
 const PG_BIN = "/usr/lib/postgresql/16/bin";
 const claimConfig = JSON.parse(readFileSync(join(PG, "claim-config.json"), "utf8"));
 const only = new Set(process.argv.slice(2));
+const VERIFY_STATE = process.env.F001_VERIFY_POWER_STATE ?? null;   // post-reboot verification of a power-loss run (scenario P2)
+const PAUSE_AT = process.env.F001_PAUSE_AT ?? null;                  // power-loss run: pause at this boundary (scenario P1)
+const POWER_STATE = process.env.F001_POWER_STATE ?? null;            // where P1 persists what P2 needs; must be on the disk under test
 
 // ── OS identities ───────────────────────────────────────────────────────────
 // The executor runs as an unprivileged user (not root); the witness runs as a different
@@ -66,6 +69,8 @@ mkdirSync(OUT, { recursive: true });
 
 // ── result recording ────────────────────────────────────────────────────────
 const results = [];
+let head0 = "unknown";
+try { head0 = execFileSync("git", ["rev-parse", "HEAD"], { cwd: SRC, encoding: "utf8" }).trim(); } catch { /* not a checkout */ }
 async function scenario(id, title, expected, fn) {
   if (only.size && !only.has(id)) return;
   const entry = { id, title, expected, status: "FAIL", observed: null };
@@ -113,9 +118,9 @@ let witnessClientConfig = null, witnessProc = null, witnessPort = null, witnessK
 const witnessLogPath = join(WDIR, "data", "spend-log.jsonl");
 const witnessEntries = () => (existsSync(witnessLogPath) ? readFileSync(witnessLogPath, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l).entry) : []);
 async function startWitness({ port = 0, key = witnessKey } = {}) {
-  writeFileSync(join(WDIR, "witness-key.pem"), key.privatePem, { mode: 0o600 });
+  if (key) writeFileSync(join(WDIR, "witness-key.pem"), key.privatePem, { mode: 0o600 });
   writeFileSync(join(WDIR, "witness-config.json"), JSON.stringify({ host: "127.0.0.1", port, data_dir: join(WDIR, "data"), witness_id: WITNESS_ID,
-    key_id: key.keyId, key_file: join(WDIR, "witness-key.pem"), tls_cert_file: join(WDIR, "pki", "server.crt"), tls_key_file: join(WDIR, "pki", "server.key"),
+    key_id: key?.keyId ?? JSON.parse(readFileSync(join(WDIR, "witness-config.json"), "utf8")).key_id, key_file: join(WDIR, "witness-key.pem"), tls_cert_file: join(WDIR, "pki", "server.crt"), tls_key_file: join(WDIR, "pki", "server.key"),
     tokens_file: join(WDIR, "tokens.json") }));
   own(WDIR, WITNESS_USER);
   spawnSync("chown", ["root:root", join(WDIR, "pki", "ca.crt")]);
@@ -145,7 +150,7 @@ function writeWitnessClientConfig({ keys = [{ key_id: witnessKey.keyId, public_k
   own(dir);
   witnessClientConfig = path;
 }
-if (WITNESS_ON) {
+if (WITNESS_ON && !VERIFY_STATE) {
   rmSync(WDIR, { recursive: true, force: true });
   mkdirSync(join(WDIR, "pki"), { recursive: true }); mkdirSync(join(WDIR, "data"), { mode: 0o700 });
   const ossl = (...a) => { const r = spawnSync("openssl", a, { cwd: join(WDIR, "pki"), encoding: "utf8" }); if (r.status !== 0) throw new Error(`openssl ${a[0]} failed: ${r.stderr}`); };
@@ -928,6 +933,81 @@ await scenario("W8", "100 concurrent consumes of one grant against the real TLS 
     assert.equal(out.tally.CONSUMED, 1, JSON.stringify(out));
     return out;
   });
+
+// ── power-loss tooling (docs/F001-POWER-LOSS-RUNBOOK.md) ───────────────────────────────────────────
+// P1 runs one authorization to a named boundary and PAUSES there with everything before it durably written.
+// A human then cuts power. P2 runs after reboot and reports which records survived and that replay is refused.
+// With F001_SIMULATE_POWER_CUT=1 P1 SIGKILLs itself instead: that exercises the tooling and is NOT a power-loss result.
+const BOUNDARIES = {
+  "fs-after-start-record":     { kind: "fault", durable: ["db", "ledger", "witness", "start"],             remote: "pre" },
+  "witness-after-consume":     { kind: "fault", durable: ["db", "ledger", "witness"],                      remote: "pre" },
+  "fs-evidence-before-rename": { kind: "fault", durable: ["db", "ledger", "witness", "start"],             remote: "approved" },
+  "post-receive":              { kind: "hold",  durable: ["db", "ledger", "witness", "start"],             remote: "approved" }
+};
+if (PAUSE_AT && (!only.size || only.has("P1"))) {
+  await scenario("P1", `power-loss run: pause at ${PAUSE_AT}`, "paused at the boundary with all earlier records fsynced; waits for power to be cut", async () => {
+    const spec = BOUNDARIES[PAUSE_AT];
+    blockedUnless(spec && POWER_STATE && isAbsolute(POWER_STATE), "F001_PAUSE_AT must be one of " + Object.keys(BOUNDARIES).join(", ") + " and F001_POWER_STATE an absolute path on the disk under test");
+    const c = newCase("power-loss");
+    const a = await authorize(c);
+    const env = operatorEnv(c, spec.kind === "fault" ? { MNDE_F001_FAULT: PAUSE_AT, MNDE_F001_PAUSE: "1" } : {});
+    const state = { boundary: PAUSE_AT, spec, caseDir: c.caseDir, evidenceDir: c.evidenceDir, requestPath: a.path, grantId: a.grantId, executionId: a.executionId,
+      approvedSha: a.parameters.source_commit, preSha: a.parameters.expected_old_sha, barePath: c.repos.barePath, remoteUrl: c.repos.remoteUrl,
+      env, witnessPort, witnessUser: WITNESS_USER, wdir: WDIR, receivedBefore: c.received(), commit: head0, created_at: new Date().toISOString() };
+    writeFileSync(POWER_STATE, JSON.stringify(state, null, 2));
+    spawnSync("sync");
+    if (spec.kind === "hold") writeFileSync(c.flag("hold-post-receive"), "");
+    const run = startCli(c, a.path, spec.kind === "fault" ? { fault: PAUSE_AT, env: { MNDE_F001_PAUSE: "1" } } : {});
+    if (spec.kind === "hold") await waitFor(c.flag("post-receive-reached")); else await waitFor(c.log);
+    if (spec.kind === "fault") for (let i = 0; i < 600 && !readFileSync(c.log, "utf8").includes("PAUSED@"); i += 1) await new Promise((r) => setTimeout(r, 100));
+    console.log(`\n>>> PAUSED at ${PAUSE_AT}. State: ${POWER_STATE}\n>>> NOW CUT POWER (hard power-off, not shutdown). After boot, start PostgreSQL and run:\n>>>   F001_VERIFY_POWER_STATE=${POWER_STATE} node tests/f001-closure/closure.mjs P2\n`);
+    if (process.env.F001_SIMULATE_POWER_CUT === "1") { run.child.kill("SIGKILL"); await stopWitness("SIGKILL"); process.kill(process.pid, "SIGKILL"); }
+    await new Promise(() => {});
+  });
+}
+if (VERIFY_STATE && (!only.size || only.has("P2"))) {
+  await scenario("P2", "power-loss verification after reboot", "every record fsynced before the boundary survived; the consumed grant is refused; nothing is sent; unknown stays INDETERMINATE", async () => {
+    const st = JSON.parse(readFileSync(VERIFY_STATE, "utf8"));
+    witnessPort = st.witnessPort; witnessClientConfig = st.env.MNDE_WITNESS_CONFIG;
+    if (WITNESS_ON) { try { await startWitness({ port: st.witnessPort, key: null }); } catch (e) { throw new Error(`the witness did not come back after the cut: ${e.message}`); } }
+    const c = { caseDir: st.caseDir, evidenceDir: st.evidenceDir, log: join(st.caseDir, "fault-verify.log"), repos: { barePath: st.barePath },
+      received: () => { const p = join(st.barePath, "received.log"); return existsSync(p) ? readFileSync(p, "utf8").split("\n").filter(Boolean).length : 0; },
+      attempts: () => 0, flag: (n) => join(st.barePath, n) };
+    const surv = {
+      db: claimRows(st.grantId) === 1,
+      ledger: existsSync(join(st.evidenceDir, "spent-ledger")) && readdirSync(join(st.evidenceDir, "spent-ledger")).some((n) => n.startsWith("grant-")),
+      witness: witnessEntries().some((e) => e.grant_id === st.grantId),
+      start: existsSync(st.evidenceDir) && readdirSync(st.evidenceDir).some((n) => n.endsWith(".started.json"))
+    };
+    const lost = st.spec.durable.filter((k) => !surv[k]);
+    const remoteSha = git(["ls-remote", "--refs", st.remoteUrl, "refs/heads/main"], st.barePath).split(/\s+/)[0];
+    const remoteState = remoteSha === st.approvedSha ? "approved" : remoteSha === st.preSha ? "pre" : "diverged";
+    const before = c.received();
+    const replay = await new Promise((res) => {
+      const child = spawn(NODE, ["--no-warnings", "--import", FAULTS, CLI, st.requestPath], { cwd: st.caseDir, env: { ...st.env, MNDE_F001_FAULT: "", MNDE_F001_PAUSE: "" }, stdio: ["ignore", "pipe", "pipe"], ...asUser });
+      let out = ""; child.stdout.on("data", (d) => { out += d; }); child.on("close", (code) => { try { res({ code, out: JSON.parse(out.split("\n").filter(Boolean)[0]) }); } catch { res({ code, out: null }); } });
+    });
+    const k = classifyGitPushExecution({ evidenceDir: st.evidenceDir, executionId: st.executionId });
+    const signed = existsSync(st.evidenceDir) ? readdirSync(st.evidenceDir).filter((n) => n.endsWith(".signed.json")) : [];
+    const observed = { boundary: st.boundary, records_that_must_survive: st.spec.durable, survived: surv, lost_records: lost, remote_state: remoteState, expected_remote_state: st.spec.remote,
+      replay: { outcome: replay.out?.outcome, reason: replay.out?.reason_code }, pushes_sent_by_replay: c.received() - before, classification: k.condition,
+      signed_evidence_files: signed.length, note: "a SIGKILL-simulated run proves the tooling only; the power-loss result requires a real hard power cut on the hardware under test" };
+    const check = (cond, msg) => { if (!cond) throw Object.assign(new Error(msg), { observed }); };
+    check(lost.length === 0, `records fsynced before the boundary were LOST: ${lost}`);
+    check(remoteState === st.spec.remote, "the remote is not where the boundary implies");
+    check(replay.out?.outcome === "REFUSED", `the replay was not refused: ${JSON.stringify(replay.out)}`);
+    check(c.received() - before === 0, "the replay pushed");
+    if (remoteState === "approved" && signed.length === 0) check(k.condition === "INDETERMINATE", "an effect with no evidence must stay INDETERMINATE until reconciled");
+    for (const f of signed) {
+      // Against the ORIGINAL run's pinned bundle and root fingerprint (from the persisted environment), not this process's.
+      const r = spawnSync(process.execPath, [join(ROOT, "scripts", "verify-git-push-evidence.mjs"), join(st.evidenceDir, f), "--authority-bundle", st.env.MNDE_VERIFY_AUTHORITY_BUNDLE,
+        "--root-fingerprint", st.env.MNDE_VERIFY_TRUSTED_ROOT_FINGERPRINT, "--expected-executor-id", st.env.MNDE_VERIFY_EXPECTED_EXECUTOR_ID, "--expected-environment-id", st.env.MNDE_VERIFY_ENVIRONMENT_ID], { encoding: "utf8" });
+      check(r.status === 0, `signed evidence ${f} does not verify: ${r.stdout.slice(0, 200)}`);
+      observed.signed_evidence_verifies = true;
+    }
+    return observed;
+  });
+}
 
 // ── GitHub-App credential path, against a local EMULATOR (not GitHub) ───────
 const wantsEmulator = !only.size || [...only].some((id) => id.startsWith("G"));
