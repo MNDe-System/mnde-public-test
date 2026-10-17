@@ -1,0 +1,57 @@
+{
+  "schema_version": "mnde.git-push-execution-evidence-envelope.v1",
+  "evidence": {
+    "schema_version": "mnde.git-push-execution-evidence.v1",
+    "action": "git.push",
+    "execution_id": "exec-c1dfd614-9414-43ea-a9e9-2fdc63959b72",
+    "grant_id": "grant-03ea8319-7cd1-4f80-bdc5-891758a24dd6",
+    "authorization_receipt_hash": "4d2b2e512806566dd376b41083ce35da27c6b5645c265c9316f3d4132b6f693f",
+    "authority_digest": "404a5bef94e632a2fde7fad1342ef3f19fbaeb4c2f798cfd5c8da000d6c90fa9",
+    "executor_id": "mnde:test:prod:executor:gitpush:01",
+    "environment_id": "prod",
+    "key_id": "mnde-exk:b9df55f66e5524a8c1f6ba4a8b4cf910",
+    "credential_id": "mnde-cred:3dc38557a227127578337e10d059b0ee",
+    "authority_bundle_fingerprint": "ec178dee8e2530f9b5dc01b6ef0f7a00f530e6a3e36d4e2c494ddd034cac0d3e",
+    "repository": "file:/tmp/mnde-f001-closure-OlNTDe/01-baseline/remote",
+    "remote": "origin",
+    "remote_url": "file:///tmp/mnde-f001-closure-OlNTDe/01-baseline/remote.git",
+    "target_ref": "refs/heads/main",
+    "expected_old_sha": "0749f9b74ebdc1745f593a38d74b65c3f8d589eb",
+    "approved_new_sha": "acb27e1132a0109816a77613bd91d44496db46b7",
+    "observed_before_sha": "0749f9b74ebdc1745f593a38d74b65c3f8d589eb",
+    "observed_after_sha": "acb27e1132a0109816a77613bd91d44496db46b7",
+    "claim": {
+      "decision": "CLAIMED",
+      "namespace": "f001-closure-ns",
+      "record_digest": "a37b1a679a173f388b76f6cd03483701c215e9537573e8526a5a51f19fb21c76"
+    },
+    "effect_attempted": true,
+    "outcome": "EXECUTED",
+    "reason_code": null,
+    "recorded_at": "2026-10-17T01:04:38.534Z"
+  },
+  "credential": {
+    "schema_version": "mnde.executor.credential.v1",
+    "executor_id": "mnde:test:prod:executor:gitpush:01",
+    "key_id": "mnde-exk:b9df55f66e5524a8c1f6ba4a8b4cf910",
+    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAKZ+QA2V7Iso5UhQUut+/kf/Hvi9ANVK/tzp1Xsf26ck=\n-----END PUBLIC KEY-----\n",
+    "issuer_id": "mnde-git-push-test",
+    "issuer_key_id": "git-push-test-root",
+    "environment_id": "prod",
+    "issued_at": "2026-06-14T00:00:00.000Z",
+    "not_before": "2026-01-01T00:00:00.000Z",
+    "expires_at": "2099-01-01T00:00:00.000Z",
+    "capabilities": [
+      "sign_execution_receipt"
+    ],
+    "trust_epoch": "executor-identity-v1",
+    "signature_algorithm": "ED25519",
+    "credential_id": "mnde-cred:3dc38557a227127578337e10d059b0ee",
+    "issuer_signature": "e9fa261f50d02b9060cb3a7761b6586671e0113d1ccdac6001740d0ed7f7aa3b5ba7d4da1a3a66afd0a95670481d68e015396260536845e7aa9064373b6fc40a"
+  },
+  "signature": {
+    "algorithm": "ED25519",
+    "key_id": "mnde-exk:b9df55f66e5524a8c1f6ba4a8b4cf910",
+    "value": "cec0e6c6db8209759c91345762f8e74f46a4c16458ca3a47cd14faa114ba4b984c3dbcb2967440afec5c9b49eb329396ad17372b16cf0f45c29e4cc98454af0b"
+  }
+}

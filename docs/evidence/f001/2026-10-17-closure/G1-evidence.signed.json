@@ -1,0 +1,57 @@
+{
+  "schema_version": "mnde.git-push-execution-evidence-envelope.v1",
+  "evidence": {
+    "schema_version": "mnde.git-push-execution-evidence.v1",
+    "action": "git.push",
+    "execution_id": "exec-661aecf9-120f-40b4-9bf8-aad1f27f3d3f",
+    "grant_id": "grant-2fd4a537-a514-43b8-92c9-3bee1b5f9f3e",
+    "authorization_receipt_hash": "d8e79c968ed8cf4c4383dcc46cd08c7a4deb7168fc24956872f548c5df233901",
+    "authority_digest": "e6eb2f91777f9794c5af7502285abb8c0af463e45d62f881db382d540400f5f1",
+    "executor_id": "mnde:test:prod:executor:gitpush:01",
+    "environment_id": "prod",
+    "key_id": "mnde-exk:b9df55f66e5524a8c1f6ba4a8b4cf910",
+    "credential_id": "mnde-cred:3dc38557a227127578337e10d059b0ee",
+    "authority_bundle_fingerprint": "ec178dee8e2530f9b5dc01b6ef0f7a00f530e6a3e36d4e2c494ddd034cac0d3e",
+    "repository": "https:localhost/acme/widgets",
+    "remote": "origin",
+    "remote_url": "https://localhost:33463/acme/widgets.git",
+    "target_ref": "refs/heads/main",
+    "expected_old_sha": "7e2c17810458130442689c4b3f245a8d78fe80d9",
+    "approved_new_sha": "6e540f87e5f6d7cff782ece6c70471995418c5cd",
+    "observed_before_sha": "7e2c17810458130442689c4b3f245a8d78fe80d9",
+    "observed_after_sha": "6e540f87e5f6d7cff782ece6c70471995418c5cd",
+    "claim": {
+      "decision": "CLAIMED",
+      "namespace": "f001-closure-ns",
+      "record_digest": "65b190d92ae5da12f49dc5dbe5b0513a187ad393651eb4ad5e08ab21555d3df8"
+    },
+    "effect_attempted": true,
+    "outcome": "EXECUTED",
+    "reason_code": null,
+    "recorded_at": "2026-10-17T01:05:14.994Z"
+  },
+  "credential": {
+    "schema_version": "mnde.executor.credential.v1",
+    "executor_id": "mnde:test:prod:executor:gitpush:01",
+    "key_id": "mnde-exk:b9df55f66e5524a8c1f6ba4a8b4cf910",
+    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAKZ+QA2V7Iso5UhQUut+/kf/Hvi9ANVK/tzp1Xsf26ck=\n-----END PUBLIC KEY-----\n",
+    "issuer_id": "mnde-git-push-test",
+    "issuer_key_id": "git-push-test-root",
+    "environment_id": "prod",
+    "issued_at": "2026-06-14T00:00:00.000Z",
+    "not_before": "2026-01-01T00:00:00.000Z",
+    "expires_at": "2099-01-01T00:00:00.000Z",
+    "capabilities": [
+      "sign_execution_receipt"
+    ],
+    "trust_epoch": "executor-identity-v1",
+    "signature_algorithm": "ED25519",
+    "credential_id": "mnde-cred:3dc38557a227127578337e10d059b0ee",
+    "issuer_signature": "e9fa261f50d02b9060cb3a7761b6586671e0113d1ccdac6001740d0ed7f7aa3b5ba7d4da1a3a66afd0a95670481d68e015396260536845e7aa9064373b6fc40a"
+  },
+  "signature": {
+    "algorithm": "ED25519",
+    "key_id": "mnde-exk:b9df55f66e5524a8c1f6ba4a8b4cf910",
+    "value": "4f02be7d9d93e5b8a13b3b85df9547fb4c43b053f18ecadf0cdde28b07a4703e010558808ce94f339a4bf6e9894df322cf97393b246aa591f93b08515413a30b"
+  }
+}

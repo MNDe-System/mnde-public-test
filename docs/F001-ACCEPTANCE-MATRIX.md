@@ -6,6 +6,8 @@ nine questions and their history; this matrix adds the ten push-test criteria an
 independent-database criteria, and says for each what is established, by what, and
 what exact action closes it.
 
+**Superseded in part by [F001-CLOSURE-REPORT.md](F001-CLOSURE-REPORT.md) (2026-10-17): Q6 now has an executor-local rollback ledger ([F001-ROLLBACK-TRUST-BOUNDARY.md](F001-ROLLBACK-TRUST-BOUNDARY.md)); verdict there is BLOCKED.**
+
 **F-001 is NOT closed.** No row below that matters for closure is `ESTABLISHED`
 against independent infrastructure, and the one hard blocker (an independently
 administered claim database plus a production-trust run) cannot be satisfied from this

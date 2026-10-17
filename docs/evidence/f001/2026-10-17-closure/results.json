@@ -1,0 +1,607 @@
+{
+  "generated_at": "2026-10-17T01:06:04.380Z",
+  "tree": "/home/user/mnde-public-test",
+  "tree_head": "75f7575e34d34d8e42f9a9b396ffb930f05bf165",
+  "node": "v24.22.0",
+  "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+  "results": [
+    {
+      "id": "T01",
+      "title": "authorized push succeeds once; claim, ledger, start record and signed evidence all exist",
+      "expected": "EXECUTED, remote at approved SHA, 1 DB row, ledger entry, start record, evidence verifies offline",
+      "status": "PASS",
+      "observed": {
+        "outcome": "EXECUTED",
+        "db_rows": 1,
+        "ledger_entries": [
+          "LEDGER.json",
+          "exec-178d0dbdfba502adf9cdf91d148f4add265bb247384e19aad173ba1c47036306.json",
+          "grant-72daa166b4debea4bfbc2dd20f14258d7ed04b8a144079e50b635c68c78e8534.json"
+        ],
+        "offline_verify": {
+          "exit": 0,
+          "ok": true,
+          "reason_code": null,
+          "detail": null,
+          "outcome": "EXECUTED",
+          "execution_id": "exec-c1dfd614-9414-43ea-a9e9-2fdc63959b72",
+          "executor_id": "mnde:test:prod:executor:gitpush:01",
+          "grant_id": "grant-03ea8319-7cd1-4f80-bdc5-891758a24dd6",
+          "repository": "file:/tmp/mnde-f001-closure-OlNTDe/01-baseline/remote",
+          "target_ref": "refs/heads/main",
+          "expected_old_sha": "0749f9b74ebdc1745f593a38d74b65c3f8d589eb",
+          "approved_new_sha": "acb27e1132a0109816a77613bd91d44496db46b7",
+          "observed_before_sha": "0749f9b74ebdc1745f593a38d74b65c3f8d589eb",
+          "observed_after_sha": "acb27e1132a0109816a77613bd91d44496db46b7"
+        },
+        "evidence_copy": "T01-evidence.signed.json",
+        "push_credential": {
+          "credential_provider_kind": "none",
+          "credential_scope": "file:/tmp/mnde-f001-closure-OlNTDe/01-baseline/remote",
+          "credential_access": "static",
+          "executor_id": "mnde:test:prod:executor:gitpush:01",
+          "credential_issuance_id": null,
+          "credential_expires_at": null,
+          "credential_fingerprint": null,
+          "released": true
+        }
+      }
+    },
+    {
+      "id": "T02",
+      "title": "repeated execution of a consumed authorization fails, three times, with the remote reset so only the claim can stop it",
+      "expected": "every replay REFUSED already-spent; remote receives zero further pushes",
+      "status": "PASS",
+      "observed": {
+        "replays": [
+          {
+            "exit": 1,
+            "outcome": "REFUSED",
+            "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+          },
+          {
+            "exit": 1,
+            "outcome": "REFUSED",
+            "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+          },
+          {
+            "exit": 1,
+            "outcome": "REFUSED",
+            "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+          }
+        ],
+        "remote_pushes_after_first": 0
+      }
+    },
+    {
+      "id": "T03",
+      "title": "100 concurrent claims of one grant against real PostgreSQL",
+      "expected": "exactly one CLAIMED",
+      "status": "PASS",
+      "observed": {
+        "mode": "claims",
+        "count": 100,
+        "tally": {
+          "ALREADY_SPENT": 99,
+          "CLAIMED": 1
+        }
+      }
+    },
+    {
+      "id": "T04",
+      "title": "100 concurrent executeGitPush() calls of one authorization in one executor, then 12 concurrent CLI processes of another",
+      "expected": "exactly one push reaches the remote in each",
+      "status": "PASS",
+      "observed": {
+        "in_process_100": {
+          "REFUSED:ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT": 99,
+          "EXECUTED": 1
+        },
+        "remote_pushes_in_process": 1,
+        "processes_12": {
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT": 10,
+          "ERR_GIT_PUSH_REMOTE_MOVED": 1,
+          "EXECUTED": 1
+        },
+        "remote_pushes_processes": 1
+      }
+    },
+    {
+      "id": "C1",
+      "title": "crash BEFORE claiming (died before first_claim was sent)",
+      "expected": "SIGKILL; authority not consumed; one retry executes once; a further retry is refused",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "SIGKILL@sql-before-claim",
+        "db_claim_rows_after_crash": 0,
+        "remote_after_crash": "REMOTE_AT_PRE_STATE",
+        "classification": "NOT_STARTED",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 0,
+          "outcome": "EXECUTED",
+          "reason": null
+        },
+        "second_retry": {
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        }
+      }
+    },
+    {
+      "id": "C2",
+      "title": "crash DURING claim commit, transaction open and COMMIT not yet sent",
+      "expected": "SIGKILL; authority not consumed; one retry executes once; a further retry is refused",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "SIGKILL@sql-before-commit",
+        "db_claim_rows_after_crash": 0,
+        "remote_after_crash": "REMOTE_AT_PRE_STATE",
+        "classification": "NOT_STARTED",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 0,
+          "outcome": "EXECUTED",
+          "reason": null
+        },
+        "second_retry": {
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        }
+      }
+    },
+    {
+      "id": "C2b",
+      "title": "crash DURING claim commit: COMMIT written to the socket, process killed before the reply",
+      "expected": "either the claim committed (recovery refuses) or it did not (retry executes once); never both",
+      "status": "PASS",
+      "observed": {
+        "claim_committed_before_death": true,
+        "recovery": {
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        },
+        "remote_pushes": 0
+      }
+    },
+    {
+      "id": "C3",
+      "title": "crash AFTER claim commit was acknowledged",
+      "expected": "SIGKILL; authority consumed; recovery refuses reuse and sends nothing",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "SIGKILL@sql-after-commit",
+        "db_claim_rows_after_crash": 1,
+        "remote_after_crash": "REMOTE_AT_PRE_STATE",
+        "classification": "NOT_STARTED",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        },
+        "remote_pushes_total": 0,
+        "reconciliation": "REMOTE_AT_PRE_STATE"
+      }
+    },
+    {
+      "id": "C3b",
+      "title": "SIMULATED (not a crash): COMMIT acknowledged but the reply reported lost",
+      "expected": "claim found durably present by lookup; nothing sent; replay refused",
+      "status": "PASS",
+      "observed": {
+        "first": {
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "claim": {
+            "namespace": "f001-closure-ns",
+            "backend_kind": "remote-postgresql",
+            "decision": "SPENT",
+            "note": "claim-ack-lost-but-durably-present"
+          }
+        },
+        "replay": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+        "remote_pushes": 0
+      }
+    },
+    {
+      "id": "C4",
+      "title": "crash after claim, BEFORE the executor-local ledger entry",
+      "expected": "SIGKILL; authority consumed; recovery refuses reuse and sends nothing",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "SIGKILL@fs-before-ledger",
+        "db_claim_rows_after_crash": 1,
+        "remote_after_crash": "REMOTE_AT_PRE_STATE",
+        "classification": "NOT_STARTED",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        },
+        "remote_pushes_total": 0,
+        "reconciliation": "REMOTE_AT_PRE_STATE"
+      }
+    },
+    {
+      "id": "C5",
+      "title": "crash BEFORE execution-start persistence (ledger entry written)",
+      "expected": "SIGKILL; authority consumed; recovery refuses reuse and sends nothing",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "SIGKILL@fs-before-start-record",
+        "db_claim_rows_after_crash": 1,
+        "remote_after_crash": "REMOTE_AT_PRE_STATE",
+        "classification": "NOT_STARTED",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        },
+        "remote_pushes_total": 0,
+        "reconciliation": "REMOTE_AT_PRE_STATE"
+      }
+    },
+    {
+      "id": "C6",
+      "title": "crash AFTER execution-start persistence (file and directory fsynced)",
+      "expected": "SIGKILL; authority consumed; recovery refuses reuse and sends nothing",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "SIGKILL@fs-after-start-record",
+        "db_claim_rows_after_crash": 1,
+        "remote_after_crash": "REMOTE_AT_PRE_STATE",
+        "classification": "INDETERMINATE",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        },
+        "remote_pushes_total": 0,
+        "reconciliation": "REMOTE_AT_PRE_STATE"
+      }
+    },
+    {
+      "id": "C6b",
+      "title": "crash immediately before `git push` is spawned",
+      "expected": "SIGKILL; authority consumed; recovery refuses reuse and sends nothing",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "SIGKILL@exec-before-push",
+        "db_claim_rows_after_crash": 1,
+        "remote_after_crash": "REMOTE_AT_PRE_STATE",
+        "classification": "INDETERMINATE",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        },
+        "remote_pushes_total": 0,
+        "reconciliation": "REMOTE_AT_PRE_STATE"
+      }
+    },
+    {
+      "id": "C7",
+      "title": "crash DURING the GitHub-side push (receive-pack blocked in pre-receive; client SIGKILLed)",
+      "expected": "SIGKILL; authority consumed; recovery refuses reuse and sends nothing",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "(held hook; parent killed child)",
+        "db_claim_rows_after_crash": 1,
+        "remote_after_crash": "REMOTE_AT_PRE_STATE",
+        "classification": "INDETERMINATE",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        },
+        "remote_pushes_total": 0,
+        "reconciliation": "REMOTE_AT_PRE_STATE"
+      }
+    },
+    {
+      "id": "C8",
+      "title": "crash AFTER remote success, before any local evidence (post-receive blocked; client SIGKILLed)",
+      "expected": "SIGKILL; authority consumed; recovery refuses reuse and sends nothing",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "(held hook; parent killed child)",
+        "db_claim_rows_after_crash": 1,
+        "remote_after_crash": "REMOTE_AT_APPROVED_SHA",
+        "classification": "INDETERMINATE",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        },
+        "remote_pushes_total": 1,
+        "reconciliation": "REMOTE_AT_APPROVED_SHA"
+      }
+    },
+    {
+      "id": "C9",
+      "title": "crash DURING evidence persistence: signed evidence fsynced as *.tmp, not renamed",
+      "expected": "SIGKILL; authority consumed; recovery refuses reuse and sends nothing",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "SIGKILL@fs-evidence-before-rename",
+        "db_claim_rows_after_crash": 1,
+        "remote_after_crash": "REMOTE_AT_APPROVED_SHA",
+        "classification": "INDETERMINATE",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        },
+        "remote_pushes_total": 1,
+        "reconciliation": "REMOTE_AT_APPROVED_SHA"
+      }
+    },
+    {
+      "id": "C9b",
+      "title": "crash DURING evidence persistence: renamed, directory not yet fsynced",
+      "expected": "SIGKILL; authority consumed; recovery refuses reuse and sends nothing",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "SIGKILL@fs-evidence-after-rename",
+        "db_claim_rows_after_crash": 1,
+        "remote_after_crash": "REMOTE_AT_APPROVED_SHA",
+        "classification": "INDETERMINATE",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        },
+        "remote_pushes_total": 1,
+        "reconciliation": "REMOTE_AT_APPROVED_SHA"
+      }
+    },
+    {
+      "id": "C10",
+      "title": "crash BEFORE the client response (evidence durable)",
+      "expected": "SIGKILL; authority consumed; recovery refuses reuse and sends nothing",
+      "status": "PASS",
+      "observed": {
+        "fault_log": "SIGKILL@stdout-before-response",
+        "db_claim_rows_after_crash": 1,
+        "remote_after_crash": "REMOTE_AT_APPROVED_SHA",
+        "classification": "EXECUTED",
+        "retry_permitted": false,
+        "recovery": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        },
+        "remote_pushes_total": 1,
+        "reconciliation": "REMOTE_AT_APPROVED_SHA"
+      }
+    },
+    {
+      "id": "C11",
+      "title": "executor restart: a new process, same state directories, after a completed push",
+      "expected": "refuses; classification is EXECUTED",
+      "status": "PASS",
+      "observed": {
+        "restarted": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+        "classification": "EXECUTED",
+        "remote_pushes": 1
+      }
+    },
+    {
+      "id": "B1",
+      "title": "wrong ref, wrong repository, changed target SHA, stale authorization: refused before any claim, authority stays usable",
+      "expected": "each REFUSED with no DB row and no push; the genuine request then still executes once",
+      "status": "PASS",
+      "observed": {
+        "refusal_reasons": {
+          "wrong_ref": "ERR_GIT_PUSH_REQUEST_BINDING",
+          "wrong_repository": "ERR_GIT_PUSH_REQUEST_BINDING",
+          "changed_target_sha": "ERR_GIT_PUSH_REQUEST_BINDING",
+          "changed_expected_old_sha": "ERR_GIT_PUSH_REQUEST_BINDING",
+          "wrong_remote_url": "ERR_GIT_PUSH_REQUEST_BINDING",
+          "stale_authorization": "ERR_AUTHORITY_EXPIRED"
+        },
+        "db_rows_before_genuine": 0,
+        "genuine_then_executed_once": true,
+        "remote_pushes": 1
+      }
+    },
+    {
+      "id": "B2",
+      "title": "ledger lost: spent-ledger directory removed next to existing start records",
+      "expected": "fails closed (ERR_LEDGER_UNAVAILABLE), never re-initializes",
+      "status": "PASS",
+      "observed": {
+        "reason": "ERR_LEDGER_UNAVAILABLE",
+        "remote_pushes": 1
+      }
+    },
+    {
+      "id": "R1",
+      "title": "restore a PostgreSQL snapshot taken BEFORE the authorization was consumed, then replay it",
+      "expected": "REFUSED (rollback detected, quarantined); zero further pushes; a different fresh authorization also refused while quarantined",
+      "status": "PASS",
+      "observed": {
+        "rows_before_restore": 1,
+        "rows_after_restore": 0,
+        "replay_new_execution_id_same_grant": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_LEDGER_ROLLBACK_DETECTED",
+          "detail": "the claim store has no record of an authorization this executor began: the database was rolled back; nothing was sent and all pushes are quarantined",
+          "pushes_received_by_remote": 0
+        },
+        "replay_same_authorization": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_LEDGER_QUARANTINED",
+          "detail": "a database rollback was detected; every push refuses until an operator investigates and removes QUARANTINE.json; nothing was sent",
+          "pushes_received_by_remote": 0
+        },
+        "remote_after_replays": "REMOTE_AT_PRE_STATE",
+        "fresh_authorization_while_quarantined": {
+          "outcome": "REFUSED",
+          "reason": "ERR_LEDGER_QUARANTINED"
+        },
+        "fresh_after_operator_clears_quarantine": "EXECUTED"
+      }
+    },
+    {
+      "id": "G1",
+      "title": "[emulator] authorized push with the github-app credential: read token for the pre-state, write token only after the claim",
+      "expected": "EXECUTED; mint order read then write; both revoked; evidence verifies offline",
+      "status": "PASS",
+      "observed": {
+        "mint_sequence": [
+          "minted:read",
+          "minted:write",
+          "revoked:read",
+          "revoked:write"
+        ],
+        "push_credential": {
+          "credential_provider_kind": "github-app",
+          "credential_scope": "https:localhost/acme/widgets",
+          "credential_access": "write",
+          "executor_id": "mnde:test:prod:executor:gitpush:01",
+          "credential_issuance_id": "github-app:424242/installation:777",
+          "credential_expires_at": "2026-10-17T02:05:14.808Z",
+          "credential_fingerprint": null,
+          "released": true,
+          "revoked": true
+        },
+        "offline_verify": {
+          "exit": 0,
+          "ok": true,
+          "reason_code": null,
+          "detail": null,
+          "outcome": "EXECUTED",
+          "execution_id": "exec-661aecf9-120f-40b4-9bf8-aad1f27f3d3f",
+          "executor_id": "mnde:test:prod:executor:gitpush:01",
+          "grant_id": "grant-2fd4a537-a514-43b8-92c9-3bee1b5f9f3e",
+          "repository": "https:localhost/acme/widgets",
+          "target_ref": "refs/heads/main",
+          "expected_old_sha": "7e2c17810458130442689c4b3f245a8d78fe80d9",
+          "approved_new_sha": "6e540f87e5f6d7cff782ece6c70471995418c5cd",
+          "observed_before_sha": "7e2c17810458130442689c4b3f245a8d78fe80d9",
+          "observed_after_sha": "6e540f87e5f6d7cff782ece6c70471995418c5cd"
+        },
+        "emulator_pushes_applied": true
+      }
+    },
+    {
+      "id": "G2",
+      "title": "[emulator] 12 concurrent presentations of one authorization: write tokens minted == claim winners",
+      "expected": "exactly 1 write token minted, 1 push applied; losers never held a write-capable token",
+      "status": "PASS",
+      "observed": {
+        "executed": 1,
+        "read_tokens_minted": 12,
+        "write_tokens_minted": 1,
+        "pushes_applied": 1,
+        "refusal_reasons": [
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        ]
+      }
+    },
+    {
+      "id": "G3",
+      "title": "[emulator] GitHub App credential failure (token endpoint answers 500) before execution",
+      "expected": "REFUSED, nothing sent, authority NOT spent; after the fault clears the same authorization executes once",
+      "status": "PASS",
+      "observed": {
+        "first": {
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_CREDENTIAL_UNAVAILABLE"
+        },
+        "db_rows_after_failure": 0,
+        "retry_after_fault_cleared": "EXECUTED"
+      }
+    },
+    {
+      "id": "G4",
+      "title": "[emulator] GitHub API timeout BEFORE execution (token endpoint never answers)",
+      "expected": "REFUSED after the 10 s HTTP timeout; authority NOT spent; retry after recovery executes once",
+      "status": "PASS",
+      "observed": {
+        "first": {
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_CREDENTIAL_UNAVAILABLE",
+          "seconds": 11
+        },
+        "db_rows_after_failure": 0,
+        "retry": "EXECUTED"
+      }
+    },
+    {
+      "id": "G5",
+      "title": "[emulator] write-token mint fails AFTER the claim (read mint ok, write mint 500)",
+      "expected": "REFUSED, nothing sent, authority SPENT; replay refused; classification NOT_STARTED",
+      "status": "PASS",
+      "observed": {
+        "first": {
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_CREDENTIAL_UNAVAILABLE"
+        },
+        "db_rows": 1,
+        "replay": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+        "classification": "NOT_STARTED"
+      }
+    },
+    {
+      "id": "G6",
+      "title": "[emulator] transport timeout AFTER a possibly-applied push (receive-pack response held past the 30 s executor timeout)",
+      "expected": "remote read-back decides: ref at approved SHA => EXECUTED; replay refused; no second push",
+      "status": "PASS",
+      "observed": {
+        "outcome": "EXECUTED",
+        "exit_code_of_git_push_in_evidence": "see evidence",
+        "pushes_applied": 1,
+        "replay": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+      }
+    },
+    {
+      "id": "G7",
+      "title": "[emulator] push applied, then the remote becomes unreachable so the read-back fails (unknown outcome)",
+      "expected": "INDETERMINATE (exit 2), authority SPENT, replay refused, operator reconciliation shows the ref at the approved SHA; no second push",
+      "status": "PASS",
+      "observed": {
+        "outcome": "INDETERMINATE",
+        "exit": 2,
+        "classification": "INDETERMINATE",
+        "review_required": true,
+        "reconciliation": "REMOTE_AT_APPROVED_SHA",
+        "signed_evidence_outcome": "INDETERMINATE",
+        "offline_verify_ok": true,
+        "pushes_applied": 1,
+        "replay": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+      }
+    },
+    {
+      "id": "G8",
+      "title": "[emulator] direct `git push` by a holder of no push credential",
+      "expected": "denied (401); the remote does not move. Says nothing about GitHub rulesets or a real agent environment",
+      "status": "PASS",
+      "observed": {
+        "direct_push_exit": 128,
+        "remote_unchanged": true,
+        "stderr_tail": "fatal: could not read Username for 'https://localhost:33463': terminal prompts disabled"
+      }
+    }
+  ]
+}
