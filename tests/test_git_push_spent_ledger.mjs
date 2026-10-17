@@ -25,9 +25,19 @@ import {
 const NAMESPACE = "mnde-git-push-ledger-namespace";
 let passed = 0;
 let failed = 0;
+// Every executor case builds a pair of real git repositories. Left until the end, deleting them is an
+// I/O burst that lands on whatever suite runs next, and on a loaded Windows runner that is enough to
+// trip the sidecar's load-shedding guard (ERR_SYSTEM_SATURATED) in a later, unrelated suite. Each case
+// therefore removes its own directory as soon as it finishes (see the same note in test_git_push_effect).
+const pendingCleanup = [];
 async function test(name, fn) {
   try { await fn(); passed += 1; console.log(`  [PASS] ${name}`); }
   catch (error) { failed += 1; console.error(`  [FAIL] ${name}: ${error instanceof Error ? error.stack : String(error)}`); }
+  finally {
+    while (pendingCleanup.length) {
+      try { rmSync(pendingCleanup.pop(), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* best effort */ }
+    }
+  }
 }
 
 const dir = mkdtempSync(join(tmpdir(), "mnde-git-push-ledger-"));
@@ -100,6 +110,7 @@ let caseIndex = 0;
 function world() {
   caseIndex += 1;
   const caseDir = join(dir, `case-${caseIndex}`);
+  pendingCleanup.push(caseDir);
   const repos = makeRepositories(caseDir);
   process.env.MNDE_GIT_CREDENTIAL_CONFIG = repos.credentialConfigPath;
   const evidenceDir = join(caseDir, "evidence");
