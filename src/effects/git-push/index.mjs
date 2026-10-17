@@ -53,6 +53,7 @@ import { isProductionExecutionAuthority, verifyExecutionAuthority } from "../../
 import { claimAuthority, deriveClaimRecord, DISPATCH } from "../../freshness/claim.mjs";
 import { openExecutorClaimBackend } from "../../freshness/postgres_claim.mjs";
 import { ERR_LEDGER_ROLLBACK_DETECTED, ERR_LEDGER_SPENT, openLocalSpentLedger } from "../../freshness/local_spent_ledger.mjs";
+import { openExecutorSpendWitness, WITNESS_DECISION } from "../../freshness/spend_witness.mjs";
 import { parseRuntimeProfile } from "../../../shared/runtime-profile.mjs";
 import {
   bindRequestToAuthority,
@@ -106,6 +107,10 @@ export const ERR_EXECUTION_START_NOT_RECORDED = "ERR_GIT_PUSH_EXECUTION_START_NO
 export const ERR_BACKEND_SUBSTITUTION = "ERR_GIT_PUSH_BACKEND_SUBSTITUTION";
 export const ERR_EVIDENCE_GENERATION = "ERR_GIT_PUSH_EVIDENCE_GENERATION";
 export const ERR_EVIDENCE_PERSISTENCE = "ERR_GIT_PUSH_EVIDENCE_PERSISTENCE";
+export const ERR_WITNESS_NOT_CONFIGURED = "ERR_GIT_PUSH_WITNESS_NOT_CONFIGURED";
+export const ERR_WITNESS_UNAVAILABLE = "ERR_GIT_PUSH_WITNESS_UNAVAILABLE";
+export const ERR_WITNESS_ALREADY_CONSUMED = "ERR_GIT_PUSH_WITNESS_ALREADY_CONSUMED";
+export const ERR_WITNESS_OUTCOME_UNKNOWN = "ERR_GIT_PUSH_WITNESS_OUTCOME_UNKNOWN";
 
 export const EXECUTION_START_SCHEMA = "mnde.git-push-execution-start.v1";
 
@@ -360,6 +365,18 @@ export function createGitPushExecutor(startup = {}) {
     (error) => ({ backend: null, detail: String(error?.message ?? error) })
   );
 
+  // The external spend witness (src/freshness/spend_witness.mjs), opened from the operator's
+  // MNDE_WITNESS_CONFIG and from nowhere else. Configured => required on every push: an
+  // unreachable, unverifiable or conflicting witness refuses. A configuration that does not
+  // load is also "required and unavailable", never "absent". Leaving it unconfigured keeps the
+  // database-plus-ledger protection only, which does NOT stop whole-system rollback (F-001 W0);
+  // MNDE_WITNESS_REQUIRED=true makes that omission itself a refusal.
+  let witness = null;
+  let witnessConfigError = null;
+  try { witness = openExecutorSpendWitness(env, { forbiddenRoots: [context.repoPath, PACKAGE_ROOT] }); }
+  catch (error) { witnessConfigError = String(error?.message ?? error); }
+  const witnessRequired = witness !== null || witnessConfigError !== null || env.MNDE_WITNESS_REQUIRED === "true";
+
   // Retain unfinished directory flushes across attempts in this executor. A
   // failed flush does not turn newly created directories into provisioned ones.
   let evidenceDirectoryParentToSync = null;
@@ -497,7 +514,7 @@ export function createGitPushExecutor(startup = {}) {
   // Never remove this marker on failure: the authority is already consumed.
   // It records only that an attempt began and what it was bound to; the outcome, when there is
   // one, lives in the ordinary evidence record.
-  function recordExecutionStart({ execution_id, grant_id, executor_id, authorized, namespace: ns }) {
+  function recordExecutionStart({ execution_id, grant_id, executor_id, authorized, namespace: ns, witness: witnessRef = null }) {
     if (!nonEmptyString(execution_id)) return { ok: false, detail: "no execution id" };
     let fd = null;
     try {
@@ -511,6 +528,7 @@ export function createGitPushExecutor(startup = {}) {
         executor_id: executor_id ?? null,
         namespace: ns,
         authorized,
+        witness: witnessRef,
         started_at: new Date().toISOString()
       }, null, 2)}\n`, "utf8");
       fsyncSync(fd);
@@ -699,6 +717,19 @@ export function createGitPushExecutor(startup = {}) {
         { ...identity, authorized, claim: { namespace, decision: DISPATCH.SPENT, record_digest: null, note: ERR_LEDGER_SPENT } });
     }
 
+    // ── 5c. The witness is reachable, authentic and consistent — BEFORE anything is spent ──
+    if (witnessRequired) {
+      if (!witness) {
+        return refuse(witnessConfigError ? ERR_WITNESS_UNAVAILABLE : ERR_WITNESS_NOT_CONFIGURED,
+          `${witnessConfigError ?? "a spend witness is required (MNDE_WITNESS_REQUIRED) but MNDE_WITNESS_CONFIG is not set"}; nothing was sent and the authority was not spent`,
+          { ...identity, authorized });
+      }
+      const pre = await witness.preflight({ namespace });
+      if (pre.decision !== "OK") {
+        return refuse(ERR_WITNESS_UNAVAILABLE, `the spend witness could not be verified (${pre.detail}); nothing was sent and the authority was not spent`, { ...identity, authorized });
+      }
+    }
+
     // ── 6. The repository we are standing in is the one that was authorized ──
     const configuredRemote = await readConfiguredRemoteUrl(p.remote, context);
     if (!configuredRemote.ok) return refuse(configuredRemote.reason, configuredRemote.detail, { ...identity, authorized });
@@ -872,6 +903,28 @@ export function createGitPushExecutor(startup = {}) {
         { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
     }
 
+    // ── 11b'. The external witness records the spend before anything can be sent ──
+    // First writer wins at the witness. A CONFLICT here, after the database and the ledger both
+    // said "fresh", means this executor's own state was rolled back: quarantine. An answer we
+    // cannot verify is UNKNOWN: the authority is spent everywhere that matters, nothing is sent,
+    // and an operator reconciles with the witness `lookup`. No retry.
+    if (witnessRequired) {
+      const consumed = await witness.consume({ namespace, grant_id: derived.record.grant_id, execution_id: derived.record.execution_id,
+        executor_id: derived.record.executor_id, receipt_hash: derived.record.receipt_hash, aplus_digest: derived.record.aplus_digest });
+      if (consumed.decision === WITNESS_DECISION.CONFLICT) {
+        opened.ledger.quarantine("the external spend witness already holds this authorization although the database and the executor ledger reported it fresh");
+        return refuse(ERR_WITNESS_ALREADY_CONSUMED,
+          "the external spend witness already recorded this authorization as consumed: this executor's state was rolled back; nothing was sent and all pushes are quarantined",
+          { ...identity, authorized, observed: { before: before.sha }, claim: { ...claimMeta, witness: consumed.witness } });
+      }
+      if (consumed.decision !== WITNESS_DECISION.CONSUMED) {
+        return refuse(ERR_WITNESS_OUTCOME_UNKNOWN,
+          `the spend witness outcome is unknown (${consumed.detail}); the authority is spent, nothing was sent, and it must be reconciled by an operator`,
+          { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
+      }
+      claimMeta.witness = consumed.witness;
+    }
+
     // ── 11c. NOW, and only now, the write credential ─────────────────────────
     if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized, claim: claimMeta });
     let writeContext;
@@ -894,7 +947,7 @@ export function createGitPushExecutor(startup = {}) {
     // written — and fsynced — before anything leaves the process. If it cannot
     // be, nothing is sent: an effect whose start cannot be recorded cannot later
     // be classified, and the authority is already spent either way.
-    const started = recordExecutionStart({ ...identity, authorized, namespace });
+    const started = recordExecutionStart({ ...identity, authorized, namespace, witness: claimMeta.witness ?? null });
     if (!started.ok) {
       return refuse(ERR_EXECUTION_START_NOT_RECORDED,
         `the execution start could not be durably recorded (${started.detail}); nothing was sent`,
@@ -954,6 +1007,10 @@ export function createGitPushExecutor(startup = {}) {
     // A quarantined or unavailable spent ledger refuses every push, so it must also
     // make the Hub report DEGRADED instead of ACTIVE.
     if (!ledger().ok) return { ready: false };
+    if (witnessRequired) {
+      if (!witness) return { ready: false };
+      try { if ((await witness.preflight({ namespace })).decision !== "OK") return { ready: false }; } catch { return { ready: false }; }
+    }
     try { return { ready: (await store.backend?.health())?.ok === true }; }
     catch { return { ready: false }; }
   }
