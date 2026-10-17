@@ -173,6 +173,7 @@
     "test:git-push-isolation": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_isolation.mjs",
     "test:git-push-reachability": "node ./tests/test_git_push_reachability.mjs",
     "test:git-push-single-route": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_single_route.mjs",
+    "test:git-push-spent-ledger": "node --import ./tests/support/claim_backend_hooks.mjs ./tests/test_git_push_spent_ledger.mjs",
     "test:decision-not-execution": "node ./tests/test_decision_not_execution.mjs",
     "hub": "node ./bin/mnde-hub.mjs",
     "test:hub": "node --import ./tests/support/hub_observation_hooks.mjs ./tests/test_hub.mjs"

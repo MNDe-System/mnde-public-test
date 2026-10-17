@@ -134,6 +134,7 @@ export async function gitPushAuthorization(trust, parameters, {
   subject = SUBJECT_ID,
   action = "git.push",
   now = "2026-06-14T00:00:00.000Z",
+  expiresAt = undefined,
   repoLocalInner = false
 } = {}) {
   // Reuse the trust's default executor when this authorization is for it, so
@@ -165,6 +166,7 @@ export async function gitPushAuthorization(trust, parameters, {
     request_id: executionId,
     grant_id: grantId,
     timestamp: now,
+    ...(expiresAt === undefined ? {} : { expires_at: expiresAt }),
     principal: { id: subject },
     agent: { id: "mnde-test-agent" },
     tool: { tool_name: action },

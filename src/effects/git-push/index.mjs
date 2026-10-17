@@ -52,6 +52,7 @@ import { evaluateExecutorPosture } from "../../executor-posture-preflight.mjs";
 import { isProductionExecutionAuthority, verifyExecutionAuthority } from "../../execution-authority/index.mjs";
 import { claimAuthority, deriveClaimRecord, DISPATCH } from "../../freshness/claim.mjs";
 import { openExecutorClaimBackend } from "../../freshness/postgres_claim.mjs";
+import { ERR_LEDGER_ROLLBACK_DETECTED, ERR_LEDGER_SPENT, openLocalSpentLedger } from "../../freshness/local_spent_ledger.mjs";
 import { parseRuntimeProfile } from "../../../shared/runtime-profile.mjs";
 import {
   bindRequestToAuthority,
@@ -363,6 +364,21 @@ export function createGitPushExecutor(startup = {}) {
   // failed flush does not turn newly created directories into provisioned ones.
   let evidenceDirectoryParentToSync = null;
 
+  // The executor-local spent ledger (src/freshness/local_spent_ledger.mjs): the
+  // record a database restore cannot rewind. Opened lazily because "is this a new
+  // deployment" is decided from the evidence directory at first use, and cached
+  // only on success so an unavailable ledger is re-examined, never assumed.
+  let spentLedger = null;
+  function ledger() {
+    if (spentLedger) return { ok: true, ledger: spentLedger };
+    let hasHistory = false;
+    try { hasHistory = readdirSync(evidenceDir).some((name) => name.endsWith(".started.json")); }
+    catch (error) { if (error?.code !== "ENOENT") hasHistory = true; }
+    const opened = openLocalSpentLedger(join(evidenceDir, "spent-ledger"), { hasHistory });
+    if (opened.ok) spentLedger = opened.ledger;
+    return opened;
+  }
+
   function writeEvidence(evidence) {
     const body = JSON.stringify(evidence, null, 2);
     try {
@@ -656,6 +672,30 @@ export function createGitPushExecutor(startup = {}) {
       expected_old_sha: p.expected_old_sha
     });
 
+    // ── 5b. This executor has not already begun this authorization ───────────
+    // Before the database, before any credential: a request this executor's own
+    // ledger says was begun is refused here, with no network contact at all. If
+    // the database does not know about it, the database was rolled back.
+    const derivedEarly = deriveClaimRecord(authority, { namespace });
+    if (!derivedEarly.ok) return refuse(derivedEarly.reason, "the claim record could not be derived from the verified authority", { ...identity, authorized });
+    const opened = ledger();
+    if (!opened.ok) return refuse(opened.reason, `${opened.detail}; nothing was sent`, { ...identity, authorized });
+    const seen = opened.ledger.isSpent(derivedEarly.record);
+    if (!seen.ok) return refuse(seen.reason, `${seen.detail}; nothing was sent`, { ...identity, authorized });
+    if (seen.spent) {
+      let known = null;
+      try { known = (await (await claimStore).backend?.lookup(derivedEarly.record))?.found === true; } catch { known = null; }
+      if (known === false) {
+        opened.ledger.quarantine("the executor ledger records this authorization as begun but the claim store has no record of it");
+        return refuse(ERR_LEDGER_ROLLBACK_DETECTED,
+          "the claim store has no record of an authorization this executor began: the database was rolled back; nothing was sent and all pushes are quarantined",
+          { ...identity, authorized });
+      }
+      return refuse(ERR_AUTHORITY_ALREADY_SPENT,
+        "this executor already began this authorization; it cannot authorize a second push",
+        { ...identity, authorized, claim: { namespace, decision: DISPATCH.SPENT, record_digest: null, note: ERR_LEDGER_SPENT } });
+    }
+
     // ── 6. The repository we are standing in is the one that was authorized ──
     const configuredRemote = await readConfiguredRemoteUrl(p.remote, context);
     if (!configuredRemote.ok) return refuse(configuredRemote.reason, configuredRemote.detail, { ...identity, authorized });
@@ -686,55 +726,68 @@ export function createGitPushExecutor(startup = {}) {
       if (!local.ok) return refuse(local.reason, local.detail, { ...identity, authorized });
     }
 
-    // ── 8b. Obtain the push credential ───────────────────────────────────────
-    // As late as the transport allows, and no later. Every step above is local
-    // and needs no credential. The very next step reads the remote, and a
-    // private remote cannot be read without authenticating, so the credential
-    // is obtained here — BEFORE the claim, deliberately: if the credential
-    // cannot be obtained (secret service down, token refused, scope wrong),
-    // the refusal spends nothing and a fresh attempt with the same
-    // authorization is legitimate. Obtaining it after the claim would turn
-    // every credential outage into burned authority.
+    // ── 8b. Obtain a READ credential ─────────────────────────────────────────
+    // The pre-state read needs authentication on a private remote, so a credential
+    // is obtained here — before the claim, deliberately: if it cannot be obtained
+    // the refusal spends nothing and a fresh attempt is legitimate. But it is the
+    // READ credential. A GitHub App token minted here is contents:read, so a
+    // request that is refused as already spent, or whose claim fails, never held
+    // a write-capable token. The write credential is minted only after the
+    // durable claim (remoteEffect, step 11c). Static kinds (token file, ssh key,
+    // none) have one credential for both; for them the executor process is the
+    // custodian either way and this split changes nothing.
     if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized });
+    const held = [];
     let handle;
     try {
-      handle = await credentials.acquire({ repository: p.repository, remoteUrl: p.remote_url, executorId: identity.executor_id });
+      handle = await credentials.acquire({ repository: p.repository, remoteUrl: p.remote_url, executorId: identity.executor_id, access: "read" });
     } catch (error) {
       return refuse(error?.code ?? ERR_CREDENTIAL_UNAVAILABLE,
         `${String(error?.message ?? error)}; nothing was sent and the authority was not spent`,
         { ...identity, authorized });
     }
+    held.push(handle);
     const credentialed = withPushCredential(stage, handle);
     if (!credentialed.ok) {
       await handle.release().catch(() => null);
       return refuse(credentialed.reason, credentialed.detail, { ...identity, authorized });
     }
 
-    // Whatever happens next, the credential is released before the outcome is
-    // written, and everything written is scrubbed of it first.
+    // Whatever happens next, every credential is released before the outcome is
+    // written, and everything written is scrubbed of all of them first.
     let parts;
     try {
-      parts = await remoteEffect(stage, credentialed.context, { authority, identity, authorized, p, epoch });
+      parts = await remoteEffect(stage, credentialed.context, { authority, identity, authorized, p, epoch, held });
     } finally {
-      parts = await releaseInto(parts, handle);
+      parts = await releaseInto(parts, held);
     }
     return settle(parts.evidence, parts.result);
   }
 
-  async function releaseInto(parts, handle) {
-    let released;
-    try { released = await handle.release(); } catch { released = { released: false }; }
+  async function releaseInto(parts, held) {
+    const released = [];
+    for (const handle of held) {
+      try { released.push(await handle.release()); } catch { released.push({ released: false }); }
+    }
     if (!parts) return parts;
-    const scrub = (value) => JSON.parse(handle.redact(JSON.stringify(value)));
+    const scrub = (value) => {
+      let text = JSON.stringify(value);
+      for (const handle of held) text = handle.redact(text);
+      return JSON.parse(text);
+    };
+    // push_credential describes the credential the effect used: the write
+    // credential when one was minted, otherwise the read credential.
+    const last = held.length - 1;
     return {
-      evidence: scrub({ ...parts.evidence, push_credential: { ...handle.metadata, ...released } }),
+      evidence: scrub({ ...parts.evidence, push_credential: { ...held[last].metadata, ...released[last] },
+        credentials_minted: held.map((handle, index) => ({ access: handle.metadata.credential_access, ...released[index] })) }),
       result: scrub(parts.result)
     };
   }
 
   // Steps 9 onward, run with the credentialed context for the three operations
   // that talk to the remote. Returns { evidence, result } unsettled.
-  async function remoteEffect(stage, remote, { authority, identity, authorized, p, epoch }) {
+  async function remoteEffect(stage, remote, { authority, identity, authorized, p, epoch, held }) {
     const refuse = refusal;
 
     // ── 9. The remote is observed, independently, in the approved pre-state ──
@@ -796,7 +849,42 @@ export function createGitPushExecutor(startup = {}) {
         { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
     }
 
-    // ── 11b. Durably record that the effect is starting ──────────────────────
+    // ── 11b. Record the spend where a database restore cannot reach ──────────
+    // The executor-local ledger entry is durable (file and directory fsync) before
+    // the start record and before any write credential exists. If it already
+    // exists, the database just told us "fresh" about something this executor
+    // began: it was rolled back, and nothing is sent.
+    const opened = ledger();
+    if (!opened.ok) {
+      return refuse(opened.reason, `${opened.detail}; the authority is spent in the claim store and nothing was sent`,
+        { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
+    }
+    const spentLocally = opened.ledger.commit(derived.record);
+    if (!spentLocally.ok) {
+      if (spentLocally.conflict) opened.ledger.quarantine("the claim store reported a fresh claim for an authorization the executor ledger already records");
+      return refuse(spentLocally.reason,
+        spentLocally.conflict
+          ? "the claim store reported a fresh claim for an authorization this executor already began: the database was rolled back; nothing was sent and all pushes are quarantined"
+          : `the executor ledger could not durably record the spend (${spentLocally.detail}); nothing was sent`,
+        { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
+    }
+
+    // ── 11c. NOW, and only now, the write credential ─────────────────────────
+    if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized, claim: claimMeta });
+    let writeContext;
+    try {
+      const writeHandle = await credentials.acquire({ repository: p.repository, remoteUrl: p.remote_url, executorId: identity.executor_id, access: "write" });
+      held.push(writeHandle);
+      const writable = withPushCredential(stage, writeHandle);
+      if (!writable.ok) return refuse(writable.reason, `${writable.detail}; the authority is spent and nothing was sent`, { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
+      writeContext = writable.context;
+    } catch (error) {
+      return refuse(error?.code ?? ERR_CREDENTIAL_UNAVAILABLE,
+        `${String(error?.message ?? error)}; the authority is spent and nothing was sent`,
+        { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
+    }
+
+    // ── 11d. Durably record that the effect is starting ──────────────────────
     // Claim-before-effect deliberately spends authority before the push, so a
     // crash here can leave "spent, never sent" or "sent, outcome never recorded".
     // Those need opposite handling and are indistinguishable unless the start is
@@ -812,13 +900,13 @@ export function createGitPushExecutor(startup = {}) {
 
     // ── 12. THE EFFECT ───────────────────────────────────────────────────────
     if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized, claim: claimMeta });
-    const pushed = await performPush(argv, remote, claim.ticket);
+    const pushed = await performPush(argv, writeContext, claim.ticket);
 
     // ── 13. Believe the remote, not the exit code ────────────────────────────
     // Exit 0 is the subprocess's opinion. The effect is what the remote says it
     // is, so it is read back independently and that observation is what the
     // evidence records.
-    const after = await readRemoteRef(p.remote_url, p.target_ref, remote);
+    const after = await readRemoteRef(p.remote_url, p.target_ref, writeContext);
 
     const base = {
       schema: EVIDENCE_SCHEMA,

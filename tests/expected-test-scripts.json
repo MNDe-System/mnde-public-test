@@ -50,6 +50,7 @@
   "test:git-push-isolation",
   "test:git-push-reachability",
   "test:git-push-single-route",
+  "test:git-push-spent-ledger",
   "test:graceful-shutdown",
   "test:historical-policy-bundle",
   "test:hub",

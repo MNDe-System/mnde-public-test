@@ -293,17 +293,20 @@ const GITHUB_HEADERS = Object.freeze({
   "X-GitHub-Api-Version": "2022-11-28"
 });
 
-// Mint a token for exactly one repository with contents:write and nothing else
-// the installation might also hold. The response is checked, not trusted: a
+// Mint a token for exactly one repository with contents:<access> and nothing else
+// the installation might also hold. `read` is what the pre-state check uses, so a
+// request that is later refused as already spent never held a write-capable
+// token; `write` is minted only after the durable claim (F-001). The response is checked, not trusted: a
 // token that came back broader than asked for is revoked and refused.
-async function mintInstallationToken(config, repository, { http, now }) {
+async function mintInstallationToken(config, repository, { http, now, access = "write" }) {
+  if (access !== "read" && access !== "write") throw configError("access must be 'read' or 'write'", ERR_CREDENTIAL_SCOPE);
   const [, owner, repo] = /^https:[^/]+\/([^/]+)\/([^/]+)$/.exec(repository);
   const jwt = appJwt(config.app_id, config.private_key_file, Math.floor(now() / 1000));
   const response = await http({
     method: "POST",
     url: apiUrl(config.api_base_url, `/app/installations/${config.installation_id}/access_tokens`),
     headers: { ...GITHUB_HEADERS, Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ repositories: [repo], permissions: { contents: "write" } })
+    body: JSON.stringify({ repositories: [repo], permissions: { contents: access } })
   });
   if (response.status !== 201) {
     // The status only. A response body is the provider's text and is not
@@ -321,10 +324,10 @@ async function mintInstallationToken(config, repository, { http, now }) {
   if (!Number.isFinite(expires) || expires <= now() || expires > now() + 2 * 60 * 60 * 1000) problems.push("expiry");
   const permissions = isPlainObject(parsed.permissions) ? parsed.permissions : {};
   for (const [name, level] of Object.entries(permissions)) {
-    const expected = name === "contents" ? "write" : name === "metadata" ? "read" : null;
+    const expected = name === "contents" ? access : name === "metadata" ? "read" : null;
     if (level !== expected) problems.push(`permission ${name}`);
   }
-  if (permissions.contents !== "write") problems.push("contents:write missing");
+  if (permissions.contents !== access) problems.push(`contents:${access} missing`);
   const repos = Array.isArray(parsed.repositories) ? parsed.repositories.map((r) => String(r?.full_name ?? "").toLowerCase()) : null;
   if (!repos || repos.length !== 1 || repos[0] !== `${owner}/${repo}`.toLowerCase()) problems.push("repository scope");
   if (problems.length > 0) {
@@ -373,13 +376,15 @@ export function openPushCredentialProvider(config, { forbiddenRoots = [], http =
 
   // Acquire the credential for one execution. Returns a handle or throws a
   // coded error; never returns a partial credential.
-  async function acquire({ repository, remoteUrl, executorId } = {}) {
+  async function acquire({ repository, remoteUrl, executorId, access = "write" } = {}) {
+    if (access !== "read" && access !== "write") throw configError("access must be 'read' or 'write'", ERR_CREDENTIAL_SCOPE);
     const scopeProblem = checkScope(parsed, { repository, remoteUrl });
     if (scopeProblem) throw configError(scopeProblem, ERR_CREDENTIAL_SCOPE);
     const allowProtocol = CREDENTIAL_KINDS[parsed.kind];
     const baseMeta = {
       credential_provider_kind: parsed.kind,
       credential_scope: repository,
+      credential_access: parsed.kind === "github-app" ? access : "static",
       executor_id: nonEmptyString(executorId) ? executorId : null
     };
 
@@ -419,7 +424,7 @@ export function openPushCredentialProvider(config, { forbiddenRoots = [], http =
       if (!TOKEN_SHAPE.test(token)) throw configError("token_file does not hold a single printable token", ERR_CREDENTIAL_UNAVAILABLE);
     } else {
       requireSecretFile(parsed.private_key_file, "private_key_file", { ...fileOptions, secret: true });
-      const minted = await mintInstallationToken(parsed, repository, { http, now });
+      const minted = await mintInstallationToken(parsed, repository, { http, now, access });
       token = minted.token;
       expiresAt = minted.expires_at;
     }
