@@ -85,12 +85,12 @@ directory is unusable, because the ledger is now the first durable barrier. No s
 | --- | --- | --- | --- |
 | `c252ae4` | **success** (run `38991817024`, job `117275652208`) | **success** (job `117275652474`) | the candidate; PASS |
 | `76e158e` | attempt 1 failed (`test:sidecar-pe`, `ERR_SYSTEM_SATURATED`); **attempt 2 success** (run `38990966726`) | success | same commit, no code change between attempts |
-| `156e4cb` | attempt 1 failed (`test:sidecar-pe`); re-run in progress at time of writing | success | not relied on |
+| `156e4cb` | attempt 1 failed (`test:sidecar-pe`); **attempt 2 success** (run `38991048888`) | success | same commit, no code change between attempts |
 | `4447c72` | failed only `test:git-push-cli` case B (fixed in `8d504c6`) | success | confirms the Windows fsync fix |
 
 The `sidecar-pe` and `issuance-guard` failures were `ERR_SYSTEM_SATURATED`, the sidecar's own load-shedding guard,
 in suites that do not touch this change; my added suite's end-of-run repository deletion was a plausible contributor and
-was removed (`c252ae4`). That attribution is an inference; the evidence is the pass of attempt 2 and of `c252ae4`.
+was removed (`c252ae4`). That attribution is an inference; the evidence is that both failed heads passed on re-run with identical code, and that `c252ae4` passed.
 
 ## 8. Full local test results (`c252ae4`, Node 24.22.0)
 
