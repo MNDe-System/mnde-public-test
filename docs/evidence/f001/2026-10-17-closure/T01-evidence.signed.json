@@ -1,40 +1,58 @@
 {
   "schema_version": "mnde.git-push-execution-evidence-envelope.v1",
   "evidence": {
-    "schema_version": "mnde.git-push-execution-evidence.v1",
+    "schema_version": "mnde.git-push-execution-evidence.v2",
     "action": "git.push",
-    "execution_id": "exec-c8bdf116-227b-48e2-83ae-88a2a3d44491",
-    "grant_id": "grant-76955cd5-747b-41f5-97f8-ee39671dbe11",
-    "authorization_receipt_hash": "889fe998081d36cfd3abd3e5e98ca8d75bea95ef0a397f90a0a12e6654e1b2f2",
-    "authority_digest": "c79428e873b937df55591e4a97b5c8422e6d7c8753946c9e14fa497cd2793c4d",
+    "execution_id": "exec-84e7ba4f-555d-41e7-81fe-30390401065f",
+    "grant_id": "grant-8b1e89ea-e85d-4b5b-b4dc-254eb6faf10d",
+    "authorization_receipt_hash": "e25737a336bde9939632fa40fe9fb4f679628a7b04dac53d57beaa45c15fa09c",
+    "authority_digest": "7e50c32aa3e7d7471e6281a1c6f92043ccf0faeed7ad284e3d52affe564fa99e",
     "executor_id": "mnde:test:prod:executor:gitpush:01",
     "environment_id": "prod",
-    "key_id": "mnde-exk:3c8db5d837b011666618ee4ea34086d9",
-    "credential_id": "mnde-cred:618439429a60b6bf2bad3514b6877320",
-    "authority_bundle_fingerprint": "b0c15e45a85d5f09ba74e292a6e4c26fc3e8c4c78e4633023c23ea2d1bce2bff",
-    "repository": "file:/tmp/mnde-f001-closure-hVYWyB/01-baseline/remote",
+    "key_id": "mnde-exk:925c0b7e790d63e5002f49435bc0123e",
+    "credential_id": "mnde-cred:f0b93b0bb8f6e073cc6d7468385d4bd8",
+    "authority_bundle_fingerprint": "bacdb7e591877481553bbfd82ba4d5a8bc1c336e05f8ecbe6b1729e5bb67c794",
+    "repository": "file:/tmp/mnde-f001-closure-VLwYpW/01-baseline/remote",
     "remote": "origin",
-    "remote_url": "file:///tmp/mnde-f001-closure-hVYWyB/01-baseline/remote.git",
+    "remote_url": "file:///tmp/mnde-f001-closure-VLwYpW/01-baseline/remote.git",
     "target_ref": "refs/heads/main",
-    "expected_old_sha": "415d289fc118e659180acc165d0c082ae3822a53",
-    "approved_new_sha": "c81a497cea40aa07f874e708544f5fa24090a92a",
-    "observed_before_sha": "415d289fc118e659180acc165d0c082ae3822a53",
-    "observed_after_sha": "c81a497cea40aa07f874e708544f5fa24090a92a",
+    "expected_old_sha": "8b17fe3d274050e207e3f5fb01b08fcf9f6e4541",
+    "approved_new_sha": "604b63e88fd598121e016cf6caed4456ff99f308",
+    "observed_before_sha": "8b17fe3d274050e207e3f5fb01b08fcf9f6e4541",
+    "observed_after_sha": "604b63e88fd598121e016cf6caed4456ff99f308",
     "claim": {
       "decision": "CLAIMED",
       "namespace": "f001-closure-ns",
-      "record_digest": "1fcd981beab1659f8c12672c531d6ac10004c7ed7a15e54057cd14d82da02e5c"
+      "record_digest": "94a9ea1c4406f2a35d9881bef7aea43d3752d26d60146c08702b927b9bf9669c"
     },
     "effect_attempted": true,
     "outcome": "EXECUTED",
     "reason_code": null,
-    "recorded_at": "2026-10-17T01:45:42.396Z"
+    "recorded_at": "2026-10-17T02:54:01.257Z",
+    "execution_start": {
+      "record_sha256": "60f14aa635885cf398134339fa65b6708162b3eaea7f0d2a75848fca69d262aa",
+      "started_at": "2026-10-17T02:54:01.211Z"
+    },
+    "push_credential": {
+      "kind": "none",
+      "access": "static",
+      "scope": "file:/tmp/mnde-f001-closure-VLwYpW/01-baseline/remote",
+      "app_id": null,
+      "installation_id": null,
+      "expires_at": null
+    },
+    "witness": {
+      "witness_id": "mnde-closure-witness",
+      "key_id": "witness-key-1",
+      "n": 1,
+      "entry_digest": "a218cba1d26444d5f8a89e294d05783c8976e9ca48027344e6710b48c35af7c6"
+    }
   },
   "credential": {
     "schema_version": "mnde.executor.credential.v1",
     "executor_id": "mnde:test:prod:executor:gitpush:01",
-    "key_id": "mnde-exk:3c8db5d837b011666618ee4ea34086d9",
-    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA5JQe7uH2ytUWZdheyVz/O/vBv9mUMFOex8XtuWW6dNw=\n-----END PUBLIC KEY-----\n",
+    "key_id": "mnde-exk:925c0b7e790d63e5002f49435bc0123e",
+    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEADcFJtpTJDMyu0hNo12ebVyAujZty7k7Tm4mPBN7KGOw=\n-----END PUBLIC KEY-----\n",
     "issuer_id": "mnde-git-push-test",
     "issuer_key_id": "git-push-test-root",
     "environment_id": "prod",
@@ -46,12 +64,12 @@
     ],
     "trust_epoch": "executor-identity-v1",
     "signature_algorithm": "ED25519",
-    "credential_id": "mnde-cred:618439429a60b6bf2bad3514b6877320",
-    "issuer_signature": "ae6bf52708b449f4ca8011889a713371a99c27b67ddf2404067ffcacab3f71724d5d7e43e90be7364cb158c0695e39ca2119fbfc308c545c8d7d6122f6a6f403"
+    "credential_id": "mnde-cred:f0b93b0bb8f6e073cc6d7468385d4bd8",
+    "issuer_signature": "d1ee5a086a3dfc90a91d9c5e5d67425b50811a0f75b1ab3dd4be8319cad475f7bcc7badbbf2ad1f1a8e1ee4d8edc5360f20a14b42918cdaa1de103e697194b0c"
   },
   "signature": {
     "algorithm": "ED25519",
-    "key_id": "mnde-exk:3c8db5d837b011666618ee4ea34086d9",
-    "value": "fbb49d4cda469160d2e7f96dd8db81dd6ead7aafa3dffd1ef1e01d0ec3e5c32c82349a68dd35dbf77d2c99e61d1c2318f04f76e166f9b99b9c3a82040ed95604"
+    "key_id": "mnde-exk:925c0b7e790d63e5002f49435bc0123e",
+    "value": "6fd40c6a47d58b9c3b7f62585d076cfeb7748e832fd26bee9be6f83b35624010a7b31278e48bf76ee0e2bf4e7b57347699341db02d9f44a25ecd46c5473c6c00"
   }
 }

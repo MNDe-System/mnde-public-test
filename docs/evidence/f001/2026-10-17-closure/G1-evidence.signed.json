@@ -1,40 +1,58 @@
 {
   "schema_version": "mnde.git-push-execution-evidence-envelope.v1",
   "evidence": {
-    "schema_version": "mnde.git-push-execution-evidence.v1",
+    "schema_version": "mnde.git-push-execution-evidence.v2",
     "action": "git.push",
-    "execution_id": "exec-a27edbba-74c1-4949-b909-a79fd6eacdf2",
-    "grant_id": "grant-9a0ae88d-406b-4acc-bfd4-70a51db89360",
-    "authorization_receipt_hash": "8f7661c0ffeb11ddc8cd614cd21cb105a8df44877903f233d747e3b1071b9a33",
-    "authority_digest": "ed5136a0e44439d77f4022d5ec5324d1cfe4ea55911fc21637e4fbbffbff5694",
+    "execution_id": "exec-d0523fb4-80a6-4d87-af58-0d245c0313fe",
+    "grant_id": "grant-72c142cb-f85f-41a5-9f23-242f492dc230",
+    "authorization_receipt_hash": "5b4da1b031c9e555778d9c2d5bb7c130d0e08cbfabf68ec870fe5440eb269316",
+    "authority_digest": "3e46554740582a91349f40735c75749cabf2d76ff2f99c91e5c8be7f2d459256",
     "executor_id": "mnde:test:prod:executor:gitpush:01",
     "environment_id": "prod",
-    "key_id": "mnde-exk:3c8db5d837b011666618ee4ea34086d9",
-    "credential_id": "mnde-cred:618439429a60b6bf2bad3514b6877320",
-    "authority_bundle_fingerprint": "b0c15e45a85d5f09ba74e292a6e4c26fc3e8c4c78e4633023c23ea2d1bce2bff",
+    "key_id": "mnde-exk:925c0b7e790d63e5002f49435bc0123e",
+    "credential_id": "mnde-cred:f0b93b0bb8f6e073cc6d7468385d4bd8",
+    "authority_bundle_fingerprint": "bacdb7e591877481553bbfd82ba4d5a8bc1c336e05f8ecbe6b1729e5bb67c794",
     "repository": "https:localhost/acme/widgets",
     "remote": "origin",
-    "remote_url": "https://localhost:37381/acme/widgets.git",
+    "remote_url": "https://localhost:37681/acme/widgets.git",
     "target_ref": "refs/heads/main",
-    "expected_old_sha": "fa1cabc88d0d8edaa243d3543b8eea83d4cbc4c4",
-    "approved_new_sha": "a99d28694d9ecbe3f93aeb73e92c26f6c01ea449",
-    "observed_before_sha": "fa1cabc88d0d8edaa243d3543b8eea83d4cbc4c4",
-    "observed_after_sha": "a99d28694d9ecbe3f93aeb73e92c26f6c01ea449",
+    "expected_old_sha": "dbe9a4390c32ffe0ebab0b9e78185e0f2fb0a68d",
+    "approved_new_sha": "d28d210835e4a0d8edf88ee0db91ffb8d52cee75",
+    "observed_before_sha": "dbe9a4390c32ffe0ebab0b9e78185e0f2fb0a68d",
+    "observed_after_sha": "d28d210835e4a0d8edf88ee0db91ffb8d52cee75",
     "claim": {
       "decision": "CLAIMED",
       "namespace": "f001-closure-ns",
-      "record_digest": "e4d62894ea97cf5c234ddd54cc9a87c6b1a28e07f0e0a46efb0164effe503106"
+      "record_digest": "519f3c762e3f783ad3a600d82d5f3d3ccc6090c39fa6b1f372413d81ef8226d9"
     },
     "effect_attempted": true,
     "outcome": "EXECUTED",
     "reason_code": null,
-    "recorded_at": "2026-10-17T01:46:27.008Z"
+    "recorded_at": "2026-10-17T02:55:01.064Z",
+    "execution_start": {
+      "record_sha256": "ca87d3b6fc706a8e1a50af838339ebd713cdc52030df36be05f5747b54666d7e",
+      "started_at": "2026-10-17T02:55:00.888Z"
+    },
+    "push_credential": {
+      "kind": "github-app",
+      "access": "write",
+      "scope": "https:localhost/acme/widgets",
+      "app_id": "424242",
+      "installation_id": "777",
+      "expires_at": "2026-10-17T03:55:00.887Z"
+    },
+    "witness": {
+      "witness_id": "mnde-closure-witness",
+      "key_id": "witness-key-2",
+      "n": 31,
+      "entry_digest": "c89f93d3ae613c4a4b452bac923e394e95cade95d873a0c0e4ce58dc6d32c1de"
+    }
   },
   "credential": {
     "schema_version": "mnde.executor.credential.v1",
     "executor_id": "mnde:test:prod:executor:gitpush:01",
-    "key_id": "mnde-exk:3c8db5d837b011666618ee4ea34086d9",
-    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA5JQe7uH2ytUWZdheyVz/O/vBv9mUMFOex8XtuWW6dNw=\n-----END PUBLIC KEY-----\n",
+    "key_id": "mnde-exk:925c0b7e790d63e5002f49435bc0123e",
+    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEADcFJtpTJDMyu0hNo12ebVyAujZty7k7Tm4mPBN7KGOw=\n-----END PUBLIC KEY-----\n",
     "issuer_id": "mnde-git-push-test",
     "issuer_key_id": "git-push-test-root",
     "environment_id": "prod",
@@ -46,12 +64,12 @@
     ],
     "trust_epoch": "executor-identity-v1",
     "signature_algorithm": "ED25519",
-    "credential_id": "mnde-cred:618439429a60b6bf2bad3514b6877320",
-    "issuer_signature": "ae6bf52708b449f4ca8011889a713371a99c27b67ddf2404067ffcacab3f71724d5d7e43e90be7364cb158c0695e39ca2119fbfc308c545c8d7d6122f6a6f403"
+    "credential_id": "mnde-cred:f0b93b0bb8f6e073cc6d7468385d4bd8",
+    "issuer_signature": "d1ee5a086a3dfc90a91d9c5e5d67425b50811a0f75b1ab3dd4be8319cad475f7bcc7badbbf2ad1f1a8e1ee4d8edc5360f20a14b42918cdaa1de103e697194b0c"
   },
   "signature": {
     "algorithm": "ED25519",
-    "key_id": "mnde-exk:3c8db5d837b011666618ee4ea34086d9",
-    "value": "c0018f3d9cb48611cf8028dfc40c317d2a0584af65de56fbd6da09da296bc2b16021f761777d51fc00360d7baff7261372caf7542b0996f5eff093b2da411503"
+    "key_id": "mnde-exk:925c0b7e790d63e5002f49435bc0123e",
+    "value": "724a9175eff82a309f1af2f352e76d45fdcef45888521ea328752a43c62f7e5d30e8ef316e7cb4280fee845d8b2b80a9e0b94ff7d7861af85622bad365e6c90e"
   }
 }
