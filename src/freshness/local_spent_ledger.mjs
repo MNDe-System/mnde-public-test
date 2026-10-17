@@ -115,6 +115,14 @@ function makeLedger(dir, ledgerId) {
     // Read-only. Any I/O error other than "absent" is unavailable, never "unspent".
     // The quarantine latch is re-read on every use: a long-lived executor (the Hub)
     // holds this object open, and a latch set by one request must stop the next.
+    // Cheap health probe: the latch and the marker, re-read each time.
+    status() {
+      try {
+        if (exists(join(dir, QUARANTINE))) return { ok: false, reason: ERR_LEDGER_QUARANTINED, detail: QUARANTINED_DETAIL };
+        if (!exists(join(dir, MARKER))) return { ok: false, reason: ERR_LEDGER_UNAVAILABLE, detail: "ledger marker is missing" };
+        return { ok: true };
+      } catch (error) { return { ok: false, reason: ERR_LEDGER_UNAVAILABLE, detail: String(error?.code ?? error) }; }
+    },
     isSpent(record) {
       if (exists(join(dir, QUARANTINE))) return { ok: false, reason: ERR_LEDGER_QUARANTINED, detail: QUARANTINED_DETAIL };
       try { return { ok: true, spent: paths(record).some(exists) }; }

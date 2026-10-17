@@ -370,7 +370,10 @@ export function createGitPushExecutor(startup = {}) {
   // only on success so an unavailable ledger is re-examined, never assumed.
   let spentLedger = null;
   function ledger() {
-    if (spentLedger) return { ok: true, ledger: spentLedger };
+    if (spentLedger) {
+      const state = spentLedger.status();
+      return state.ok ? { ok: true, ledger: spentLedger } : state;
+    }
     let hasHistory = false;
     try { hasHistory = readdirSync(evidenceDir).some((name) => name.endsWith(".started.json")); }
     catch (error) { if (error?.code !== "ENOENT") hasHistory = true; }
@@ -948,6 +951,9 @@ export function createGitPushExecutor(startup = {}) {
 
   async function readiness() {
     const store = await claimStore;
+    // A quarantined or unavailable spent ledger refuses every push, so it must also
+    // make the Hub report DEGRADED instead of ACTIVE.
+    if (!ledger().ok) return { ready: false };
     try { return { ready: (await store.backend?.health())?.ok === true }; }
     catch { return { ready: false }; }
   }

@@ -186,6 +186,19 @@ await test("an executed push leaves the ledger marker plus one grant entry and o
   assert.ok(names.includes("LEDGER.json"));
 });
 
+await test("readiness reports not-ready while the ledger is quarantined and ready again once cleared", async () => {
+  const w = world();
+  const a = await w.request();
+  assert.equal((await w.boot().executeGitPush(a.body)).outcome, OUTCOME.EXECUTED);
+  w.repos.setRemoteTo(w.repos.commits[0]);
+  const executor = w.boot(inMemoryClaimBackend({ namespace: NAMESPACE }));
+  assert.equal((await executor.readiness()).ready, true);
+  assert.equal((await executor.executeGitPush(a.body)).reason_code, ERR_LEDGER_ROLLBACK_DETECTED);
+  assert.equal((await executor.readiness()).ready, false, "a quarantined executor must not report ready");
+  rmSync(join(w.evidenceDir, "spent-ledger", "QUARANTINE.json"));
+  assert.equal((await executor.readiness()).ready, true);
+});
+
 await test("a lost ledger (evidence history present, ledger gone) refuses before the claim store is touched", async () => {
   const w = world();
   const a = await w.request();
