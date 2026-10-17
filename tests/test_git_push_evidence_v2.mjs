@@ -30,10 +30,11 @@ import {
 
 const NAMESPACE = "mnde-git-push-evidence-v2-namespace";
 let passed = 0, failed = 0;
+const closers = [];
 async function test(name, fn) {
   try { await fn(); passed += 1; console.log(`  [PASS] ${name}`); }
   catch (error) { failed += 1; console.error(`  [FAIL] ${name}: ${error instanceof Error ? error.stack : String(error)}`); }
-  finally { installWitnessClient(undefined); }
+  finally { installWitnessClient(undefined); while (closers.length) { try { closers.pop()(); } catch { /* already closed */ } } }
 }
 
 const dir = mkdtempSync(join(tmpdir(), "mnde-evidence-v2-"));
@@ -51,6 +52,7 @@ async function executed({ withWitness = false } = {}) {
   process.env.MNDE_GIT_CREDENTIAL_CONFIG = repos.credentialConfigPath;
   const identity = { executor_id: EXECUTOR_ID, namespace: NAMESPACE };
   const witness = withWitness ? startInProcessWitness({ identities: [identity], dataDir: join(caseDir, "witness") }) : null;
+  if (witness) closers.push(() => witness.close());
   installClaimBackend(inMemoryClaimBackend({ namespace: NAMESPACE }));
   installWitnessClient(withWitness ? witness.client(identity) : null);
   const evidenceDir = join(caseDir, "evidence");

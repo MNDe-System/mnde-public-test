@@ -29,11 +29,13 @@ import {
 const NAMESPACE = "mnde-git-push-witness-namespace";
 let passed = 0, failed = 0;
 const pending = [];
+const closers = [];            // witnesses opened by a case: their log handle and lock must be released before the directory is removed
 async function test(name, fn) {
   try { await fn(); passed += 1; console.log(`  [PASS] ${name}`); }
   catch (error) { failed += 1; console.error(`  [FAIL] ${name}: ${error instanceof Error ? error.stack : String(error)}`); }
   finally {
     installWitnessClient(undefined);
+    while (closers.length) { try { closers.pop()(); } catch { /* already closed */ } }
     while (pending.length) { try { rmSync(pending.pop(), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* best effort */ } }
   }
 }
@@ -52,6 +54,7 @@ function world({ wrap } = {}) {
   process.env.MNDE_GIT_CREDENTIAL_CONFIG = repos.credentialConfigPath;
   const witness = startInProcessWitness({ identities: [IDENTITY], dataDir: join(caseDir, "witness-data") });
   pending.push(witness.dataDir);
+  closers.push(() => witness.close());
   // An executor "machine": its own claim store and evidence directory. The witness is shared.
   const machine = (name, { backend = inMemoryClaimBackend({ namespace: NAMESPACE }), client = witness.client(IDENTITY, { wrap }), real = false, env = process.env } = {}) => {
     const evidenceDir = join(caseDir, `evidence-${name}`);

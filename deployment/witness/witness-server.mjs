@@ -63,7 +63,8 @@ export function openWitnessLog(dataDir) {
   let n = 0, head = GENESIS;
   try {
     fd = openSync(logPath, "a", 0o600);
-    if (created) { const d = openSync(dataDir, "r"); try { fsyncSync(d); } finally { closeSync(d); } }
+    // Windows needs a writable handle to flush a directory; POSIX opens it read-only.
+    if (created) { const d = openSync(dataDir, process.platform === "win32" ? "r+" : "r"); try { fsyncSync(d); } finally { closeSync(d); } }
     const text = readFileSync(logPath, "utf8");
     if (text.length && !text.endsWith("\n")) throw new Error("ERR_WITNESS_LOG_CORRUPT: torn final line");
     for (const line of text.split("\n").filter(Boolean)) {
