@@ -18,12 +18,16 @@
 //   fs-evidence-before-rename  die with the signed evidence fsynced as *.tmp only
 //   fs-evidence-after-rename   die after the rename, before the directory fsync
 //   stdout-before-response die after evidence is durable, before the caller hears
+//   witness-before-consume die before the spend witness consume request is sent
+//   witness-during-consume die after the consume request is fully written, reply unread
+//   witness-after-consume  die after the witness reply was received (witness has committed)
 //
 // The pg-level faults work by redirecting the adapter's dynamic `import("pg")` to
 // ./pg_wrapper.mjs, which wraps the real driver; the adapter itself is unmodified.
 
 import fs from "node:fs";
 import cp from "node:child_process";
+import https from "node:https";
 import { registerHooks, syncBuiltinESMExports } from "node:module";
 
 const fault = process.env.MNDE_F001_FAULT ?? "";
@@ -40,7 +44,7 @@ if (fault.startsWith("sql-")) {
   });
 }
 
-const originals = { openSync: fs.openSync, closeSync: fs.closeSync, fsyncSync: fs.fsyncSync, renameSync: fs.renameSync, execFile: cp.execFile };
+const originals = { httpsRequest: https.request, openSync: fs.openSync, closeSync: fs.closeSync, fsyncSync: fs.fsyncSync, renameSync: fs.renameSync, execFile: cp.execFile };
 let startFd = null;
 let startClosed = false;
 
@@ -68,6 +72,16 @@ if (fault === "fs-evidence-before-rename") {
 }
 if (fault === "fs-evidence-after-rename") {
   fs.renameSync = (from, to) => { originals.renameSync(from, to); if (String(from).endsWith(".signed.json.tmp")) die(fault); };
+}
+if (fault.startsWith("witness-")) {
+  https.request = (...args) => {
+    const isConsume = String(args[0]?.pathname ?? args[0]).endsWith("/v1/consume");
+    if (isConsume && fault === "witness-before-consume") die(fault);
+    const req = originals.httpsRequest(...args);
+    if (isConsume && fault === "witness-during-consume") req.on("finish", () => die(fault));
+    if (isConsume && fault === "witness-after-consume") req.on("response", (res) => res.on("end", () => die(fault)));
+    return req;
+  };
 }
 if (fault === "stdout-before-response") {
   const write = process.stdout.write.bind(process.stdout);

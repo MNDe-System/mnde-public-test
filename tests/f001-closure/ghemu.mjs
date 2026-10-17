@@ -76,7 +76,7 @@ export function startEmulator({ stateDir, projectRoot, cert, key, appId, appPubl
         log({ e: "git", writes, access: info.access, path: url.pathname });
         const payload = await body(req);
         const [, pathInfo] = [null, url.pathname];
-        const cgi = spawn("git", ["http-backend"], { env: { PATH: process.env.PATH, GIT_PROJECT_ROOT: projectRoot, GIT_HTTP_EXPORT_ALL: "1",
+        const cgi = spawn("git", ["http-backend"], { env: { PATH: process.env.PATH, GIT_PROJECT_ROOT: projectRoot, GIT_HTTP_EXPORT_ALL: "1", GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL ?? "",
           REQUEST_METHOD: req.method, PATH_INFO: pathInfo, QUERY_STRING: url.search.slice(1), CONTENT_TYPE: req.headers["content-type"] ?? "",
           CONTENT_LENGTH: String(payload.length), HTTP_CONTENT_ENCODING: req.headers["content-encoding"] ?? "", REMOTE_USER: "emulator", REMOTE_ADDR: "127.0.0.1" } });
         const out = [];

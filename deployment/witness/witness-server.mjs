@@ -46,8 +46,17 @@ export function openWitnessLog(dataDir) {
   const lockPath = join(dataDir, "witness.lock");
   const created = !existsSync(logPath);
   let lock;
-  try { lock = openSync(lockPath, "wx", 0o600); writeSync(lock, String(process.pid)); }
-  catch { throw new Error("ERR_WITNESS_LOCKED: another witness process holds this data directory (remove witness.lock only if you are certain none is running)"); }
+  const take = () => { lock = openSync(lockPath, "wx", 0o600); writeSync(lock, String(process.pid)); };
+  try { take(); }
+  catch {
+    // A lock whose owner is gone (the witness was killed or the machine lost power) is taken over;
+    // one whose owner is alive is never touched. The log itself is re-verified below either way.
+    let alive = true;
+    try { process.kill(Number(readFileSync(lockPath, "utf8")), 0); } catch (e) { alive = e?.code === "EPERM"; }
+    if (alive) throw new Error("ERR_WITNESS_LOCKED: another witness process holds this data directory");
+    unlinkSync(lockPath);
+    try { take(); } catch { throw new Error("ERR_WITNESS_LOCKED: could not take over a stale lock"); }
+  }
   let fd = null;
   const release = () => { try { if (fd !== null) closeSync(fd); } catch { /* */ } try { closeSync(lock); } catch { /* */ } try { unlinkSync(lockPath); } catch { /* */ } };
   const byGrant = new Map(), byExec = new Map();

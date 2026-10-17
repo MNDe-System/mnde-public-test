@@ -24,6 +24,16 @@ if (mode === "claims") {
     executor_id: "e", receipt_hash: "r".repeat(64), aplus_digest: "a".repeat(64)
   }).then((r) => r.status, (e) => `THROW:${e.message}`)));
   console.log(JSON.stringify({ mode, count, tally: tally(results) }));
+} else if (mode === "witness") {
+  const { openExecutorSpendWitness } = await import("../../src/freshness/spend_witness.mjs");
+  const witness = openExecutorSpendWitness(process.env);
+  const unique = `w${Date.now()}${Math.random().toString(16).slice(2)}`;
+  const namespace = JSON.parse(readFileSync(process.env.MNDE_CLAIM_CONFIG, "utf8")).namespace;
+  const results = await Promise.all(Array.from({ length: count }, (_, i) => witness.consume({
+    namespace, grant_id: `${unique}-grant`, execution_id: `${unique}-exec-${i}`, executor_id: process.env.MNDE_EXECUTOR_ID,
+    receipt_hash: "r".repeat(64), aplus_digest: "a".repeat(64)
+  }).then((r) => r.decision, (e) => `THROW:${e.message}`)));
+  console.log(JSON.stringify({ mode, count, tally: tally(results) }));
 } else if (mode === "execute") {
   const loaded = await loadGitPushStartup(process.env);
   if (!loaded.ok) { console.log(JSON.stringify({ mode, startup_failed: loaded.reason_code ?? loaded.detail })); process.exit(4); }

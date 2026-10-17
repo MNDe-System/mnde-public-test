@@ -26,6 +26,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { classifyGitPushExecution } from "../../src/effects/git-push/index.mjs";
 import { canonicalRepositoryIdentity } from "../../src/effects/git-push/validate.mjs";
+import { generateAuthorityKeyPair } from "../../src/custody/bundle.mjs";
+import { sha256 } from "../../src/crypto/provider.mjs";
+import { openSpendWitness } from "../../src/freshness/spend_witness.mjs";
 import { startEmulator } from "./ghemu.mjs";
 import {
   ENVIRONMENT_ID, EXECUTOR_ID, gitPushAuthorization, makeRepositories, productionTrust, pushParameters
@@ -41,6 +44,24 @@ const FAULTS = pathToFileURL(join(HERE, "faults.mjs")).href;
 const PG_BIN = "/usr/lib/postgresql/16/bin";
 const claimConfig = JSON.parse(readFileSync(join(PG, "claim-config.json"), "utf8"));
 const only = new Set(process.argv.slice(2));
+
+// ── OS identities ───────────────────────────────────────────────────────────
+// The executor runs as an unprivileged user (not root); the witness runs as a different
+// unprivileged user whose data directory only it can read. F001_RUN_AS="" runs executors as the
+// current user (root in this sandbox) and is for debugging only.
+const RUN_AS = process.env.F001_RUN_AS ?? "mnde-exec";
+const WITNESS_USER = process.env.F001_WITNESS_USER ?? "mnde-witness";
+const NODE = process.env.F001_NODE ?? "/opt/node24/bin/node";   // readable by both users
+const WDIR = resolve(process.env.F001_WITNESS_DIR ?? "/var/tmp/mnde-witness");
+const idOf = (name, flag) => Number(execFileSync("id", [flag, name], { encoding: "utf8" }));
+const asUser = RUN_AS ? { uid: idOf(RUN_AS, "-u"), gid: idOf(RUN_AS, "-g") } : {};
+const asWitness = { uid: idOf(WITNESS_USER, "-u"), gid: idOf(WITNESS_USER, "-g") };
+const own = (path, user = RUN_AS) => { if (user) spawnSync("chown", ["-R", `${user}:${user}`, path]); };
+// git refuses repositories owned by another user; the harness is root and the repositories belong to the executor user.
+// A harness-only global config (never the executor's, which is built from empty): trust repositories owned by the executor user.
+const harnessGitConfig = join(tmpdir(), `mnde-f001-harness-gitconfig-${process.pid}`);
+writeFileSync(harnessGitConfig, "[safe]\n\tdirectory = *\n");
+process.env.GIT_CONFIG_GLOBAL = harnessGitConfig;
 mkdirSync(OUT, { recursive: true });
 
 // ── result recording ────────────────────────────────────────────────────────
@@ -71,6 +92,7 @@ const pgCtl = (...args) => spawnSync("su", ["postgres", "-c", `${PG_BIN}/pg_ctl 
 
 // ── world ───────────────────────────────────────────────────────────────────
 const dir = mkdtempSync(join(tmpdir(), "mnde-f001-closure-"));
+own(dir);
 const trust = await productionTrust(dir);
 const operatorDir = join(dir, "operator");
 mkdirSync(operatorDir, { recursive: true });
@@ -78,6 +100,71 @@ const keyPath = join(operatorDir, "executor-key.pem");
 writeFileSync(keyPath, trust.executor.keys.privatePem, { encoding: "utf8", mode: 0o600 });
 const credentialPath = join(operatorDir, "executor-credential.json");
 writeFileSync(credentialPath, `${JSON.stringify(trust.executor.credential, null, 2)}\n`, "utf8");
+own(dir);
+
+
+// ── spend witness: its own process, its own OS user, its own data directory ──────────────────────
+// Nothing in the restore scenarios touches WDIR/data. The executor user cannot read it (scenario S1).
+// HONEST LIMIT: it is the same machine and root can reach everything, so this proves the mechanism and
+// the executor identity's lack of access, not administrative independence.
+const WITNESS_ON = (process.env.F001_WITNESS ?? "1") !== "0";
+const WITNESS_ID = "mnde-closure-witness";
+let witnessClientConfig = null, witnessProc = null, witnessPort = null, witnessKey = null, witnessToken = null;
+const witnessLogPath = join(WDIR, "data", "spend-log.jsonl");
+const witnessEntries = () => (existsSync(witnessLogPath) ? readFileSync(witnessLogPath, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l).entry) : []);
+async function startWitness({ port = 0, key = witnessKey } = {}) {
+  writeFileSync(join(WDIR, "witness-key.pem"), key.privatePem, { mode: 0o600 });
+  writeFileSync(join(WDIR, "witness-config.json"), JSON.stringify({ host: "127.0.0.1", port, data_dir: join(WDIR, "data"), witness_id: WITNESS_ID,
+    key_id: key.keyId, key_file: join(WDIR, "witness-key.pem"), tls_cert_file: join(WDIR, "pki", "server.crt"), tls_key_file: join(WDIR, "pki", "server.key"),
+    tokens_file: join(WDIR, "tokens.json") }));
+  own(WDIR, WITNESS_USER);
+  spawnSync("chown", ["root:root", join(WDIR, "pki", "ca.crt")]);
+  const child = spawn(NODE, ["--no-warnings", join(ROOT, "deployment", "witness", "witness-server.mjs"), join(WDIR, "witness-config.json")],
+    { stdio: ["ignore", "pipe", "pipe"], ...asWitness });
+  let err = "";
+  child.stderr.on("data", (d) => { err += d; });
+  const started = await new Promise((res, rej) => {
+    let buf = "";
+    child.stdout.on("data", (d) => { buf += d; const line = buf.split("\n")[0]; if (line.includes("witness.started")) res(JSON.parse(line)); });
+    child.on("exit", (code) => rej(new Error(`witness exited ${code}: ${err.slice(0, 400)}`)));
+    setTimeout(() => rej(new Error("witness did not start")), 15000);
+  });
+  witnessProc = child; witnessPort = started.port;
+  return started;
+}
+async function stopWitness(signal = "SIGTERM") {
+  if (!witnessProc) return;
+  const p = witnessProc; witnessProc = null;
+  await new Promise((res) => { p.on("exit", res); p.kill(signal); setTimeout(res, 5000); });
+  if (signal === "SIGKILL") rmSync(join(WDIR, "data", "witness.lock"), { force: true }); // an operator removes a stale lock after confirming no server runs
+}
+function writeWitnessClientConfig({ keys = [{ key_id: witnessKey.keyId, public_key: witnessKey.publicPem }], caFile = join(WDIR, "pki", "ca.crt"), token = witnessToken, timeoutMs = 3000 } = {}) {
+  writeFileSync(join(dir, "operator", "witness-token"), token, { mode: 0o600 });
+  const path = join(dir, "operator", "witness-client.json");
+  writeFileSync(path, JSON.stringify({ url: `https://localhost:${witnessPort}`, witness_id: WITNESS_ID, caFile, tokenFile: join(dir, "operator", "witness-token"), witness_keys: keys, timeoutMs }));
+  own(dir);
+  witnessClientConfig = path;
+}
+if (WITNESS_ON) {
+  rmSync(WDIR, { recursive: true, force: true });
+  mkdirSync(join(WDIR, "pki"), { recursive: true }); mkdirSync(join(WDIR, "data"), { mode: 0o700 });
+  const ossl = (...a) => { const r = spawnSync("openssl", a, { cwd: join(WDIR, "pki"), encoding: "utf8" }); if (r.status !== 0) throw new Error(`openssl ${a[0]} failed: ${r.stderr}`); };
+  ossl("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "ca.key", "-out", "ca.crt", "-days", "2", "-subj", "/CN=mnde-witness-test-ca");
+  ossl("req", "-newkey", "rsa:2048", "-nodes", "-keyout", "server.key", "-out", "server.csr", "-subj", "/CN=localhost");
+  writeFileSync(join(WDIR, "pki", "san.cnf"), "subjectAltName=DNS:localhost,IP:127.0.0.1");
+  ossl("x509", "-req", "-in", "server.csr", "-CA", "ca.crt", "-CAkey", "ca.key", "-CAcreateserial", "-out", "server.crt", "-days", "2", "-extfile", "san.cnf");
+  const pair = generateAuthorityKeyPair();
+  witnessKey = { keyId: "witness-key-1", privatePem: pair.privatePem, publicPem: pair.publicPem };
+  witnessToken = `witness-token-${randomUUID()}`;
+  writeFileSync(join(WDIR, "tokens.json"), JSON.stringify({ [sha256(witnessToken)]: { executor_id: EXECUTOR_ID, namespace: claimConfig.namespace } }));
+  rmSync(join(WDIR, "pki", "ca.key"), { force: true });   // the CA key is not needed after signing and must not outlive the setup
+  spawnSync("chmod", ["755", WDIR, join(WDIR, "pki")]); spawnSync("chmod", ["644", join(WDIR, "pki", "ca.crt")]);
+  own(WDIR, WITNESS_USER);
+  spawnSync("chmod", ["755", WDIR, join(WDIR, "pki")]); spawnSync("chmod", ["700", join(WDIR, "data")]);
+  spawnSync("chown", ["root:root", join(WDIR, "pki", "ca.crt")]);    // a trust anchor is owned by root, never by the witness or the executor
+  await startWitness();
+  writeWitnessClientConfig();
+}
 
 const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const PRE_RECEIVE = `#!/bin/sh
@@ -98,6 +185,7 @@ function newCase(label) {
   const repos = makeRepositories(caseDir);
   writeFileSync(join(repos.barePath, "hooks", "pre-receive"), PRE_RECEIVE, { mode: 0o755 });
   writeFileSync(join(repos.barePath, "hooks", "post-receive"), POST_RECEIVE, { mode: 0o755 });
+  own(caseDir);
   const count = (name) => { const p = join(repos.barePath, name); return existsSync(p) ? readFileSync(p, "utf8").split("\n").filter(Boolean).length : 0; };
   return { caseDir, repos, label, evidenceDir: join(caseDir, "evidence"), log: join(caseDir, "fault.log"),
     attempts: () => count("attempts.log"), received: () => count("received.log"),
@@ -106,7 +194,8 @@ function newCase(label) {
 
 function operatorEnv(c, overrides = {}) {
   const env = {};
-  for (const [k, v] of Object.entries(process.env)) if (!k.startsWith("MNDE_") && !k.startsWith("PG")) env[k] = v;
+  for (const [k, v] of Object.entries(process.env)) if (!k.startsWith("MNDE_") && !k.startsWith("PG") && !k.startsWith("GIT_CONFIG")) env[k] = v;
+  env.HOME = c.caseDir;
   Object.assign(env, {
     MNDE_PROFILE: "production",
     MNDE_CLAIM_CONFIG: join(PG, "claim-config.json"),
@@ -123,7 +212,8 @@ function operatorEnv(c, overrides = {}) {
     MNDE_EXECUTOR_PRIVATE_KEY: keyPath,
     MNDE_EXECUTOR_CREDENTIAL: credentialPath,
     MNDE_EXECUTOR_ENVIRONMENT: ENVIRONMENT_ID,
-    MNDE_F001_LOG: c.log
+    MNDE_F001_LOG: c.log,
+    ...(witnessClientConfig ? { MNDE_WITNESS_CONFIG: witnessClientConfig } : {})
   });
   for (const [k, v] of Object.entries(overrides)) { if (v === undefined) delete env[k]; else env[k] = v; }
   return env;
@@ -131,8 +221,8 @@ function operatorEnv(c, overrides = {}) {
 
 // Start the production CLI. Resolves with what the OS reports, plus parsed stdout when there is one.
 function startCli(c, requestPath, { fault = "", env = {} } = {}) {
-  const child = spawn(process.execPath, ["--no-warnings", "--import", FAULTS, CLI, requestPath],
-    { cwd: c.caseDir, env: operatorEnv(c, { MNDE_F001_FAULT: fault, ...env }), stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(NODE, ["--no-warnings", "--import", FAULTS, CLI, requestPath],
+    { cwd: c.caseDir, env: operatorEnv(c, { MNDE_F001_FAULT: fault, ...env }), stdio: ["ignore", "pipe", "pipe"], ...asUser });
   let stdout = "", stderr = "";
   child.stdout.on("data", (d) => { stdout += d; });
   child.stderr.on("data", (d) => { stderr += d; });
@@ -232,7 +322,7 @@ await scenario("T02", "repeated execution of a consumed authorization fails, thr
 await scenario("T03", "100 concurrent claims of one grant against real PostgreSQL",
   "exactly one CLAIMED", async () => {
     const c = newCase("claims100");
-    const run = spawnSync(process.execPath, [join(HERE, "concurrent.mjs"), "claims", "100"], { env: operatorEnv(c), encoding: "utf8", timeout: 180000 });
+    const run = spawnSync(NODE, [join(HERE, "concurrent.mjs"), "claims", "100"], { env: operatorEnv(c), encoding: "utf8", timeout: 180000, ...asUser });
     const out = JSON.parse(run.stdout.split("\n").filter(Boolean).pop());
     assert.equal(out.tally.CLAIMED, 1, JSON.stringify(out));
     return out;
@@ -242,7 +332,7 @@ await scenario("T04", "100 concurrent executeGitPush() calls of one authorizatio
   "exactly one push reaches the remote in each", async () => {
     const c = newCase("race-inproc");
     const a = await authorize(c);
-    const run = spawnSync(process.execPath, ["--no-warnings", join(HERE, "concurrent.mjs"), "execute", "100", a.path], { env: operatorEnv(c), encoding: "utf8", timeout: 280000 });
+    const run = spawnSync(NODE, ["--no-warnings", join(HERE, "concurrent.mjs"), "execute", "100", a.path], { env: operatorEnv(c), encoding: "utf8", timeout: 280000, ...asUser });
     const inproc = JSON.parse(run.stdout.split("\n").filter(Boolean).pop());
     assert.equal(inproc.tally.EXECUTED, 1, JSON.stringify(inproc));
     assert.equal(c.received(), 1, `remote received ${c.received()} pushes`);
@@ -625,25 +715,218 @@ await scenario("D1", "executor database login cannot administer: roles, replicat
         note: "executor and database share one machine and the harness runs as root, which can read, replace and restore the data directory; administrative independence is NOT demonstrated by this rig" } };
   });
 
-await scenario("W0", "KNOWN GAP (whole-system rollback): database AND executor evidence directory (spent-ledger) restored together, then the consumed grant is replayed",
-  "documented gap: the replay is expected to EXECUTE until the external witness exists; this scenario must flip to REFUSED when the witness is implemented", async () => {
+const blockedUnless = (cond, why) => { if (!cond) throw Object.assign(new Error(why), { blocked: true }); };
+const wClient = () => openSpendWitness({ url: `https://localhost:${witnessPort}`, witness_id: WITNESS_ID, caFile: join(WDIR, "pki", "ca.crt"),
+  tokenFile: join(dir, "operator", "witness-token"), witness_keys: [{ key_id: witnessKey.keyId, public_key: witnessKey.publicPem }], timeoutMs: 3000 }, { readFiles: false });
+const restoreExecutorState = (c, evidenceSnap) => { rmSync(c.evidenceDir, { recursive: true, force: true }); cpSync(evidenceSnap, c.evidenceDir, { recursive: true }); own(c.caseDir); };
+const WITNESS_CONSUMED = "ERR_GIT_PUSH_WITNESS_ALREADY_CONSUMED";
+
+await scenario("S1", "executor OS identity cannot administer PostgreSQL or the witness (no read, write, delete, rename, truncate, signal or stop)",
+  "every attempt as the executor user fails; its legitimate reads still work", async () => {
+    blockedUnless(RUN_AS && WITNESS_ON, "needs F001_RUN_AS and the witness");
+    const sh = (cmd) => spawnSync("sh", ["-c", cmd], { encoding: "utf8", ...asUser });
+    const pgPid = readFileSync(join(PG, "data", "postmaster.pid"), "utf8").split("\n")[0];
+    const attempts = {
+      read_postgres_data_dir: `ls ${PG}/data`, read_database_owner_password: `cat ${PG}/ownerpw`, read_postgres_server_key: `cat ${PG}/server.key`,
+      list_witness_data_dir: `ls ${WDIR}/data`, read_witness_signing_key: `cat ${WDIR}/witness-key.pem`, read_witness_tls_key: `cat ${WDIR}/pki/server.key`,
+      append_witness_log: `echo x >> ${witnessLogPath}`, truncate_witness_log: `: > ${witnessLogPath}`, delete_witness_log: `rm -f ${witnessLogPath}`,
+      rename_witness_log: `mv ${witnessLogPath} ${witnessLogPath}.bak`, replace_witness_data_dir: `rm -rf ${WDIR}/data`,
+      signal_postgres: `kill -0 ${pgPid}`, signal_witness: `kill -0 ${witnessProc.pid}`,
+      stop_postgres: `${PG_BIN}/pg_ctl -D ${PG}/data stop -m fast`, replace_postgres_snapshot: `mv ${PG}/data ${PG}/data.evil`
+    };
+    const refused = {};
+    for (const [name, cmd] of Object.entries(attempts)) {
+      const r = sh(cmd);
+      refused[name] = r.status !== 0 ? "refused" : "ALLOWED";
+      assert.notEqual(r.status, 0, `${name} was allowed: ${r.stdout}${r.stderr}`);
+    }
+    assert.equal(sh("id -un").stdout.trim(), RUN_AS);
+    assert.equal(sh(`cat ${join(PG, "claim-config.json")} > /dev/null`).status, 0, "the executor must still read its claim configuration");
+    const before = witnessEntries().length;
+    return { executor_os_user: RUN_AS, witness_os_user: WITNESS_USER, attempts_refused: refused, witness_log_entries_unchanged: witnessEntries().length === before,
+      note: "same machine: root can reach all of this; this shows the executor IDENTITY has no administrative route, not administrative independence" };
+  });
+
+await scenario("W0", "WHOLE-SYSTEM ROLLBACK: database AND executor ledger/evidence restored together, then the consumed grant is replayed (two restored executors at once)",
+  "REFUSED by the external witness; zero further pushes; the witness log unchanged; signed witness proof of why", async () => {
+    blockedUnless(WITNESS_ON, "the witness is disabled (F001_WITNESS=0)");
     const c = newCase("whole-system-rollback");
     const snap = takeSnapshot();
     const evidenceSnap = join(c.caseDir, "evidence-snapshot");
-    mkdirSync(c.evidenceDir, { recursive: true });
+    mkdirSync(c.evidenceDir, { recursive: true }); own(c.caseDir);
     cpSync(c.evidenceDir, evidenceSnap, { recursive: true });
     const a = await authorize(c);
-    assert.equal((await runCli(c, a.path)).code, 0);
+    const first = await runCli(c, a.path);
+    assert.equal(first.code, 0, JSON.stringify(first.out));
+    const entriesAfterFirst = witnessEntries();
+    const mine = entriesAfterFirst.find((e) => e.grant_id === a.grantId);
+    assert.ok(mine, "the witness recorded the first execution");
     c.repos.setRemoteTo(a.parameters.expected_old_sha);
-    const before = c.received();
+    const baseline = c.received();
     await restorePg(snap);
-    rmSync(c.evidenceDir, { recursive: true, force: true });
-    cpSync(evidenceSnap, c.evidenceDir, { recursive: true });
+    restoreExecutorState(c, evidenceSnap);
+    assert.equal(claimRows(a.grantId), 0, "the database restore must have removed the claim");
+    assert.equal(existsSync(join(c.evidenceDir, "spent-ledger")), false, "the ledger restore must have removed the spend entry");
+    const [r1, r2] = await Promise.all([runCli(c, a.path), runCli(c, a.path)]);
+    const reasons = [r1, r2].map((r) => r.out?.reason_code);
+    for (const r of [r1, r2]) assert.equal(r.out?.outcome, "REFUSED", JSON.stringify(r.out));
+    assert.ok(reasons.includes(WITNESS_CONSUMED), `expected the witness to refuse: ${reasons}`);
+    assert.equal(c.received(), baseline, "a restored executor pushed a consumed grant again");
+    assert.deepEqual(witnessEntries().filter((e) => e.grant_id === a.grantId).map((e) => e.n), [mine.n], "the witness history must be unchanged");
+    const proof = await wClient().lookup({ namespace: claimConfig.namespace, grant_id: a.grantId, execution_id: a.executionId });
+    assert.equal(proof.decision, "FOUND");
+    writeFileSync(join(OUT, "W0-witness-lookup.signed.json"), `${JSON.stringify(proof.record, null, 2)}\n`);
+    return { first_execution: first.out.outcome, witness_entry_n: mine.n, witness_entry_digest_prefix: proof.record.entry_digest.slice(0, 16),
+      restored_executors: reasons, remote_pushes_after_restore: c.received() - baseline, witness_log_unchanged: true,
+      refusal_witness_reference: [r1, r2].find((r) => r.out?.reason_code === WITNESS_CONSUMED)?.out?.claim?.witness ?? null, signed_witness_proof: "W0-witness-lookup.signed.json" };
+  });
+
+await scenario("W0c", "CONTROL: the identical whole-system rollback with the witness DISABLED reproduces the gap",
+  "the replay EXECUTES (this is the attack W0 defeats; if it does not reproduce, W0 proves nothing)", async () => {
+    const c = newCase("whole-system-rollback-control");
+    const snap = takeSnapshot();
+    const evidenceSnap = join(c.caseDir, "evidence-snapshot");
+    mkdirSync(c.evidenceDir, { recursive: true }); own(c.caseDir);
+    cpSync(c.evidenceDir, evidenceSnap, { recursive: true });
+    const a = await authorize(c);
+    const noWitness = { env: { MNDE_WITNESS_CONFIG: undefined } };
+    assert.equal((await runCli(c, a.path, noWitness)).code, 0);
+    c.repos.setRemoteTo(a.parameters.expected_old_sha);
+    const baseline = c.received();
+    await restorePg(snap);
+    restoreExecutorState(c, evidenceSnap);
+    const replay = await runCli(c, a.path, noWitness);
+    assert.equal(replay.out?.outcome, "EXECUTED", `the control did not reproduce the gap: ${JSON.stringify(replay.out)}`);
+    assert.equal(c.received() - baseline, 1);
+    return { replay_without_witness: "EXECUTED", second_push_reached_remote: true };
+  });
+
+await scenario("W1", "two executors with SEPARATE databases, SEPARATE ledgers and separate evidence directories race one authorization",
+  "exactly one push; the witness is the only shared arbiter", async () => {
+    blockedUnless(WITNESS_ON, "the witness is disabled");
+    const dbB = "mnde_claim_test_b";
+    sql(`drop database if exists ${dbB}`, "postgres"); sql(`create database ${dbB}`, "postgres");
+    execFileSync("psql", ["-h", "127.0.0.1", "-p", String(claimConfig.port), "-U", "owner", "-d", dbB, "-q", "-v", "ON_ERROR_STOP=1", "-f", join(ROOT, "deployment", "freshness", "postgres.sql")], { env: ownerEnv });
+    for (const q of [`insert into mnde_claim.executor_namespaces values ('${claimConfig.user}', '${claimConfig.namespace}')`, `grant usage on schema mnde_claim to ${claimConfig.user}`,
+      `grant execute on function mnde_claim.bound_namespace(), mnde_claim.first_claim(jsonb), mnde_claim.lookup_claim(jsonb) to ${claimConfig.user}`, `revoke all on database ${dbB} from public`, `grant connect on database ${dbB} to ${claimConfig.user}`]) sql(q, dbB);
+    const cfgB = join(dir, "operator", "claim-config-b.json");
+    writeFileSync(cfgB, JSON.stringify({ ...claimConfig, database: dbB })); own(dir);
+    const c = newCase("two-databases");
+    const a = await authorize(c);
+    const evidenceB = join(c.caseDir, "evidence-executor-b");
+    const baselineEntries = witnessEntries().length;
+    const runs = await Promise.all(Array.from({ length: 8 }, (_, i) => runCli(c, a.path, i % 2 ? { env: { MNDE_CLAIM_CONFIG: cfgB, MNDE_GIT_PUSH_EVIDENCE_DIR: evidenceB } } : {})));
+    const executed = runs.filter((r) => r.out?.outcome === "EXECUTED").length;
+    assert.equal(executed, 1, JSON.stringify(runs.map((r) => r.out?.reason_code ?? r.out?.outcome)));
+    assert.equal(c.received(), 1);
+    assert.equal(witnessEntries().length - baselineEntries, 1, "one authorization, one witness entry");
+    const tally = {};
+    for (const r of runs) { const k = r.out?.reason_code ?? r.out?.outcome; tally[k] = (tally[k] ?? 0) + 1; }
+    return { executed, outcomes: tally, remote_pushes: c.received(), witness_entries_added: 1, database_a_rows: claimRows(a.grantId), database_b_rows: Number(sql(`select count(*) from mnde_claim.claims where grant_id='${a.grantId}'`, dbB)) };
+  });
+
+await scenario("W2", "witness UNAVAILABLE before the claim (process stopped)",
+  "REFUSED before anything is spent; the same authorization executes once the witness is back", async () => {
+    blockedUnless(WITNESS_ON, "the witness is disabled");
+    const c = newCase("witness-outage"); const a = await authorize(c);
+    await stopWitness("SIGTERM");
+    const down = await runCli(c, a.path);
+    await startWitness({ port: witnessPort });
+    assert.equal(down.out?.outcome, "REFUSED"); assert.equal(down.out?.reason_code, "ERR_GIT_PUSH_WITNESS_UNAVAILABLE", JSON.stringify(down.out));
+    assert.equal(claimRows(a.grantId), 0, "an unreachable witness must not spend the database claim");
+    assert.equal(c.received(), 0);
+    const up = await runCli(c, a.path);
+    assert.equal(up.out?.outcome, "EXECUTED", JSON.stringify(up.out));
+    return { while_down: down.out.reason_code, rows_while_down: 0, after_restart: up.out.outcome };
+  });
+
+for (const fault of ["witness-before-consume", "witness-during-consume", "witness-after-consume"]) {
+  await scenario(`W3-${fault.split("-")[1]}`, `process killed at the witness boundary: ${fault}`,
+    "authority consumed or not, nothing is ever sent; recovery refuses; the witness holds the spend iff it received it", async () => {
+      blockedUnless(WITNESS_ON, "the witness is disabled");
+      const c = newCase(`w3-${fault}`); const a = await authorize(c);
+      const before = witnessEntries().length;
+      const killed = await runCli(c, a.path, { fault });
+      assert.equal(killed.signal, "SIGKILL", JSON.stringify(killed));
+      await new Promise((r) => setTimeout(r, 400));
+      const recorded = witnessEntries().length - before;
+      if (fault === "witness-before-consume") assert.equal(recorded, 0);
+      if (fault === "witness-after-consume") assert.equal(recorded, 1);
+      assert.equal(c.received(), 0, "nothing may be sent at a witness boundary");
+      const recovery = await runCli(c, a.path);
+      assert.equal(recovery.out?.outcome, "REFUSED", JSON.stringify(recovery.out));
+      assert.equal(c.received(), 0);
+      const k = classify(c, a, a.executionId);
+      assert.equal(k.condition, "NOT_STARTED");
+      const looked = await wClient().lookup({ namespace: claimConfig.namespace, grant_id: a.grantId, execution_id: a.executionId });
+      return { witness_entries_recorded: recorded, db_rows: claimRows(a.grantId), recovery: recovery.out.reason_code, classification: k.condition, witness_lookup: looked.decision, remote_pushes: 0 };
+    });
+}
+
+await scenario("W4", "witness SIGKILLed and restarted after a spend, then a rolled-back executor replays",
+  "the spend survives the witness restart; the replay is refused by the witness", async () => {
+    blockedUnless(WITNESS_ON, "the witness is disabled");
+    const c = newCase("witness-restart");
+    const snap = takeSnapshot();
+    const evidenceSnap = join(c.caseDir, "evidence-snapshot"); mkdirSync(c.evidenceDir, { recursive: true }); own(c.caseDir); cpSync(c.evidenceDir, evidenceSnap, { recursive: true });
+    const a = await authorize(c);
+    assert.equal((await runCli(c, a.path)).code, 0);
+    const n = witnessEntries().length;
+    await stopWitness("SIGKILL");
+    await startWitness({ port: witnessPort });                    // takes over the dead process's stale lock, re-verifies the log
+    assert.equal(witnessEntries().length, n);
+    c.repos.setRemoteTo(a.parameters.expected_old_sha);
+    const baseline = c.received();
+    await restorePg(snap); restoreExecutorState(c, evidenceSnap);
     const replay = await runCli(c, a.path);
-    const reExecuted = replay.out?.outcome === "EXECUTED" && c.received() - before === 1;
-    const entry = { rows_after_restore_before_replay: "restored", replay: { outcome: replay.out?.outcome, reason: replay.out?.reason_code }, second_push_reached_remote: reExecuted };
-    if (!reExecuted) throw Object.assign(new Error(`the known gap did not reproduce (the replay was refused: ${replay.out?.reason_code}); update the documentation and this scenario`), { observed: entry });
-    throw Object.assign(new Error("KNOWN GAP reproduced: whole-system rollback revives a consumed authorization. Requirement F is NOT met."), { knownGap: true, observed: entry });
+    assert.equal(replay.out?.reason_code, WITNESS_CONSUMED, JSON.stringify(replay.out));
+    assert.equal(c.received(), baseline);
+    return { witness_entries_survived_sigkill: n, replay: replay.out.reason_code, remote_pushes_after_restore: 0 };
+  });
+
+await scenario("W5", "witness key rotation: the witness signs with a key the executor has not pinned",
+  "REFUSED before the claim while unpinned; after pinning both keys the same authorization executes", async () => {
+    blockedUnless(WITNESS_ON, "the witness is disabled");
+    const c = newCase("witness-rotation"); const a = await authorize(c);
+    const oldKey = witnessKey;
+    const pair = generateAuthorityKeyPair();
+    witnessKey = { keyId: "witness-key-2", privatePem: pair.privatePem, publicPem: pair.publicPem };
+    await stopWitness("SIGTERM"); await startWitness({ port: witnessPort, key: witnessKey });
+    writeWitnessClientConfig({ keys: [{ key_id: oldKey.keyId, public_key: oldKey.publicPem }] });
+    const unpinned = await runCli(c, a.path);
+    assert.equal(unpinned.out?.reason_code, "ERR_GIT_PUSH_WITNESS_UNAVAILABLE", JSON.stringify(unpinned.out));
+    assert.equal(claimRows(a.grantId), 0);
+    writeWitnessClientConfig({ keys: [{ key_id: oldKey.keyId, public_key: oldKey.publicPem }, { key_id: witnessKey.keyId, public_key: witnessKey.publicPem }] });
+    const pinned = await runCli(c, a.path);
+    assert.equal(pinned.out?.outcome, "EXECUTED", JSON.stringify(pinned.out));
+    writeWitnessClientConfig();
+    return { unpinned_key: unpinned.out.reason_code, after_pinning_both: pinned.out.outcome };
+  });
+
+await scenario("W6", "authenticated-channel failures: wrong CA and wrong token",
+  "REFUSED before the claim in both cases; nothing spent", async () => {
+    blockedUnless(WITNESS_ON, "the witness is disabled");
+    const out = {};
+    for (const [name, opts] of Object.entries({ wrong_ca: { caFile: join(PG, "ca.crt") }, wrong_token: { token: "not-the-token" } })) {
+      const c = newCase(`w6-${name}`); const a = await authorize(c);
+      writeWitnessClientConfig(opts);
+      const r = await runCli(c, a.path);
+      assert.equal(r.out?.reason_code, "ERR_GIT_PUSH_WITNESS_UNAVAILABLE", `${name}: ${JSON.stringify(r.out)}`);
+      assert.equal(claimRows(a.grantId), 0); assert.equal(c.received(), 0);
+      out[name] = r.out.reason_code;
+    }
+    writeWitnessClientConfig();
+    return out;
+  });
+
+await scenario("W8", "100 concurrent consumes of one grant against the real TLS witness",
+  "exactly one CONSUMED", async () => {
+    blockedUnless(WITNESS_ON, "the witness is disabled");
+    const c = newCase("witness-100");
+    const run = spawnSync(NODE, [join(HERE, "concurrent.mjs"), "witness", "100"], { env: operatorEnv(c), encoding: "utf8", timeout: 120000, ...asUser });
+    const out = JSON.parse(run.stdout.split("\n").filter(Boolean).pop());
+    assert.equal(out.tally.CONSUMED, 1, JSON.stringify(out));
+    return out;
   });
 
 // ── GitHub-App credential path, against a local EMULATOR (not GitHub) ───────
@@ -665,6 +948,7 @@ if (wantsEmulator) {
   gh = { appKeyPath, remoteUrl: `https://localhost:${emu.port}/acme/widgets.git`, root, ca: join(PG, "ca.crt") };
   const transportEnvPath = join(operatorDir, "transport-env.json");
   writeFileSync(transportEnvPath, JSON.stringify({ GIT_SSL_CAINFO: gh.ca }));
+  own(operatorDir);
   gh.transportEnvPath = transportEnvPath;
 }
 const setFlag = (name, on = true) => { const p = join(emuState, name); if (on) writeFileSync(p, ""); else rmSync(p, { force: true }); };
@@ -678,6 +962,7 @@ function newGhCase(label) {
   const configPath = join(c.caseDir, "git-credential-config.app.json");
   writeFileSync(configPath, JSON.stringify({ schema: "mnde.git-credential-config.v1", kind: "github-app", app_id: 424242, installation_id: 777,
     private_key_file: gh.appKeyPath, api_base_url: `https://localhost:${emu.port}`, repositories: [canonicalRepositoryIdentity(gh.remoteUrl)] }), { mode: 0o600 });
+  own(c.caseDir);
   c.env = { MNDE_GIT_CREDENTIAL_CONFIG: configPath, MNDE_GIT_PUSH_ALLOWED_SCHEMES: "https", MNDE_GIT_PUSH_TRANSPORT_ENV: gh.transportEnvPath, NODE_EXTRA_CA_CERTS: gh.ca };
   return c;
 }
@@ -845,6 +1130,7 @@ try {
 } catch { head = "unknown"; }
 writeFileSync(file, `${JSON.stringify({ generated_at: new Date().toISOString(), tree: SRC, tree_head: head, tree_dirty_paths: dirty, node: process.version,
   postgres: sql("show server_version"), results }, null, 2)}\n`);
+await stopWitness("SIGTERM");
 const failed = results.filter((r) => r.status !== "PASS" && r.status !== "KNOWN_GAP");
 console.log(`\n${failed.length ? "FAIL" : "PASS"} f001 closure (${results.length - failed.length}/${results.length}) -> ${file}`);
 rmSync(dir, { recursive: true, force: true });
