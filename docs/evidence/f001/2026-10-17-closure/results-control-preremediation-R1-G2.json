@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-10-17T02:56:25.624Z",
+  "tree": "/var/tmp/mnde-base",
+  "tree_head": "3f0e3a599ee73d39ba22bb9596a2e8d39caf6328",
+  "tree_dirty_paths": [
+    "?? node_modules"
+  ],
+  "node": "v24.22.0",
+  "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+  "results": [
+    {
+      "id": "R1",
+      "title": "restore a PostgreSQL snapshot taken BEFORE the authorization was consumed, then replay it",
+      "expected": "CONTROL against the pre-remediation tree: the replay is expected to EXECUTE a second time (the vulnerability)",
+      "status": "PASS",
+      "observed": {
+        "rows_before_restore": 1,
+        "rows_after_restore": 0,
+        "replay_new_execution_id_same_grant": {
+          "exit": 0,
+          "outcome": "EXECUTED",
+          "reason": null,
+          "detail": null,
+          "pushes_received_by_remote": 1
+        },
+        "replay_same_authorization": {
+          "exit": 1,
+          "outcome": "REFUSED",
+          "reason": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "detail": "this execution authority has already been spent; it cannot authorize a second push",
+          "pushes_received_by_remote": 0
+        },
+        "remote_after_replays": "REMOTE_AT_PRE_STATE",
+        "control_vulnerability_reproduced": true
+      }
+    },
+    {
+      "id": "G2",
+      "title": "[emulator] 12 concurrent presentations of one authorization: write tokens minted == claim winners",
+      "expected": "exactly 1 write token minted, 1 push applied; losers never held a write-capable token",
+      "status": "PASS",
+      "observed": {
+        "executed": 1,
+        "read_tokens_minted": 0,
+        "write_tokens_minted": 12,
+        "pushes_applied": 1,
+        "refusal_reasons": [
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
+        ],
+        "control_write_tokens_exceed_winners": true
+      }
+    }
+  ]
+}

@@ -397,7 +397,10 @@ async function main() {
     assert.equal(run.out.outcome, "REFUSED");
     assert.equal(run.out.reason_code, "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT");
     assert.equal(run.out.claim.decision, "SPENT", "refused by the claim, not the remote state");
-    assert.equal(run.out.observed.before, c.repos.commits[0], "the remote was in the approved pre-state");
+    // Since the executor-local spent ledger (F-001 rollback resistance) a replay is refused before the
+    // remote is read at all, so there is no observed pre-state in the evidence. The remote WAS in the
+    // approved pre-state (reset above); that it was never contacted is asserted by assertNothingSent.
+    assert.equal(run.out.observed ?? null, null, "a spent authorization is refused before the remote is read");
     assert.equal(run.out.effect_attempted, false);
     assertNothingSent(c, run, "B");
     assertOneCall(run, "B");

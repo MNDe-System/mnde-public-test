@@ -330,6 +330,23 @@ async function main() {
     assert.equal(api.calls.length, 2);
   });
 
+  await test("a read credential asks for contents:read only, and a write-capable answer to a read request is revoked and refused", async () => {
+    const readMint = (level) => () => ({ status: 201, body: JSON.stringify({ token: INSTALLATION_TOKEN, expires_at: new Date(NOW + 3600_000).toISOString(),
+      permissions: { contents: level, metadata: "read" }, repositories: [{ full_name: "acme/widgets" }] }) });
+    const api = stubApi(readMint("read"));
+    const provider = openPushCredentialProvider(appConfig, { http: api.http, now: () => NOW });
+    const handle = await provider.acquire({ repository: REPO, remoteUrl: REMOTE, executorId: "ex-1", access: "read" });
+    assert.deepEqual(JSON.parse(api.calls[0].body), { repositories: ["widgets"], permissions: { contents: "read" } });
+    assert.equal(handle.metadata.credential_access, "read");
+    await handle.release();
+    const wide = stubApi(readMint("write"));
+    const refused = await asyncCodeOf(openPushCredentialProvider(appConfig, { http: wide.http, now: () => NOW }).acquire({ repository: REPO, remoteUrl: REMOTE, access: "read" }));
+    assert.equal(refused.code, ERR_CREDENTIAL_SCOPE);
+    assert.ok(wide.calls.some((c) => c.method === "DELETE"), "a write-capable token minted for a read request must be revoked");
+    const bad = await asyncCodeOf(openPushCredentialProvider(appConfig, { http: api.http, now: () => NOW }).acquire({ repository: REPO, remoteUrl: REMOTE, access: "admin" }));
+    assert.equal(bad.code, ERR_CREDENTIAL_SCOPE);
+  });
+
   await test("a token broader than requested is revoked and refused", async () => {
     for (const body of [
       { permissions: { contents: "write", metadata: "read", administration: "write" }, repositories: [{ full_name: "acme/widgets" }] },

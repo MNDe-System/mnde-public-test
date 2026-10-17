@@ -61,7 +61,13 @@ async function main() {
     expected_old_sha: evidence?.expected_old_sha ?? null,
     approved_new_sha: evidence?.approved_new_sha ?? null,
     observed_before_sha: evidence?.observed_before_sha ?? null,
-    observed_after_sha: evidence?.observed_after_sha ?? null
+    observed_after_sha: evidence?.observed_after_sha ?? null,
+    // v2 only (null for v1): what the signature additionally binds. These are the executor's signed
+    // assertions; they are NOT independent proof of the remote state or of the witness entry.
+    evidence_version: verdict.ok ? verdict.evidence_version : null,
+    execution_start: evidence?.execution_start ?? null,
+    push_credential: evidence?.push_credential ?? null,
+    witness: evidence?.witness ?? null
   })}\n`);
   process.exit(verdict.ok ? 0 : 1);
 }

@@ -229,7 +229,11 @@ async function main() {
     const fx = fixture({ evidenceDir: blocker });
     const result = await pushOnce(fx);
     assert.equal(result.outcome, OUTCOME.REFUSED);
-    assert.equal(result.reason_code, ERR_EXECUTION_START_NOT_RECORDED);
+    // The executor-local spent ledger is the first durable barrier after the claim
+    // and lives under the same directory, so it is what fails first here; the start
+    // record's own faults are injected in test_git_push_cli.mjs. Either refusal is
+    // "spent, durably unrecordable, nothing sent".
+    assert.ok([ERR_EXECUTION_START_NOT_RECORDED, "ERR_LEDGER_UNAVAILABLE"].includes(result.reason_code), result.reason_code);
     assert.equal(fx.repos.remoteSha(), fx.repos.commits[0], "a push was sent without a durable start record");
   });
 

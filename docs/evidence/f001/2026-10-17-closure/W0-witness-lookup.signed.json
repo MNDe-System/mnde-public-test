@@ -1,0 +1,15 @@
+{
+  "outcome": "FOUND",
+  "namespace": "f001-closure-ns",
+  "nonce": "5c25a961d227a9516b51a607fd74e362",
+  "grant_id": "grant-c6e8327c-052d-41bf-a37a-e5843cf24d17",
+  "execution_id": "exec-da724441-2698-4a2c-9b16-106a7dc31a8b",
+  "n": 23,
+  "entry_digest": "94fe50382991a85c07d3ba9a98574cf416c9aca7f4958ba03429a80cbecaf747",
+  "executor_id": "mnde:test:prod:executor:gitpush:01",
+  "aplus_digest": "57f50144a8c8ac1dd59af4af6b40706df48762bc66a15e959b5c61cd4e218793",
+  "schema": "mnde.spend-witness.response.v1",
+  "witness_id": "mnde-closure-witness",
+  "key_id": "witness-key-1",
+  "issued_at": "2026-10-17T02:54:44.495Z"
+}

@@ -29,6 +29,7 @@ import {
   EVIDENCE_OUTCOME,
   EXECUTION_EVIDENCE_ENVELOPE_SCHEMA,
   EXECUTION_EVIDENCE_SCHEMA,
+  EXECUTION_EVIDENCE_SCHEMA_V2,
   signExecutionEvidence,
   verifyExecutionEvidence
 } from "../src/effects/git-push/evidence.mjs";
@@ -165,7 +166,8 @@ async function main() {
     const envelope = result.signedEvidence;
     assert.ok(envelope, "a successful push must produce signed evidence");
     assert.equal(envelope.schema_version, EXECUTION_EVIDENCE_ENVELOPE_SCHEMA);
-    assert.equal(envelope.evidence.schema_version, EXECUTION_EVIDENCE_SCHEMA);
+    // The executor now emits v2 (additive: start reference, credential, witness). v1 keeps verifying; see test_git_push_evidence_v2.mjs.
+    assert.equal(envelope.evidence.schema_version, EXECUTION_EVIDENCE_SCHEMA_V2);
     assert.equal(envelope.evidence.outcome, EVIDENCE_OUTCOME.EXECUTED);
     assert.equal(envelope.evidence.approved_new_sha, repos.commits[1]);
     assert.equal(envelope.evidence.observed_after_sha, repos.commits[1],

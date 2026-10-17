@@ -52,13 +52,15 @@ import { evaluateExecutorPosture } from "../../executor-posture-preflight.mjs";
 import { isProductionExecutionAuthority, verifyExecutionAuthority } from "../../execution-authority/index.mjs";
 import { claimAuthority, deriveClaimRecord, DISPATCH } from "../../freshness/claim.mjs";
 import { openExecutorClaimBackend } from "../../freshness/postgres_claim.mjs";
+import { ERR_LEDGER_ROLLBACK_DETECTED, ERR_LEDGER_SPENT, openLocalSpentLedger } from "../../freshness/local_spent_ledger.mjs";
+import { openExecutorSpendWitness, WITNESS_DECISION } from "../../freshness/spend_witness.mjs";
 import { parseRuntimeProfile } from "../../../shared/runtime-profile.mjs";
 import {
   bindRequestToAuthority,
   GIT_PUSH_ACTION,
   validateGitPushParameters
 } from "./validate.mjs";
-import { buildExecutionEvidenceBody, signExecutionEvidence } from "./evidence.mjs";
+import { buildExecutionEvidenceBodyV2, signExecutionEvidence } from "./evidence.mjs";
 import {
   ERR_CREDENTIAL_SUBSTITUTION,
   ERR_CREDENTIAL_UNAVAILABLE,
@@ -105,6 +107,10 @@ export const ERR_EXECUTION_START_NOT_RECORDED = "ERR_GIT_PUSH_EXECUTION_START_NO
 export const ERR_BACKEND_SUBSTITUTION = "ERR_GIT_PUSH_BACKEND_SUBSTITUTION";
 export const ERR_EVIDENCE_GENERATION = "ERR_GIT_PUSH_EVIDENCE_GENERATION";
 export const ERR_EVIDENCE_PERSISTENCE = "ERR_GIT_PUSH_EVIDENCE_PERSISTENCE";
+export const ERR_WITNESS_NOT_CONFIGURED = "ERR_GIT_PUSH_WITNESS_NOT_CONFIGURED";
+export const ERR_WITNESS_UNAVAILABLE = "ERR_GIT_PUSH_WITNESS_UNAVAILABLE";
+export const ERR_WITNESS_ALREADY_CONSUMED = "ERR_GIT_PUSH_WITNESS_ALREADY_CONSUMED";
+export const ERR_WITNESS_OUTCOME_UNKNOWN = "ERR_GIT_PUSH_WITNESS_OUTCOME_UNKNOWN";
 
 export const EXECUTION_START_SCHEMA = "mnde.git-push-execution-start.v1";
 
@@ -359,9 +365,39 @@ export function createGitPushExecutor(startup = {}) {
     (error) => ({ backend: null, detail: String(error?.message ?? error) })
   );
 
+  // The external spend witness (src/freshness/spend_witness.mjs), opened from the operator's
+  // MNDE_WITNESS_CONFIG and from nowhere else. Configured => required on every push: an
+  // unreachable, unverifiable or conflicting witness refuses. A configuration that does not
+  // load is also "required and unavailable", never "absent". Leaving it unconfigured keeps the
+  // database-plus-ledger protection only, which does NOT stop whole-system rollback (F-001 W0);
+  // MNDE_WITNESS_REQUIRED=true makes that omission itself a refusal.
+  let witness = null;
+  let witnessConfigError = null;
+  try { witness = openExecutorSpendWitness(env, { forbiddenRoots: [context.repoPath, PACKAGE_ROOT] }); }
+  catch (error) { witnessConfigError = String(error?.message ?? error); }
+  const witnessRequired = witness !== null || witnessConfigError !== null || env.MNDE_WITNESS_REQUIRED === "true";
+
   // Retain unfinished directory flushes across attempts in this executor. A
   // failed flush does not turn newly created directories into provisioned ones.
   let evidenceDirectoryParentToSync = null;
+
+  // The executor-local spent ledger (src/freshness/local_spent_ledger.mjs): the
+  // record a database restore cannot rewind. Opened lazily because "is this a new
+  // deployment" is decided from the evidence directory at first use, and cached
+  // only on success so an unavailable ledger is re-examined, never assumed.
+  let spentLedger = null;
+  function ledger() {
+    if (spentLedger) {
+      const state = spentLedger.status();
+      return state.ok ? { ok: true, ledger: spentLedger } : state;
+    }
+    let hasHistory = false;
+    try { hasHistory = readdirSync(evidenceDir).some((name) => name.endsWith(".started.json")); }
+    catch (error) { if (error?.code !== "ENOENT") hasHistory = true; }
+    const opened = openLocalSpentLedger(join(evidenceDir, "spent-ledger"), { hasHistory });
+    if (opened.ok) spentLedger = opened.ledger;
+    return opened;
+  }
 
   function writeEvidence(evidence) {
     const body = JSON.stringify(evidence, null, 2);
@@ -390,7 +426,7 @@ export function createGitPushExecutor(startup = {}) {
     if (!evidence.authorized || !nonEmptyString(evidence.execution_id)) {
       return { envelope: null, reason: "no verified authorization to bind evidence to" };
     }
-    const built = buildExecutionEvidenceBody({
+    const built = buildExecutionEvidenceBodyV2({
       execution_id: evidence.execution_id,
       grant_id: evidence.grant_id,
       authorization_receipt_hash: evidence.receipt_hash ?? null,
@@ -416,7 +452,23 @@ export function createGitPushExecutor(startup = {}) {
       effect_attempted: evidence.effect_attempted === true,
       outcome: evidence.outcome,
       reason_code: evidence.reason_code ?? null,
-      recorded_at: evidence.recorded_at
+      recorded_at: evidence.recorded_at,
+      // v2: the durable start record, the credential last used (metadata only, never a token) and the witness entry.
+      execution_start: evidence.execution_start ?? null,
+      push_credential: evidence.push_credential ? {
+        kind: evidence.push_credential.credential_provider_kind,
+        access: evidence.push_credential.credential_access,
+        scope: evidence.push_credential.credential_scope,
+        app_id: evidence.push_credential.credential_app_id ?? null,
+        installation_id: evidence.push_credential.credential_installation_id ?? null,
+        expires_at: evidence.push_credential.credential_expires_at ?? null
+      } : null,
+      witness: evidence.claim?.witness ? {
+        witness_id: evidence.claim.witness.witness_id,
+        key_id: evidence.claim.witness.key_id,
+        n: evidence.claim.witness.n,
+        entry_digest: evidence.claim.witness.entry_digest
+      } : null
     });
     if (!built.ok) return { envelope: null, reason: built.detail ?? built.reason_code };
 
@@ -478,28 +530,32 @@ export function createGitPushExecutor(startup = {}) {
   // Never remove this marker on failure: the authority is already consumed.
   // It records only that an attempt began and what it was bound to; the outcome, when there is
   // one, lives in the ordinary evidence record.
-  function recordExecutionStart({ execution_id, grant_id, executor_id, authorized, namespace: ns }) {
+  function recordExecutionStart({ execution_id, grant_id, executor_id, authorized, namespace: ns, witness: witnessRef = null }) {
     if (!nonEmptyString(execution_id)) return { ok: false, detail: "no execution id" };
     let fd = null;
     try {
       ensureEvidenceDirectory();
       const path = join(evidenceDir, startRecordName(execution_id));
       fd = openSync(path, "wx");
-      writeFileSync(fd, `${JSON.stringify({
+      const startedAt = new Date().toISOString();
+      const text = `${JSON.stringify({
         schema: EXECUTION_START_SCHEMA,
         execution_id,
         grant_id: grant_id ?? null,
         executor_id: executor_id ?? null,
         namespace: ns,
         authorized,
-        started_at: new Date().toISOString()
-      }, null, 2)}\n`, "utf8");
+        witness: witnessRef,
+        started_at: startedAt
+      }, null, 2)}\n`;
+      writeFileSync(fd, text, "utf8");
       fsyncSync(fd);
       const writtenFd = fd;
       fd = null; // Do not retry close after an error: descriptor state is unknown.
       closeSync(writtenFd);
       syncDirectory(dirname(path));
-      return { ok: true, path };
+      // The signed evidence references this exact file by digest, so the record cannot be swapped afterwards.
+      return { ok: true, path, record_sha256: sha256(text), started_at: startedAt };
     } catch (error) {
       return { ok: false, detail: String(error?.code ?? error?.message ?? error) };
     } finally {
@@ -656,6 +712,43 @@ export function createGitPushExecutor(startup = {}) {
       expected_old_sha: p.expected_old_sha
     });
 
+    // ── 5b. This executor has not already begun this authorization ───────────
+    // Before the database, before any credential: a request this executor's own
+    // ledger says was begun is refused here, with no network contact at all. If
+    // the database does not know about it, the database was rolled back.
+    const derivedEarly = deriveClaimRecord(authority, { namespace });
+    if (!derivedEarly.ok) return refuse(derivedEarly.reason, "the claim record could not be derived from the verified authority", { ...identity, authorized });
+    const opened = ledger();
+    if (!opened.ok) return refuse(opened.reason, `${opened.detail}; nothing was sent`, { ...identity, authorized });
+    const seen = opened.ledger.isSpent(derivedEarly.record);
+    if (!seen.ok) return refuse(seen.reason, `${seen.detail}; nothing was sent`, { ...identity, authorized });
+    if (seen.spent) {
+      let known = null;
+      try { known = (await (await claimStore).backend?.lookup(derivedEarly.record))?.found === true; } catch { known = null; }
+      if (known === false) {
+        opened.ledger.quarantine("the executor ledger records this authorization as begun but the claim store has no record of it");
+        return refuse(ERR_LEDGER_ROLLBACK_DETECTED,
+          "the claim store has no record of an authorization this executor began: the database was rolled back; nothing was sent and all pushes are quarantined",
+          { ...identity, authorized });
+      }
+      return refuse(ERR_AUTHORITY_ALREADY_SPENT,
+        "this executor already began this authorization; it cannot authorize a second push",
+        { ...identity, authorized, claim: { namespace, decision: DISPATCH.SPENT, record_digest: null, note: ERR_LEDGER_SPENT } });
+    }
+
+    // ── 5c. The witness is reachable, authentic and consistent — BEFORE anything is spent ──
+    if (witnessRequired) {
+      if (!witness) {
+        return refuse(witnessConfigError ? ERR_WITNESS_UNAVAILABLE : ERR_WITNESS_NOT_CONFIGURED,
+          `${witnessConfigError ?? "a spend witness is required (MNDE_WITNESS_REQUIRED) but MNDE_WITNESS_CONFIG is not set"}; nothing was sent and the authority was not spent`,
+          { ...identity, authorized });
+      }
+      const pre = await witness.preflight({ namespace });
+      if (pre.decision !== "OK") {
+        return refuse(ERR_WITNESS_UNAVAILABLE, `the spend witness could not be verified (${pre.detail}); nothing was sent and the authority was not spent`, { ...identity, authorized });
+      }
+    }
+
     // ── 6. The repository we are standing in is the one that was authorized ──
     const configuredRemote = await readConfiguredRemoteUrl(p.remote, context);
     if (!configuredRemote.ok) return refuse(configuredRemote.reason, configuredRemote.detail, { ...identity, authorized });
@@ -686,55 +779,68 @@ export function createGitPushExecutor(startup = {}) {
       if (!local.ok) return refuse(local.reason, local.detail, { ...identity, authorized });
     }
 
-    // ── 8b. Obtain the push credential ───────────────────────────────────────
-    // As late as the transport allows, and no later. Every step above is local
-    // and needs no credential. The very next step reads the remote, and a
-    // private remote cannot be read without authenticating, so the credential
-    // is obtained here — BEFORE the claim, deliberately: if the credential
-    // cannot be obtained (secret service down, token refused, scope wrong),
-    // the refusal spends nothing and a fresh attempt with the same
-    // authorization is legitimate. Obtaining it after the claim would turn
-    // every credential outage into burned authority.
+    // ── 8b. Obtain a READ credential ─────────────────────────────────────────
+    // The pre-state read needs authentication on a private remote, so a credential
+    // is obtained here — before the claim, deliberately: if it cannot be obtained
+    // the refusal spends nothing and a fresh attempt is legitimate. But it is the
+    // READ credential. A GitHub App token minted here is contents:read, so a
+    // request that is refused as already spent, or whose claim fails, never held
+    // a write-capable token. The write credential is minted only after the
+    // durable claim (remoteEffect, step 11c). Static kinds (token file, ssh key,
+    // none) have one credential for both; for them the executor process is the
+    // custodian either way and this split changes nothing.
     if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized });
+    const held = [];
     let handle;
     try {
-      handle = await credentials.acquire({ repository: p.repository, remoteUrl: p.remote_url, executorId: identity.executor_id });
+      handle = await credentials.acquire({ repository: p.repository, remoteUrl: p.remote_url, executorId: identity.executor_id, access: "read" });
     } catch (error) {
       return refuse(error?.code ?? ERR_CREDENTIAL_UNAVAILABLE,
         `${String(error?.message ?? error)}; nothing was sent and the authority was not spent`,
         { ...identity, authorized });
     }
+    held.push(handle);
     const credentialed = withPushCredential(stage, handle);
     if (!credentialed.ok) {
       await handle.release().catch(() => null);
       return refuse(credentialed.reason, credentialed.detail, { ...identity, authorized });
     }
 
-    // Whatever happens next, the credential is released before the outcome is
-    // written, and everything written is scrubbed of it first.
+    // Whatever happens next, every credential is released before the outcome is
+    // written, and everything written is scrubbed of all of them first.
     let parts;
     try {
-      parts = await remoteEffect(stage, credentialed.context, { authority, identity, authorized, p, epoch });
+      parts = await remoteEffect(stage, credentialed.context, { authority, identity, authorized, p, epoch, held });
     } finally {
-      parts = await releaseInto(parts, handle);
+      parts = await releaseInto(parts, held);
     }
     return settle(parts.evidence, parts.result);
   }
 
-  async function releaseInto(parts, handle) {
-    let released;
-    try { released = await handle.release(); } catch { released = { released: false }; }
+  async function releaseInto(parts, held) {
+    const released = [];
+    for (const handle of held) {
+      try { released.push(await handle.release()); } catch { released.push({ released: false }); }
+    }
     if (!parts) return parts;
-    const scrub = (value) => JSON.parse(handle.redact(JSON.stringify(value)));
+    const scrub = (value) => {
+      let text = JSON.stringify(value);
+      for (const handle of held) text = handle.redact(text);
+      return JSON.parse(text);
+    };
+    // push_credential describes the credential the effect used: the write
+    // credential when one was minted, otherwise the read credential.
+    const last = held.length - 1;
     return {
-      evidence: scrub({ ...parts.evidence, push_credential: { ...handle.metadata, ...released } }),
+      evidence: scrub({ ...parts.evidence, push_credential: { ...held[last].metadata, ...released[last] },
+        credentials_minted: held.map((handle, index) => ({ access: handle.metadata.credential_access, ...released[index] })) }),
       result: scrub(parts.result)
     };
   }
 
   // Steps 9 onward, run with the credentialed context for the three operations
   // that talk to the remote. Returns { evidence, result } unsettled.
-  async function remoteEffect(stage, remote, { authority, identity, authorized, p, epoch }) {
+  async function remoteEffect(stage, remote, { authority, identity, authorized, p, epoch, held }) {
     const refuse = refusal;
 
     // ── 9. The remote is observed, independently, in the approved pre-state ──
@@ -796,29 +902,88 @@ export function createGitPushExecutor(startup = {}) {
         { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
     }
 
-    // ── 11b. Durably record that the effect is starting ──────────────────────
+    // ── 11b. Record the spend where a database restore cannot reach ──────────
+    // The executor-local ledger entry is durable (file and directory fsync) before
+    // the start record and before any write credential exists. If it already
+    // exists, the database just told us "fresh" about something this executor
+    // began: it was rolled back, and nothing is sent.
+    const opened = ledger();
+    if (!opened.ok) {
+      return refuse(opened.reason, `${opened.detail}; the authority is spent in the claim store and nothing was sent`,
+        { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
+    }
+    const spentLocally = opened.ledger.commit(derived.record);
+    if (!spentLocally.ok) {
+      if (spentLocally.conflict) opened.ledger.quarantine("the claim store reported a fresh claim for an authorization the executor ledger already records");
+      return refuse(spentLocally.reason,
+        spentLocally.conflict
+          ? "the claim store reported a fresh claim for an authorization this executor already began: the database was rolled back; nothing was sent and all pushes are quarantined"
+          : `the executor ledger could not durably record the spend (${spentLocally.detail}); nothing was sent`,
+        { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
+    }
+
+    // ── 11b'. The external witness records the spend before anything can be sent ──
+    // First writer wins at the witness. A CONFLICT here, after the database and the ledger both
+    // said "fresh", means this executor's own state was rolled back: quarantine. An answer we
+    // cannot verify is UNKNOWN: the authority is spent everywhere that matters, nothing is sent,
+    // and an operator reconciles with the witness `lookup`. No retry.
+    if (witnessRequired) {
+      const consumed = await witness.consume({ namespace, grant_id: derived.record.grant_id, execution_id: derived.record.execution_id,
+        executor_id: derived.record.executor_id, receipt_hash: derived.record.receipt_hash, aplus_digest: derived.record.aplus_digest });
+      if (consumed.decision === WITNESS_DECISION.CONFLICT) {
+        opened.ledger.quarantine("the external spend witness already holds this authorization although the database and the executor ledger reported it fresh");
+        return refuse(ERR_WITNESS_ALREADY_CONSUMED,
+          "the external spend witness already recorded this authorization as consumed: this executor's state was rolled back; nothing was sent and all pushes are quarantined",
+          { ...identity, authorized, observed: { before: before.sha }, claim: { ...claimMeta, witness: consumed.witness } });
+      }
+      if (consumed.decision !== WITNESS_DECISION.CONSUMED) {
+        return refuse(ERR_WITNESS_OUTCOME_UNKNOWN,
+          `the spend witness outcome is unknown (${consumed.detail}); the authority is spent, nothing was sent, and it must be reconciled by an operator`,
+          { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
+      }
+      claimMeta.witness = consumed.witness;
+    }
+
+    // ── 11c. NOW, and only now, the write credential ─────────────────────────
+    if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized, claim: claimMeta });
+    let writeContext;
+    try {
+      const writeHandle = await credentials.acquire({ repository: p.repository, remoteUrl: p.remote_url, executorId: identity.executor_id, access: "write" });
+      held.push(writeHandle);
+      const writable = withPushCredential(stage, writeHandle);
+      if (!writable.ok) return refuse(writable.reason, `${writable.detail}; the authority is spent and nothing was sent`, { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
+      writeContext = writable.context;
+    } catch (error) {
+      return refuse(error?.code ?? ERR_CREDENTIAL_UNAVAILABLE,
+        `${String(error?.message ?? error)}; the authority is spent and nothing was sent`,
+        { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
+    }
+
+    // ── 11d. Durably record that the effect is starting ──────────────────────
     // Claim-before-effect deliberately spends authority before the push, so a
     // crash here can leave "spent, never sent" or "sent, outcome never recorded".
     // Those need opposite handling and are indistinguishable unless the start is
     // written — and fsynced — before anything leaves the process. If it cannot
     // be, nothing is sent: an effect whose start cannot be recorded cannot later
     // be classified, and the authority is already spent either way.
-    const started = recordExecutionStart({ ...identity, authorized, namespace });
+    const started = recordExecutionStart({ ...identity, authorized, namespace, witness: claimMeta.witness ?? null });
     if (!started.ok) {
       return refuse(ERR_EXECUTION_START_NOT_RECORDED,
         `the execution start could not be durably recorded (${started.detail}); nothing was sent`,
         { ...identity, authorized, observed: { before: before.sha }, claim: claimMeta });
     }
 
+    const startRef = { record_sha256: started.record_sha256, started_at: started.started_at };
+
     // ── 12. THE EFFECT ───────────────────────────────────────────────────────
-    if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized, claim: claimMeta });
-    const pushed = await performPush(argv, remote, claim.ticket);
+    if (!permitted(epoch)) return refuse("ERR_HUB_LOCKED", "protected execution is locked", { ...identity, authorized, claim: claimMeta, execution_start: startRef });
+    const pushed = await performPush(argv, writeContext, claim.ticket);
 
     // ── 13. Believe the remote, not the exit code ────────────────────────────
     // Exit 0 is the subprocess's opinion. The effect is what the remote says it
     // is, so it is read back independently and that observation is what the
     // evidence records.
-    const after = await readRemoteRef(p.remote_url, p.target_ref, remote);
+    const after = await readRemoteRef(p.remote_url, p.target_ref, writeContext);
 
     const base = {
       schema: EVIDENCE_SCHEMA,
@@ -834,6 +999,7 @@ export function createGitPushExecutor(startup = {}) {
         stderr: (pushed.stderr ?? "").slice(0, 4096)
       },
       effect_attempted: true,
+      execution_start: startRef,
       observed: { before: before.sha, after: after.ok ? after.sha : null },
       recorded_at: new Date().toISOString()
     };
@@ -860,6 +1026,13 @@ export function createGitPushExecutor(startup = {}) {
 
   async function readiness() {
     const store = await claimStore;
+    // A quarantined or unavailable spent ledger refuses every push, so it must also
+    // make the Hub report DEGRADED instead of ACTIVE.
+    if (!ledger().ok) return { ready: false };
+    if (witnessRequired) {
+      if (!witness) return { ready: false };
+      try { if ((await witness.preflight({ namespace })).decision !== "OK") return { ready: false }; } catch { return { ready: false }; }
+    }
     try { return { ready: (await store.backend?.health())?.ok === true }; }
     catch { return { ready: false }; }
   }

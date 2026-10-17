@@ -1,0 +1,75 @@
+{
+  "schema_version": "mnde.git-push-execution-evidence-envelope.v1",
+  "evidence": {
+    "schema_version": "mnde.git-push-execution-evidence.v2",
+    "action": "git.push",
+    "execution_id": "exec-d0523fb4-80a6-4d87-af58-0d245c0313fe",
+    "grant_id": "grant-72c142cb-f85f-41a5-9f23-242f492dc230",
+    "authorization_receipt_hash": "5b4da1b031c9e555778d9c2d5bb7c130d0e08cbfabf68ec870fe5440eb269316",
+    "authority_digest": "3e46554740582a91349f40735c75749cabf2d76ff2f99c91e5c8be7f2d459256",
+    "executor_id": "mnde:test:prod:executor:gitpush:01",
+    "environment_id": "prod",
+    "key_id": "mnde-exk:925c0b7e790d63e5002f49435bc0123e",
+    "credential_id": "mnde-cred:f0b93b0bb8f6e073cc6d7468385d4bd8",
+    "authority_bundle_fingerprint": "bacdb7e591877481553bbfd82ba4d5a8bc1c336e05f8ecbe6b1729e5bb67c794",
+    "repository": "https:localhost/acme/widgets",
+    "remote": "origin",
+    "remote_url": "https://localhost:37681/acme/widgets.git",
+    "target_ref": "refs/heads/main",
+    "expected_old_sha": "dbe9a4390c32ffe0ebab0b9e78185e0f2fb0a68d",
+    "approved_new_sha": "d28d210835e4a0d8edf88ee0db91ffb8d52cee75",
+    "observed_before_sha": "dbe9a4390c32ffe0ebab0b9e78185e0f2fb0a68d",
+    "observed_after_sha": "d28d210835e4a0d8edf88ee0db91ffb8d52cee75",
+    "claim": {
+      "decision": "CLAIMED",
+      "namespace": "f001-closure-ns",
+      "record_digest": "519f3c762e3f783ad3a600d82d5f3d3ccc6090c39fa6b1f372413d81ef8226d9"
+    },
+    "effect_attempted": true,
+    "outcome": "EXECUTED",
+    "reason_code": null,
+    "recorded_at": "2026-10-17T02:55:01.064Z",
+    "execution_start": {
+      "record_sha256": "ca87d3b6fc706a8e1a50af838339ebd713cdc52030df36be05f5747b54666d7e",
+      "started_at": "2026-10-17T02:55:00.888Z"
+    },
+    "push_credential": {
+      "kind": "github-app",
+      "access": "write",
+      "scope": "https:localhost/acme/widgets",
+      "app_id": "424242",
+      "installation_id": "777",
+      "expires_at": "2026-10-17T03:55:00.887Z"
+    },
+    "witness": {
+      "witness_id": "mnde-closure-witness",
+      "key_id": "witness-key-2",
+      "n": 31,
+      "entry_digest": "c89f93d3ae613c4a4b452bac923e394e95cade95d873a0c0e4ce58dc6d32c1de"
+    }
+  },
+  "credential": {
+    "schema_version": "mnde.executor.credential.v1",
+    "executor_id": "mnde:test:prod:executor:gitpush:01",
+    "key_id": "mnde-exk:925c0b7e790d63e5002f49435bc0123e",
+    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEADcFJtpTJDMyu0hNo12ebVyAujZty7k7Tm4mPBN7KGOw=\n-----END PUBLIC KEY-----\n",
+    "issuer_id": "mnde-git-push-test",
+    "issuer_key_id": "git-push-test-root",
+    "environment_id": "prod",
+    "issued_at": "2026-06-14T00:00:00.000Z",
+    "not_before": "2026-01-01T00:00:00.000Z",
+    "expires_at": "2099-01-01T00:00:00.000Z",
+    "capabilities": [
+      "sign_execution_receipt"
+    ],
+    "trust_epoch": "executor-identity-v1",
+    "signature_algorithm": "ED25519",
+    "credential_id": "mnde-cred:f0b93b0bb8f6e073cc6d7468385d4bd8",
+    "issuer_signature": "d1ee5a086a3dfc90a91d9c5e5d67425b50811a0f75b1ab3dd4be8319cad475f7bcc7badbbf2ad1f1a8e1ee4d8edc5360f20a14b42918cdaa1de103e697194b0c"
+  },
+  "signature": {
+    "algorithm": "ED25519",
+    "key_id": "mnde-exk:925c0b7e790d63e5002f49435bc0123e",
+    "value": "724a9175eff82a309f1af2f352e76d45fdcef45888521ea328752a43c62f7e5d30e8ef316e7cb4280fee845d8b2b80a9e0b94ff7d7861af85622bad365e6c90e"
+  }
+}

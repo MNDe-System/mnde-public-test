@@ -43,6 +43,12 @@ import { EXECUTOR_RECEIPT_CAPABILITY } from "../../custody/executor-identity.mjs
 import { GIT_PUSH_ACTION } from "./validate.mjs";
 
 export const EXECUTION_EVIDENCE_SCHEMA = "mnde.git-push-execution-evidence.v1";
+// v2 is additive: the v1 fields unchanged, plus the execution-start record reference, the credential used
+// (kind, access level, scope, GitHub App and installation ids — never token material) and the spend-witness
+// entry. It is signed over a DOMAIN-SEPARATED input so a v2 body can never verify as a v1 body or the
+// reverse. v1 evidence keeps verifying exactly as before. See docs/F001-EVIDENCE-V2.md.
+export const EXECUTION_EVIDENCE_SCHEMA_V2 = "mnde.git-push-execution-evidence.v2";
+export const EVIDENCE_V2_DOMAIN = "mnde.git-push-execution-evidence.v2\n";
 export const EXECUTION_EVIDENCE_ENVELOPE_SCHEMA = "mnde.git-push-execution-evidence-envelope.v1";
 
 // Observed effect outcomes. MNDe completion failure (for example, inability to
@@ -94,6 +100,10 @@ const BODY_KEYS = Object.freeze([
   "target_ref"
 ]);
 
+const BODY_KEYS_V2 = Object.freeze([...BODY_KEYS, "execution_start", "push_credential", "witness"]);
+const START_KEYS = Object.freeze(["record_sha256", "started_at"]);
+const CREDENTIAL_KEYS = Object.freeze(["access", "app_id", "expires_at", "installation_id", "kind", "scope"]);
+const WITNESS_KEYS = Object.freeze(["entry_digest", "key_id", "n", "witness_id"]);
 const CLAIM_KEYS = Object.freeze(["decision", "namespace", "record_digest"]);
 const ENVELOPE_KEYS = Object.freeze(["credential", "evidence", "schema_version", "signature"]);
 const SIGNATURE_KEYS = Object.freeze(["algorithm", "key_id", "value"]);
@@ -120,6 +130,44 @@ function exactKeys(value, allowed, label) {
     if (!(key in value)) return `missing ${label} field: ${key}`;
   }
   return null;
+}
+
+const HEX64 = /^[0-9a-f]{64}$/;
+const isTimestamp = (v) => isNonEmptyString(v) && !Number.isNaN(Date.parse(v));
+
+// Shape and coherence of the v2-only fields, shared by the builder and the verifier so neither is
+// trusted to have done it. Returns a detail string, or null when fine.
+function checkV2Fields(body) {
+  const start = body.execution_start;
+  if (start !== null) {
+    if (!isObject(start)) return "execution_start must be null or an object";
+    const shape = exactKeys(start, START_KEYS, "execution_start");
+    if (shape) return shape;
+    if (!HEX64.test(String(start.record_sha256)) || !isTimestamp(start.started_at)) return "execution_start must carry a sha256 and a timestamp";
+  }
+  const cred = body.push_credential;
+  if (cred !== null) {
+    if (!isObject(cred)) return "push_credential must be null or an object";
+    const shape = exactKeys(cred, CREDENTIAL_KEYS, "push_credential");
+    if (shape) return shape;
+    if (!isNonEmptyString(cred.kind) || !isNonEmptyString(cred.scope) || !["read", "write", "static"].includes(cred.access)) return "push_credential kind, scope and access are required";
+    for (const f of ["app_id", "installation_id", "expires_at"]) if (cred[f] !== null && !isNonEmptyString(cred[f])) return `push_credential.${f} must be null or a string`;
+    if ((cred.app_id === null) !== (cred.installation_id === null)) return "push_credential app_id and installation_id come together";
+  }
+  const witness = body.witness;
+  if (witness !== null) {
+    if (!isObject(witness)) return "witness must be null or an object";
+    const shape = exactKeys(witness, WITNESS_KEYS, "witness");
+    if (shape) return shape;
+    if (!isNonEmptyString(witness.witness_id) || !isNonEmptyString(witness.key_id) || !Number.isInteger(witness.n) || witness.n < 1 || !HEX64.test(String(witness.entry_digest))) return "witness must name the witness, its key, a positive sequence and an entry digest";
+  }
+  if (body.effect_attempted === true && start === null) return "the effect was attempted but no execution-start record is referenced";
+  return null;
+}
+
+// What the executor signs: v1 is the canonical body (unchanged); v2 is domain-separated.
+function signingInput(body) {
+  return body.schema_version === EXECUTION_EVIDENCE_SCHEMA_V2 ? `${EVIDENCE_V2_DOMAIN}${canonicalizeJson(body)}` : canonicalizeJson(body);
 }
 
 // The one rule that makes EXECUTED mean something. Applied when the body is
@@ -221,6 +269,24 @@ export function buildExecutionEvidenceBody(input = {}) {
   return Object.freeze({ ok: true, body: Object.freeze(body) });
 }
 
+// The v2 body: everything v1 validates, plus the three additive fields. Absent inputs are null, never invented.
+export function buildExecutionEvidenceBodyV2(input = {}) {
+  const base = buildExecutionEvidenceBody(input);
+  if (!base.ok) return base;
+  const body = {
+    ...base.body,
+    schema_version: EXECUTION_EVIDENCE_SCHEMA_V2,
+    execution_start: input.execution_start ?? null,
+    push_credential: input.push_credential ?? null,
+    witness: input.witness ?? null
+  };
+  const shape = exactKeys(body, BODY_KEYS_V2, "evidence");
+  if (shape) return fail(EVIDENCE_ERRORS.INVALID, shape);
+  const detail = checkV2Fields(body);
+  if (detail) return fail(EVIDENCE_ERRORS.INCOHERENT, detail);
+  return Object.freeze({ ok: true, body: Object.freeze(body) });
+}
+
 // Sign a built body with the executor's own key. The private key never leaves
 // the caller's signer; only the signature comes back.
 export async function signExecutionEvidence(body, { identity, signer } = {}) {
@@ -241,7 +307,7 @@ export async function signExecutionEvidence(body, { identity, signer } = {}) {
 
   let value;
   try {
-    value = await signer.sign(canonicalizeJson(body));
+    value = await signer.sign(signingInput(body));
   } catch {
     return fail(EVIDENCE_ERRORS.SIGNING_FAILED, "the executor signer threw");
   }
@@ -272,11 +338,16 @@ export async function verifyExecutionEvidence(envelope, options = {}) {
 
   const body = envelope.evidence;
   if (!isObject(body)) return fail(EVIDENCE_ERRORS.INVALID, "evidence is not an object");
-  if (body.schema_version !== EXECUTION_EVIDENCE_SCHEMA) {
+  if (body.schema_version !== EXECUTION_EVIDENCE_SCHEMA && body.schema_version !== EXECUTION_EVIDENCE_SCHEMA_V2) {
     return fail(EVIDENCE_ERRORS.SCHEMA, "unsupported evidence schema_version");
   }
-  const bodyShape = exactKeys(body, BODY_KEYS, "evidence");
+  const isV2 = body.schema_version === EXECUTION_EVIDENCE_SCHEMA_V2;
+  const bodyShape = exactKeys(body, isV2 ? BODY_KEYS_V2 : BODY_KEYS, "evidence");
   if (bodyShape) return fail(EVIDENCE_ERRORS.INVALID, bodyShape);
+  if (isV2) {
+    const detail = checkV2Fields(body);
+    if (detail) return fail(EVIDENCE_ERRORS.INCOHERENT, detail);
+  }
   if (!isObject(body.claim)) return fail(EVIDENCE_ERRORS.INVALID, "claim is not an object");
   const claimShape = exactKeys(body.claim, CLAIM_KEYS, "claim");
   if (claimShape) return fail(EVIDENCE_ERRORS.INVALID, claimShape);
@@ -339,7 +410,7 @@ export async function verifyExecutionEvidence(envelope, options = {}) {
 
   let signatureValid = false;
   try {
-    signatureValid = await verifyCanonical(canonicalizeJson(body), signature.value, credentialCheck.public_key);
+    signatureValid = await verifyCanonical(signingInput(body), signature.value, credentialCheck.public_key);
   } catch {
     signatureValid = false;
   }
@@ -349,6 +420,7 @@ export async function verifyExecutionEvidence(envelope, options = {}) {
     ok: true,
     evidence: body,
     executed: body.outcome === EVIDENCE_OUTCOME.EXECUTED,
+    evidence_version: isV2 ? 2 : 1,
     executor_id: body.executor_id,
     evidence_digest: sha256(canonicalizeJson(body))
   });
