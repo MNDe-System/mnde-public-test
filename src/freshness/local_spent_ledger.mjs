@@ -30,7 +30,7 @@
 
 import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { createHash, randomUUID } from "node:crypto";
+import { randomBytes, sha256 } from "../crypto/provider.mjs";
 
 export const LEDGER_SCHEMA = "mnde.local-spent-ledger.v1";
 export const ENTRY_SCHEMA = "mnde.local-spent-entry.v1";
@@ -42,10 +42,11 @@ export const ERR_LEDGER_QUARANTINED = "ERR_LEDGER_QUARANTINED";
 const MARKER = "LEDGER.json";
 const QUARANTINE = "QUARANTINE.json";
 const QUARANTINED_DETAIL = "a database rollback was detected; every push refuses until an operator investigates and removes QUARANTINE.json";
-const key = (kind, namespace, value) => `${kind}-${createHash("sha256").update(`${namespace}\n${value}`).digest("hex")}.json`;
+const key = (kind, namespace, value) => `${kind}-${sha256(`${namespace}\n${value}`)}.json`;
 
-function syncPath(path, flags = "r") {
-  const fd = openSync(path, flags);
+// Windows needs a writable handle to flush a directory (FlushFileBuffers); POSIX opens it read-only.
+function syncPath(path) {
+  const fd = openSync(path, process.platform === "win32" ? "r+" : "r");
   try { fsyncSync(fd); } finally { closeSync(fd); }
 }
 
@@ -85,7 +86,7 @@ export function openLocalSpentLedger(dir, { hasHistory = false } = {}) {
         return { ok: false, reason: ERR_LEDGER_UNAVAILABLE,
           detail: "ledger marker is missing next to existing state; refusing to re-initialize a ledger that may have been lost" };
       }
-      ledgerId = randomUUID();
+      ledgerId = randomBytes(16).toString("hex");
       writeExclusive(join(dir, MARKER), `${JSON.stringify({ schema: LEDGER_SCHEMA, ledger_id: ledgerId, created_at: new Date().toISOString() })}\n`);
       syncPath(dir);
     }
