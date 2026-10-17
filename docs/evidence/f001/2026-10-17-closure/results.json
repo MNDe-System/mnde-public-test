@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-17T01:28:30.402Z",
+  "generated_at": "2026-10-17T01:47:16.384Z",
   "tree": "/home/user/mnde-public-test",
-  "tree_head": "76e158e23966b69238a6a330158a33089060cadc",
+  "tree_head": "c252ae4aa6517546a5f0b89a5732bb6ff6a712c5",
   "tree_dirty_paths": [],
   "node": "v24.22.0",
   "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
@@ -16,8 +16,8 @@
         "db_rows": 1,
         "ledger_entries": [
           "LEDGER.json",
-          "exec-837b4e310fd0222453b37918d2cdf0423a3701bc26ff5501b3c5f4c58db488eb.json",
-          "grant-84819919e71b1dcc95841d4570eb2396152aedb49da8b426a43c7e353956b8ec.json"
+          "exec-a5775f781822a042fb82d6a37d5b6b2ce69448bf8af480f84ca29429c8e0762d.json",
+          "grant-32ab9a2789146c2d95c2bda57f5d2f075881c67e086c9036c45cffa86d4d99a2.json"
         ],
         "offline_verify": {
           "exit": 0,
@@ -25,20 +25,20 @@
           "reason_code": null,
           "detail": null,
           "outcome": "EXECUTED",
-          "execution_id": "exec-fcc7bb88-acf9-4ced-82f1-6696f34bc73d",
+          "execution_id": "exec-c8bdf116-227b-48e2-83ae-88a2a3d44491",
           "executor_id": "mnde:test:prod:executor:gitpush:01",
-          "grant_id": "grant-1b8bc6e8-684e-4ce7-aa79-53819c27c274",
-          "repository": "file:/tmp/mnde-f001-closure-d9Ssjd/01-baseline/remote",
+          "grant_id": "grant-76955cd5-747b-41f5-97f8-ee39671dbe11",
+          "repository": "file:/tmp/mnde-f001-closure-hVYWyB/01-baseline/remote",
           "target_ref": "refs/heads/main",
-          "expected_old_sha": "e1a6882ae13f9594fbfd964cfff64dbf3a0d478e",
-          "approved_new_sha": "dd5d360e06343146e9c5c652b7527636635f3e1b",
-          "observed_before_sha": "e1a6882ae13f9594fbfd964cfff64dbf3a0d478e",
-          "observed_after_sha": "dd5d360e06343146e9c5c652b7527636635f3e1b"
+          "expected_old_sha": "415d289fc118e659180acc165d0c082ae3822a53",
+          "approved_new_sha": "c81a497cea40aa07f874e708544f5fa24090a92a",
+          "observed_before_sha": "415d289fc118e659180acc165d0c082ae3822a53",
+          "observed_after_sha": "c81a497cea40aa07f874e708544f5fa24090a92a"
         },
         "evidence_copy": "T01-evidence.signed.json",
         "push_credential": {
           "credential_provider_kind": "none",
-          "credential_scope": "file:/tmp/mnde-f001-closure-d9Ssjd/01-baseline/remote",
+          "credential_scope": "file:/tmp/mnde-f001-closure-hVYWyB/01-baseline/remote",
           "credential_access": "static",
           "executor_id": "mnde:test:prod:executor:gitpush:01",
           "credential_issuance_id": null,
@@ -100,9 +100,8 @@
         },
         "remote_pushes_in_process": 1,
         "processes_12": {
-          "EXECUTED": 1,
-          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT": 8,
-          "ERR_GIT_PUSH_REMOTE_MOVED": 3
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT": 11,
+          "EXECUTED": 1
         },
         "remote_pushes_processes": 1
       }
@@ -454,6 +453,103 @@
       }
     },
     {
+      "id": "X1",
+      "title": "two executors with SEPARATE evidence directories (separate ledgers) race one authorization against one database",
+      "expected": "exactly one push reaches the remote; the database claim alone arbitrates",
+      "status": "PASS",
+      "observed": {
+        "executed": 1,
+        "remote_pushes": 1,
+        "db_rows": 1
+      }
+    },
+    {
+      "id": "X2",
+      "title": "spent-ledger corruption and deletion: corrupt marker, emptied entry, deleted entry",
+      "expected": "corrupt/missing ledger fails closed; an emptied or deleted entry is still refused by the other barrier",
+      "status": "PASS",
+      "observed": {
+        "entries_emptied": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+        "entries_deleted_db_intact": "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+        "marker_corrupt": "ERR_LEDGER_UNAVAILABLE",
+        "pushes_after_reset": 0
+      }
+    },
+    {
+      "id": "X3",
+      "title": "malformed and forged signed evidence is rejected by the offline verifier",
+      "expected": "every tampered copy fails verification; the genuine copy verifies",
+      "status": "PASS",
+      "observed": {
+        "verifier_exit_codes": {
+          "outcome_changed": 1,
+          "approved_sha_changed": 1,
+          "observed_after_changed": 1,
+          "executor_changed": 1,
+          "signature_removed": 1,
+          "signature_flipped": 1,
+          "truncated_json": 1,
+          "extra_field": 1,
+          "wrong_root_fingerprint": 1
+        },
+        "genuine_exit": 0
+      }
+    },
+    {
+      "id": "D1",
+      "title": "executor database login cannot administer: roles, replication/backup, DDL, history edits, policy changes, file/program access",
+      "expected": "every administrative or history-altering statement is refused by the server; legitimate claims still work",
+      "status": "PASS",
+      "observed": {
+        "statements_refused": {
+          "delete_claims": "refused",
+          "update_claims": "refused",
+          "truncate_claims": "refused",
+          "insert_claim_directly": "refused",
+          "select_history_directly": "refused",
+          "rebind_namespace": "refused",
+          "create_role": "refused",
+          "alter_own_role_superuser": "refused",
+          "set_role_owner": "refused",
+          "drop_schema": "refused",
+          "alter_table": "refused",
+          "create_function_in_schema": "refused",
+          "replace_claim_function": "refused",
+          "grant_self_table": "refused",
+          "create_database": "refused",
+          "read_server_file": "refused",
+          "copy_to_program": "refused",
+          "alter_system": "refused",
+          "disable_synchronous_commit_globally": "refused",
+          "create_replication_slot": "refused",
+          "pg_switch_wal_or_backup": "refused",
+          "pg_basebackup_as_executor": "refused"
+        },
+        "legitimate_bound_namespace": "f001-closure-ns",
+        "executor_role_flags_super_createrole_createdb_replication_bypassrls_inherit": "f|f|f|f|f|f",
+        "rig_topology_NOT_independent": {
+          "postgres_data_dir_owner_os_user": "postgres",
+          "harness_and_executor_os_user": "root",
+          "note": "executor and database share one machine and the harness runs as root, which can read, replace and restore the data directory; administrative independence is NOT demonstrated by this rig"
+        }
+      }
+    },
+    {
+      "id": "W0",
+      "title": "KNOWN GAP (whole-system rollback): database AND executor evidence directory (spent-ledger) restored together, then the consumed grant is replayed",
+      "expected": "documented gap: the replay is expected to EXECUTE until the external witness exists; this scenario must flip to REFUSED when the witness is implemented",
+      "status": "KNOWN_GAP",
+      "observed": {
+        "error": "KNOWN GAP reproduced: whole-system rollback revives a consumed authorization. Requirement F is NOT met.",
+        "rows_after_restore_before_replay": "restored",
+        "replay": {
+          "outcome": "EXECUTED",
+          "reason": null
+        },
+        "second_push_reached_remote": true
+      }
+    },
+    {
       "id": "G1",
       "title": "[emulator] authorized push with the github-app credential: read token for the pre-state, write token only after the claim",
       "expected": "EXECUTED; mint order read then write; both revoked; evidence verifies offline",
@@ -471,7 +567,7 @@
           "credential_access": "write",
           "executor_id": "mnde:test:prod:executor:gitpush:01",
           "credential_issuance_id": "github-app:424242/installation:777",
-          "credential_expires_at": "2026-10-17T02:27:40.818Z",
+          "credential_expires_at": "2026-10-17T02:46:26.824Z",
           "credential_fingerprint": null,
           "released": true,
           "revoked": true
@@ -482,15 +578,15 @@
           "reason_code": null,
           "detail": null,
           "outcome": "EXECUTED",
-          "execution_id": "exec-73112997-3f12-4a22-9570-4338a8290871",
+          "execution_id": "exec-a27edbba-74c1-4949-b909-a79fd6eacdf2",
           "executor_id": "mnde:test:prod:executor:gitpush:01",
-          "grant_id": "grant-05cc35ae-f49e-4849-870f-d6e30d94d29e",
+          "grant_id": "grant-9a0ae88d-406b-4acc-bfd4-70a51db89360",
           "repository": "https:localhost/acme/widgets",
           "target_ref": "refs/heads/main",
-          "expected_old_sha": "9795812c35079e8971715b0abbe3ec4b035be384",
-          "approved_new_sha": "d157490a8b732267bb0e84c39cac7d540636f76d",
-          "observed_before_sha": "9795812c35079e8971715b0abbe3ec4b035be384",
-          "observed_after_sha": "d157490a8b732267bb0e84c39cac7d540636f76d"
+          "expected_old_sha": "fa1cabc88d0d8edaa243d3543b8eea83d4cbc4c4",
+          "approved_new_sha": "a99d28694d9ecbe3f93aeb73e92c26f6c01ea449",
+          "observed_before_sha": "fa1cabc88d0d8edaa243d3543b8eea83d4cbc4c4",
+          "observed_after_sha": "a99d28694d9ecbe3f93aeb73e92c26f6c01ea449"
         },
         "emulator_pushes_applied": true
       }
@@ -502,19 +598,19 @@
       "status": "PASS",
       "observed": {
         "executed": 1,
-        "read_tokens_minted": 12,
+        "read_tokens_minted": 11,
         "write_tokens_minted": 1,
         "pushes_applied": 1,
         "refusal_reasons": [
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
-          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
           "ERR_GIT_PUSH_REMOTE_MOVED",
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
-          "ERR_GIT_PUSH_REMOTE_MOVED",
-          "ERR_GIT_PUSH_REMOTE_MOVED",
-          "ERR_GIT_PUSH_REMOTE_MOVED",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
         ]
@@ -601,7 +697,7 @@
       "observed": {
         "direct_push_exit": 128,
         "remote_unchanged": true,
-        "stderr_tail": "fatal: could not read Username for 'https://localhost:45223': terminal prompts disabled"
+        "stderr_tail": "fatal: could not read Username for 'https://localhost:37381': terminal prompts disabled"
       }
     }
   ]

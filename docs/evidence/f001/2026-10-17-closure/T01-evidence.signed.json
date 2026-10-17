@@ -3,38 +3,38 @@
   "evidence": {
     "schema_version": "mnde.git-push-execution-evidence.v1",
     "action": "git.push",
-    "execution_id": "exec-fcc7bb88-acf9-4ced-82f1-6696f34bc73d",
-    "grant_id": "grant-1b8bc6e8-684e-4ce7-aa79-53819c27c274",
-    "authorization_receipt_hash": "9040673f1a7243f96bb07b540745bb64bca37533febce5ee59be85005ae62303",
-    "authority_digest": "81db1cb8b26d1e620cd71f589580a72f98cb56277e7657ebb26a492fd010815a",
+    "execution_id": "exec-c8bdf116-227b-48e2-83ae-88a2a3d44491",
+    "grant_id": "grant-76955cd5-747b-41f5-97f8-ee39671dbe11",
+    "authorization_receipt_hash": "889fe998081d36cfd3abd3e5e98ca8d75bea95ef0a397f90a0a12e6654e1b2f2",
+    "authority_digest": "c79428e873b937df55591e4a97b5c8422e6d7c8753946c9e14fa497cd2793c4d",
     "executor_id": "mnde:test:prod:executor:gitpush:01",
     "environment_id": "prod",
-    "key_id": "mnde-exk:20febd678a859b848bb818ec4ee0fa54",
-    "credential_id": "mnde-cred:219f9ee17ea3892664679de385134775",
-    "authority_bundle_fingerprint": "2e978e61c85208c11929f44a9928643c2a8f5429872e62bf5d3360696a1169e4",
-    "repository": "file:/tmp/mnde-f001-closure-d9Ssjd/01-baseline/remote",
+    "key_id": "mnde-exk:3c8db5d837b011666618ee4ea34086d9",
+    "credential_id": "mnde-cred:618439429a60b6bf2bad3514b6877320",
+    "authority_bundle_fingerprint": "b0c15e45a85d5f09ba74e292a6e4c26fc3e8c4c78e4633023c23ea2d1bce2bff",
+    "repository": "file:/tmp/mnde-f001-closure-hVYWyB/01-baseline/remote",
     "remote": "origin",
-    "remote_url": "file:///tmp/mnde-f001-closure-d9Ssjd/01-baseline/remote.git",
+    "remote_url": "file:///tmp/mnde-f001-closure-hVYWyB/01-baseline/remote.git",
     "target_ref": "refs/heads/main",
-    "expected_old_sha": "e1a6882ae13f9594fbfd964cfff64dbf3a0d478e",
-    "approved_new_sha": "dd5d360e06343146e9c5c652b7527636635f3e1b",
-    "observed_before_sha": "e1a6882ae13f9594fbfd964cfff64dbf3a0d478e",
-    "observed_after_sha": "dd5d360e06343146e9c5c652b7527636635f3e1b",
+    "expected_old_sha": "415d289fc118e659180acc165d0c082ae3822a53",
+    "approved_new_sha": "c81a497cea40aa07f874e708544f5fa24090a92a",
+    "observed_before_sha": "415d289fc118e659180acc165d0c082ae3822a53",
+    "observed_after_sha": "c81a497cea40aa07f874e708544f5fa24090a92a",
     "claim": {
       "decision": "CLAIMED",
       "namespace": "f001-closure-ns",
-      "record_digest": "c0d41dcf8d9ae9eea90573889235ffe50a1450694023e849773a60ee241f8529"
+      "record_digest": "1fcd981beab1659f8c12672c531d6ac10004c7ed7a15e54057cd14d82da02e5c"
     },
     "effect_attempted": true,
     "outcome": "EXECUTED",
     "reason_code": null,
-    "recorded_at": "2026-10-17T01:27:04.997Z"
+    "recorded_at": "2026-10-17T01:45:42.396Z"
   },
   "credential": {
     "schema_version": "mnde.executor.credential.v1",
     "executor_id": "mnde:test:prod:executor:gitpush:01",
-    "key_id": "mnde-exk:20febd678a859b848bb818ec4ee0fa54",
-    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAwnMohfRamrKkzRDRz2LQ86mvxJCwlrsEJ1Qbnn7C2nk=\n-----END PUBLIC KEY-----\n",
+    "key_id": "mnde-exk:3c8db5d837b011666618ee4ea34086d9",
+    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA5JQe7uH2ytUWZdheyVz/O/vBv9mUMFOex8XtuWW6dNw=\n-----END PUBLIC KEY-----\n",
     "issuer_id": "mnde-git-push-test",
     "issuer_key_id": "git-push-test-root",
     "environment_id": "prod",
@@ -46,12 +46,12 @@
     ],
     "trust_epoch": "executor-identity-v1",
     "signature_algorithm": "ED25519",
-    "credential_id": "mnde-cred:219f9ee17ea3892664679de385134775",
-    "issuer_signature": "8bf7d5a32405f0cb46f996d32416052cc78c2967e0e952ace3a79a37d159d93dce4d5cd0bc9155f9069c80b620d9ebdc207fa50e41138e133878007e2648d706"
+    "credential_id": "mnde-cred:618439429a60b6bf2bad3514b6877320",
+    "issuer_signature": "ae6bf52708b449f4ca8011889a713371a99c27b67ddf2404067ffcacab3f71724d5d7e43e90be7364cb158c0695e39ca2119fbfc308c545c8d7d6122f6a6f403"
   },
   "signature": {
     "algorithm": "ED25519",
-    "key_id": "mnde-exk:20febd678a859b848bb818ec4ee0fa54",
-    "value": "1598c8110eace88e4a826889dccc01cbc28c5aa1294c43227a647fb84444e20cb597edd24a55abd7757b8a44a76046e2b288c5eb7c0a5d92796d35e416031109"
+    "key_id": "mnde-exk:3c8db5d837b011666618ee4ea34086d9",
+    "value": "fbb49d4cda469160d2e7f96dd8db81dd6ead7aafa3dffd1ef1e01d0ec3e5c32c82349a68dd35dbf77d2c99e61d1c2318f04f76e166f9b99b9c3a82040ed95604"
   }
 }
