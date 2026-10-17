@@ -1,7 +1,8 @@
 {
-  "generated_at": "2026-10-17T01:06:04.380Z",
+  "generated_at": "2026-10-17T01:28:30.402Z",
   "tree": "/home/user/mnde-public-test",
-  "tree_head": "75f7575e34d34d8e42f9a9b396ffb930f05bf165",
+  "tree_head": "76e158e23966b69238a6a330158a33089060cadc",
+  "tree_dirty_paths": [],
   "node": "v24.22.0",
   "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
   "results": [
@@ -15,8 +16,8 @@
         "db_rows": 1,
         "ledger_entries": [
           "LEDGER.json",
-          "exec-178d0dbdfba502adf9cdf91d148f4add265bb247384e19aad173ba1c47036306.json",
-          "grant-72daa166b4debea4bfbc2dd20f14258d7ed04b8a144079e50b635c68c78e8534.json"
+          "exec-837b4e310fd0222453b37918d2cdf0423a3701bc26ff5501b3c5f4c58db488eb.json",
+          "grant-84819919e71b1dcc95841d4570eb2396152aedb49da8b426a43c7e353956b8ec.json"
         ],
         "offline_verify": {
           "exit": 0,
@@ -24,20 +25,20 @@
           "reason_code": null,
           "detail": null,
           "outcome": "EXECUTED",
-          "execution_id": "exec-c1dfd614-9414-43ea-a9e9-2fdc63959b72",
+          "execution_id": "exec-fcc7bb88-acf9-4ced-82f1-6696f34bc73d",
           "executor_id": "mnde:test:prod:executor:gitpush:01",
-          "grant_id": "grant-03ea8319-7cd1-4f80-bdc5-891758a24dd6",
-          "repository": "file:/tmp/mnde-f001-closure-OlNTDe/01-baseline/remote",
+          "grant_id": "grant-1b8bc6e8-684e-4ce7-aa79-53819c27c274",
+          "repository": "file:/tmp/mnde-f001-closure-d9Ssjd/01-baseline/remote",
           "target_ref": "refs/heads/main",
-          "expected_old_sha": "0749f9b74ebdc1745f593a38d74b65c3f8d589eb",
-          "approved_new_sha": "acb27e1132a0109816a77613bd91d44496db46b7",
-          "observed_before_sha": "0749f9b74ebdc1745f593a38d74b65c3f8d589eb",
-          "observed_after_sha": "acb27e1132a0109816a77613bd91d44496db46b7"
+          "expected_old_sha": "e1a6882ae13f9594fbfd964cfff64dbf3a0d478e",
+          "approved_new_sha": "dd5d360e06343146e9c5c652b7527636635f3e1b",
+          "observed_before_sha": "e1a6882ae13f9594fbfd964cfff64dbf3a0d478e",
+          "observed_after_sha": "dd5d360e06343146e9c5c652b7527636635f3e1b"
         },
         "evidence_copy": "T01-evidence.signed.json",
         "push_credential": {
           "credential_provider_kind": "none",
-          "credential_scope": "file:/tmp/mnde-f001-closure-OlNTDe/01-baseline/remote",
+          "credential_scope": "file:/tmp/mnde-f001-closure-d9Ssjd/01-baseline/remote",
           "credential_access": "static",
           "executor_id": "mnde:test:prod:executor:gitpush:01",
           "credential_issuance_id": null,
@@ -99,9 +100,9 @@
         },
         "remote_pushes_in_process": 1,
         "processes_12": {
-          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT": 10,
-          "ERR_GIT_PUSH_REMOTE_MOVED": 1,
-          "EXECUTED": 1
+          "EXECUTED": 1,
+          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT": 8,
+          "ERR_GIT_PUSH_REMOTE_MOVED": 3
         },
         "remote_pushes_processes": 1
       }
@@ -470,7 +471,7 @@
           "credential_access": "write",
           "executor_id": "mnde:test:prod:executor:gitpush:01",
           "credential_issuance_id": "github-app:424242/installation:777",
-          "credential_expires_at": "2026-10-17T02:05:14.808Z",
+          "credential_expires_at": "2026-10-17T02:27:40.818Z",
           "credential_fingerprint": null,
           "released": true,
           "revoked": true
@@ -481,15 +482,15 @@
           "reason_code": null,
           "detail": null,
           "outcome": "EXECUTED",
-          "execution_id": "exec-661aecf9-120f-40b4-9bf8-aad1f27f3d3f",
+          "execution_id": "exec-73112997-3f12-4a22-9570-4338a8290871",
           "executor_id": "mnde:test:prod:executor:gitpush:01",
-          "grant_id": "grant-2fd4a537-a514-43b8-92c9-3bee1b5f9f3e",
+          "grant_id": "grant-05cc35ae-f49e-4849-870f-d6e30d94d29e",
           "repository": "https:localhost/acme/widgets",
           "target_ref": "refs/heads/main",
-          "expected_old_sha": "7e2c17810458130442689c4b3f245a8d78fe80d9",
-          "approved_new_sha": "6e540f87e5f6d7cff782ece6c70471995418c5cd",
-          "observed_before_sha": "7e2c17810458130442689c4b3f245a8d78fe80d9",
-          "observed_after_sha": "6e540f87e5f6d7cff782ece6c70471995418c5cd"
+          "expected_old_sha": "9795812c35079e8971715b0abbe3ec4b035be384",
+          "approved_new_sha": "d157490a8b732267bb0e84c39cac7d540636f76d",
+          "observed_before_sha": "9795812c35079e8971715b0abbe3ec4b035be384",
+          "observed_after_sha": "d157490a8b732267bb0e84c39cac7d540636f76d"
         },
         "emulator_pushes_applied": true
       }
@@ -508,12 +509,12 @@
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_REMOTE_MOVED",
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
-          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
-          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
-          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
-          "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
+          "ERR_GIT_PUSH_REMOTE_MOVED",
+          "ERR_GIT_PUSH_REMOTE_MOVED",
+          "ERR_GIT_PUSH_REMOTE_MOVED",
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT",
           "ERR_GIT_PUSH_AUTHORITY_ALREADY_SPENT"
         ]
@@ -600,7 +601,7 @@
       "observed": {
         "direct_push_exit": 128,
         "remote_unchanged": true,
-        "stderr_tail": "fatal: could not read Username for 'https://localhost:33463': terminal prompts disabled"
+        "stderr_tail": "fatal: could not read Username for 'https://localhost:45223': terminal prompts disabled"
       }
     }
   ]

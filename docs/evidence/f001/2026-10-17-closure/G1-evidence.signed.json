@@ -3,38 +3,38 @@
   "evidence": {
     "schema_version": "mnde.git-push-execution-evidence.v1",
     "action": "git.push",
-    "execution_id": "exec-661aecf9-120f-40b4-9bf8-aad1f27f3d3f",
-    "grant_id": "grant-2fd4a537-a514-43b8-92c9-3bee1b5f9f3e",
-    "authorization_receipt_hash": "d8e79c968ed8cf4c4383dcc46cd08c7a4deb7168fc24956872f548c5df233901",
-    "authority_digest": "e6eb2f91777f9794c5af7502285abb8c0af463e45d62f881db382d540400f5f1",
+    "execution_id": "exec-73112997-3f12-4a22-9570-4338a8290871",
+    "grant_id": "grant-05cc35ae-f49e-4849-870f-d6e30d94d29e",
+    "authorization_receipt_hash": "7fd5290e172e7a80566eb112c95b981d0a47deb224769864318ee9be3dc4083e",
+    "authority_digest": "8f08a4e48a39fbdcb9055853d8ee471129d68bfff39ae5665458c3afde57b9e5",
     "executor_id": "mnde:test:prod:executor:gitpush:01",
     "environment_id": "prod",
-    "key_id": "mnde-exk:b9df55f66e5524a8c1f6ba4a8b4cf910",
-    "credential_id": "mnde-cred:3dc38557a227127578337e10d059b0ee",
-    "authority_bundle_fingerprint": "ec178dee8e2530f9b5dc01b6ef0f7a00f530e6a3e36d4e2c494ddd034cac0d3e",
+    "key_id": "mnde-exk:20febd678a859b848bb818ec4ee0fa54",
+    "credential_id": "mnde-cred:219f9ee17ea3892664679de385134775",
+    "authority_bundle_fingerprint": "2e978e61c85208c11929f44a9928643c2a8f5429872e62bf5d3360696a1169e4",
     "repository": "https:localhost/acme/widgets",
     "remote": "origin",
-    "remote_url": "https://localhost:33463/acme/widgets.git",
+    "remote_url": "https://localhost:45223/acme/widgets.git",
     "target_ref": "refs/heads/main",
-    "expected_old_sha": "7e2c17810458130442689c4b3f245a8d78fe80d9",
-    "approved_new_sha": "6e540f87e5f6d7cff782ece6c70471995418c5cd",
-    "observed_before_sha": "7e2c17810458130442689c4b3f245a8d78fe80d9",
-    "observed_after_sha": "6e540f87e5f6d7cff782ece6c70471995418c5cd",
+    "expected_old_sha": "9795812c35079e8971715b0abbe3ec4b035be384",
+    "approved_new_sha": "d157490a8b732267bb0e84c39cac7d540636f76d",
+    "observed_before_sha": "9795812c35079e8971715b0abbe3ec4b035be384",
+    "observed_after_sha": "d157490a8b732267bb0e84c39cac7d540636f76d",
     "claim": {
       "decision": "CLAIMED",
       "namespace": "f001-closure-ns",
-      "record_digest": "65b190d92ae5da12f49dc5dbe5b0513a187ad393651eb4ad5e08ab21555d3df8"
+      "record_digest": "31ab16115548c68a28487418b6bd495ee99f447248ba0900b096884f1e8a593c"
     },
     "effect_attempted": true,
     "outcome": "EXECUTED",
     "reason_code": null,
-    "recorded_at": "2026-10-17T01:05:14.994Z"
+    "recorded_at": "2026-10-17T01:27:41.046Z"
   },
   "credential": {
     "schema_version": "mnde.executor.credential.v1",
     "executor_id": "mnde:test:prod:executor:gitpush:01",
-    "key_id": "mnde-exk:b9df55f66e5524a8c1f6ba4a8b4cf910",
-    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAKZ+QA2V7Iso5UhQUut+/kf/Hvi9ANVK/tzp1Xsf26ck=\n-----END PUBLIC KEY-----\n",
+    "key_id": "mnde-exk:20febd678a859b848bb818ec4ee0fa54",
+    "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAwnMohfRamrKkzRDRz2LQ86mvxJCwlrsEJ1Qbnn7C2nk=\n-----END PUBLIC KEY-----\n",
     "issuer_id": "mnde-git-push-test",
     "issuer_key_id": "git-push-test-root",
     "environment_id": "prod",
@@ -46,12 +46,12 @@
     ],
     "trust_epoch": "executor-identity-v1",
     "signature_algorithm": "ED25519",
-    "credential_id": "mnde-cred:3dc38557a227127578337e10d059b0ee",
-    "issuer_signature": "e9fa261f50d02b9060cb3a7761b6586671e0113d1ccdac6001740d0ed7f7aa3b5ba7d4da1a3a66afd0a95670481d68e015396260536845e7aa9064373b6fc40a"
+    "credential_id": "mnde-cred:219f9ee17ea3892664679de385134775",
+    "issuer_signature": "8bf7d5a32405f0cb46f996d32416052cc78c2967e0e952ace3a79a37d159d93dce4d5cd0bc9155f9069c80b620d9ebdc207fa50e41138e133878007e2648d706"
   },
   "signature": {
     "algorithm": "ED25519",
-    "key_id": "mnde-exk:b9df55f66e5524a8c1f6ba4a8b4cf910",
-    "value": "4f02be7d9d93e5b8a13b3b85df9547fb4c43b053f18ecadf0cdde28b07a4703e010558808ce94f339a4bf6e9894df322cf97393b246aa591f93b08515413a30b"
+    "key_id": "mnde-exk:20febd678a859b848bb818ec4ee0fa54",
+    "value": "6f3b344d51f03135cca0858a90bebb74dae200c98d67abe9fde71e258d9246f80c4c4fd6c1f3cff6175be10df80d981ec13db54a8b6c1dbf0607f5992246bc05"
   }
 }

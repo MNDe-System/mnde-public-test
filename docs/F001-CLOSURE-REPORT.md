@@ -2,6 +2,22 @@
 
 **Verdict: BLOCKED.**
 
+> **Update 2026-10-17 (re-run on the updated code).** The evidence in sections 1 and 5 was first
+> produced at `75f7575`. After the CI-driven fixes (`4447c72`: Windows directory fsync, crypto
+> provider import, SBOM; `8d504c6`: one CLI test expectation) the checks below were repeated:
+>
+> | Check | Commit | Result |
+> | --- | --- | --- |
+> | Full `npm test` (112 suites), Node 24.22.0 | `36c151c` | 111/112; the one failure (`test:git-push-cli` case B) was a test expectation invalidated by the new, earlier refusal, fixed in `8d504c6` (35/35 locally). The earlier `typescript`-related failure of case N no longer occurs. |
+> | Closure harness, all 30 scenarios, real PostgreSQL 16.15 | started at `8d504c6`, recorded `tree_head` `76e158e`, `tree_dirty_paths: []` | **30/30 PASS**. `src/`, `package.json` and `tests/f001-closure/` are byte-identical across `36c151c`..`76e158e` (`git diff --stat` empty); the commits in between changed one test file and docs only. |
+> | PR #60 CI on `76e158e` | `76e158e` | Release contract: success. Guardrails (Windows): see PR; **not counted as passing until it completes on this exact head.** Earlier green/red results on `4447c72`/`f7d95ad` are not validation of later heads. |
+>
+> Evidence files are regenerated at that run: `docs/evidence/f001/2026-10-17-closure/results.json`
+> (field `tree_head`), `T01-evidence.signed.json`, `G1-evidence.signed.json`. The control runs
+> (`results-control-preremediation-*.json`) are against `3f0e3a5` and were not repeated.
+> Live-test preparation: [F001-LIVE-TEST-READINESS.md](F001-LIVE-TEST-READINESS.md). Witness
+> design (not implemented): [F001-EXTERNAL-WITNESS-PROPOSAL.md](F001-EXTERNAL-WITNESS-PROPOSAL.md).
+
 The software defects found were fixed and the tests that can run here pass. F-001 cannot be
 declared closed because mandatory evidence cannot be produced from this environment (section 4).
 Nothing below is simulated and then called proven; emulated or simulated items are labelled.
@@ -11,7 +27,7 @@ Nothing below is simulated and then called proven; emulated or simulated items a
 | Item | Value |
 | --- | --- |
 | Pre-remediation commit (control) | `3f0e3a599ee73d39ba22bb9596a2e8d39caf6328` |
-| Remediation commit (all evidence below) | `75f7575e34d34d8e42f9a9b396ffb930f05bf165` (+ test-hook fix and docs in the commit that adds this report) |
+| Remediation commit (first evidence run) | `75f7575e34d34d8e42f9a9b396ffb930f05bf165`; re-run on the updated code per the update box above (`src/` unchanged since `4447c72`) |
 | Runtime | Node v24.22.0 (the repo requires >=24; the sandbox default is 22.22 and fails 5 suites for that reason) |
 | Database | PostgreSQL 16.15, disposable, TLS (`verify-full`), `fsync=on`, `synchronous_commit=on`, data checksums, restricted `NOINHERIT` executor login bound to one namespace |
 | Remote | local bare git repository over `file://`; GitHub-App cases use a **local emulator** (`tests/f001-closure/ghemu.mjs`), not GitHub |
