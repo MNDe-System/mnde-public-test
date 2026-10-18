@@ -19,11 +19,12 @@
 // reads the remote back rather than trusting the returned reason code.
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  classifyGitPushExecution,
   createGitPushExecutor,
   decidePushOutcome,
   ERR_AUTHORITY_ALREADY_SPENT,
@@ -208,6 +209,50 @@ async function main() {
     assert.equal(second.reason_code, ERR_AUTHORITY_ALREADY_SPENT, `expected the claim to refuse, got ${second.reason_code}`);
     assert.equal(second.outcome, OUTCOME.REFUSED);
     assert.equal(repos.remoteSha(), repos.commits[0], "the replay moved the remote; the authority was reused");
+  });
+
+
+  await test("a signed URL with a malformed percent escape is a recorded refusal, not an exception", async () => {
+    const { repos, executor, caseDir } = fixture();
+    const parameters = { ...pushParameters(repos, { from: repos.commits[0], to: repos.commits[1] }), remote_url: "file:///nowhere/repo%zz.git" };
+    const authorization = await gitPushAuthorization(trust, parameters);
+    const result = await withProfile("production", () => executor.executeGitPush(requestFor(parameters, authorization)));
+    assert.equal(result.outcome, OUTCOME.REFUSED);
+    assert.equal(result.reason_code, "ERR_GIT_PUSH_REMOTE_URL_FORMAT");
+    assert.equal(result.evidence.effect_attempted, false);
+    assert.equal(repos.remoteSha(), repos.commits[0], "a refused push moved the remote");
+    assert.equal(readdirSync(join(caseDir, "evidence")).some((name) => name.endsWith(".started.json")), false, "a push was started");
+  });
+
+  await test("a refusal recorded in the same millisecond cannot overwrite the outcome record", async () => {
+    const { repos, executor, caseDir } = fixture();
+    const parameters = pushParameters(repos, { from: repos.commits[0], to: repos.commits[1] });
+    const authorization = await gitPushAuthorization(trust, parameters);
+    const first = await withProfile("production", () => executor.executeGitPush(requestFor(parameters, authorization)));
+    assert.equal(first.outcome, OUTCOME.EXECUTED);
+
+    // Present the spent authority again with the clock held at the first
+    // record's timestamp, so both records would have had the same file name.
+    repos.setRemoteTo(repos.commits[0]);
+    const stamp = first.evidence.recorded_at;
+    const RealDate = Date;
+    globalThis.Date = class extends RealDate {
+      constructor(...args) { super(...(args.length === 0 ? [stamp] : args)); }
+      toISOString() { return stamp; }
+    };
+    let second;
+    try {
+      second = await withProfile("production", () => executor.executeGitPush(requestFor(parameters, authorization)));
+    } finally {
+      globalThis.Date = RealDate;
+    }
+    assert.equal(second.reason_code, ERR_AUTHORITY_ALREADY_SPENT);
+    assert.equal(second.evidence.recorded_at, stamp, "the clock was not held; this case proves nothing");
+    assert.notEqual(second.evidencePath, first.evidencePath, "two records share one path");
+
+    const evidenceDir = join(caseDir, "evidence");
+    const condition = classifyGitPushExecution({ evidenceDir, executionId: first.evidence.execution_id });
+    assert.equal(condition.condition, OUTCOME.EXECUTED, `the outcome record was lost: ${JSON.stringify(condition)}`);
   });
 
   console.log("\n── 3-7. the request must be exactly what was authorized ──");
@@ -542,6 +587,8 @@ async function main() {
       ["a command-executing transport", { remote_url: "ext::sh -c touch%20/tmp/pwned", repository: "x" }, "ERR_GIT_PUSH_REMOTE_URL_FORMAT"],
       ["credentials in the URL", { remote_url: "https://user:token@example.invalid/owner/repo.git" }, "ERR_GIT_PUSH_REMOTE_URL_CREDENTIALS"],
       ["a newline in the URL", { remote_url: "https://example.invalid/owner/repo.git\nfoo" }, "ERR_GIT_PUSH_REMOTE_URL_FORMAT"],
+      ["a malformed percent escape in the URL", { remote_url: "https://example.invalid/owner/repo%zz.git" }, "ERR_GIT_PUSH_REMOTE_URL_FORMAT"],
+      ["a truncated multi-byte escape in the URL", { remote_url: "https://example.invalid/owner/%E0%A4%A" }, "ERR_GIT_PUSH_REMOTE_URL_FORMAT"],
       ["a repository that disagrees with the URL", { repository: "https:example.invalid/someone/else" }, "ERR_GIT_PUSH_REPOSITORY_MISMATCH"],
       ["a push with nothing to do", { source_commit: "a".repeat(40) }, "ERR_GIT_PUSH_NO_OP"]
     ];
