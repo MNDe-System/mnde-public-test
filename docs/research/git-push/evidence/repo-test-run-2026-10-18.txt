@@ -1,0 +1,85 @@
+# Repository suites re-run 2026-10-18 (tail -8 of each)
+# Node v22.22.0 (repo requires >=24), git 2.43.0, no `npm ci` performed.
+# test:git-push-cli case N failed with: Cannot find package typescript (dev dependency not installed).
+# Raw capture follows, unedited.
+
+=== test:git-push-effect
+  [PASS] the argv is the fixed shape and carries none of the forbidden flags
+  [PASS] the transport environment is built from empty and refuses anything unlisted
+
+── the bound fields are validated before anything is built ──
+  [PASS] abbreviated, option-like, malformed and credential-bearing fields all refuse
+  [PASS] a request carrying an extra field is refused
+
+PASS git.push typed effect (27/27)
+exit=0
+=== test:git-push-isolation
+
+── 2. the claim -> outcome window is classifiable ──
+  [PASS] a completed push leaves a durable start record and classifies as EXECUTED
+  [PASS] if the start cannot be recorded, nothing is sent
+  [PASS] process dies right after the claim -> NOT_STARTED, remote untouched (real child process)
+  [PASS] process killed while the push is in flight -> INDETERMINATE, review required (real child process)
+
+PASS git.push isolation (9/9)
+exit=0
+=== test:git-push-single-route
+  [PASS] claim recorded but acknowledgement lost: the lookup finds it SPENT and nothing is sent
+  [PASS] claim and lookup both partitioned: UNKNOWN, nothing sent, no retry
+  [PASS] a store that says CLAIMED for a different record is not believed
+
+── 5. the real adapter, with no test double loaded ──
+  [PASS] real adapter, no MNDE_CLAIM_CONFIG: the executor sends nothing, and a stub mints no ticket
+
+PASS git.push single route (16/16)
+exit=0
+=== test:git-push-reachability
+  [PASS] 5: no shipped file imports tests/ or experiments/
+  [PASS] 6a: the generic run() executor never invokes a caller-supplied callback
+  [PASS] 6b: the effect module exports no generic runner, and performPush refuses any untyped argv
+  [PASS] 7a: only the typed executor imports the push credential provider
+  [PASS] 7b: only the executor's startup path names MNDE_GIT_CREDENTIAL_CONFIG
+  [PASS] 7c: the credential provider starts no process and carries no git mutation literal
+
+PASS git.push reachability (14/14)
+exit=0
+=== test:git-push-execution-evidence
+
+── 8. the executor refuses to run without a way to sign ──
+  [PASS] constructing the executor without a signer throws
+  [PASS] a signing identity that is not this executor is refused at startup
+  [PASS] signing refuses when the body names a different executor than the signer
+  [PASS] a signer that throws produces no envelope and no false success
+
+PASS git.push execution evidence (49/49)
+exit=0
+=== test:git-push-cli
+    at execFileSync (node:child_process:952:15)
+    at file:///home/user/mnde-public-test/tests/test_git_push_cli.mjs:779:5
+    at test (file:///home/user/mnde-public-test/tests/test_git_push_cli.mjs:56:15)
+    at main (file:///home/user/mnde-public-test/tests/test_git_push_cli.mjs:778:9)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async file:///home/user/mnde-public-test/tests/test_git_push_cli.mjs:820:1
+
+FAIL git.push production CLI (34/35)
+exit=0
+=== test:hub
+PASS failed durable lock write latches refusal even if old unlocked bytes remain
+{"type":"hub.started","at":"2026-10-18T18:08:28.920Z"}
+{"type":"hub.started","at":"2026-10-18T18:08:29.101Z"}
+{"type":"hub.started","at":"2026-10-18T18:08:29.280Z"}
+{"type":"hub.started","at":"2026-10-18T18:08:29.468Z"}
+PASS unusable approval anchors never unlock the Hub or reach the executor (UC-002)
+PASS normal logs contain no API credential or private key
+Hub tests: 18 passed, 0 failed. PostgreSQL replaced by test adapter; Git and cryptography real.
+exit=0
+=== test:issuance-guard
+  [PASS] audit: both pre-guard fixtures are flagged as ALLOWED_WITHOUT_ENFORCED_APPROVAL
+  [PASS] audit: an approval-enforced receipt, a plain-policy receipt, and non-receipts are not flagged
+  [PASS] audit: a gate-off receipt whose decision was a REFUSE is reported as GATE_NOT_ENFORCED, not as an unauthorized ALLOW
+  [PASS] audit: the CLI scans a directory, JSONL logs and custody envelopes; exits 1 on findings, 0 on none
+  [PASS] UC-005 (known limit): an approval scoped to a tool name is reusable across requests and parameters until it expires
+  [PASS] UC-005 (known limit): a request_id-bound approval still does not bind the parameters, and '*' is an accepted tool scope
+
+PASS issuance-guard tests (53/53)
+exit=0
