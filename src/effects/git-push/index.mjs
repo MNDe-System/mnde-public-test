@@ -367,8 +367,12 @@ export function createGitPushExecutor(startup = {}) {
     const body = JSON.stringify(evidence, null, 2);
     try {
       ensureEvidenceDirectory();
-      const path = join(evidenceDir, `git-push-${evidence.execution_id ?? "unidentified"}-${evidence.recorded_at.replace(/[:.]/g, "-")}.json`);
-      writeFileSync(path, `${body}\n`, "utf8");
+      // Unique and exclusive, like the signed record. classifyGitPushExecution
+      // reads these files, and a name built from the execution id and a
+      // millisecond timestamp alone lets a refusal recorded in the same
+      // millisecond (a replay of a spent authority) overwrite the outcome record.
+      const path = join(evidenceDir, `git-push-${evidence.execution_id ?? "unidentified"}-${evidence.recorded_at.replace(/[:.]/g, "-")}-${randomBytes(8).toString("hex")}.json`);
+      writeFileSync(path, `${body}\n`, { encoding: "utf8", flag: "wx" });
       return path;
     } catch {
       // Evidence that cannot be written must not silently turn into evidence

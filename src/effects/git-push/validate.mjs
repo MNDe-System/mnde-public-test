@@ -82,9 +82,13 @@ export function canonicalRepositoryIdentity(remoteUrl) {
   let url;
   try { url = new URL(remoteUrl); } catch { return null; }
   const scheme = url.protocol.replace(/:$/, "").toLowerCase();
-  if (scheme === "file") return `file:${stripGitSuffix(decodeURIComponent(url.pathname))}`;
+  // `new URL` accepts a stray '%', but decodeURIComponent throws on it. A signed
+  // URL like that has no canonical identity, so it is a refusal, not an exception.
+  let pathname;
+  try { pathname = decodeURIComponent(url.pathname); } catch { return null; }
+  if (scheme === "file") return `file:${stripGitSuffix(pathname)}`;
   if (!url.hostname) return null;
-  return `${scheme}:${url.hostname.toLowerCase()}/${stripGitSuffix(decodeURIComponent(url.pathname)).replace(/^\/+/, "")}`;
+  return `${scheme}:${url.hostname.toLowerCase()}/${stripGitSuffix(pathname).replace(/^\/+/, "")}`;
 }
 
 function stripGitSuffix(path) {
