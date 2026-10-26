@@ -109,5 +109,6 @@
   "test:trust-anchor",
   "test:trust-root",
   "test:verifier-policy",
+  "test:windows-launcher",
   "test:witnessed-authority"
 ]
