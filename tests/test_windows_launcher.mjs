@@ -90,7 +90,10 @@ try { process.kill(id2.process_id); } catch { /* gone */ }
 // 5. A foreign listener on the port fails cleanly (non-zero, no hang).
 await new Promise((r) => setTimeout(r, 800));
 const port3 = await freePort();
-const blocker = createServer((s) => s.end("HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nno"));
+const blocker = createServer((s) => {
+  s.on("error", () => {}); // the launcher probe may reset the connection
+  s.end("HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nno");
+});
 await new Promise((r) => blocker.listen(port3, "127.0.0.1", r));
 const blocked = await run({ MNDE_BIND_PORT: String(port3), MNDE_LAUNCH_TIMEOUT_MS: "5000" });
 blocker.close();
